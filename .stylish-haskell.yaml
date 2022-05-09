@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+#
+# SPDX-License-Identifier: Unlicense
+
+steps:
+  - simple_align:
+      cases: false
+      top_level_patterns: false
+      records: false
+      multi_way_if: false
+  - imports:
+      align: none
+      list_align: after_alias
+      pad_module_names: false
+      long_list_align: new_line
+      empty_list_align: inherit
+      list_padding: 2
+      separate_lists: false
+      space_surround: false
+      post_qualify: true
+  - trailing_whitespace: {}
+columns: 100
+newline: native
+language_extensions:
+  - AllowAmbiguousTypes
+  - ApplicativeDo
+  - BangPatterns
+  - BlockArguments
+  - ConstraintKinds
+  - DataKinds
+  - DefaultSignatures
+  - DeriveAnyClass
+  - DeriveDataTypeable
+  - DeriveFoldable
+  - DeriveFunctor
+  - DeriveGeneric
+  - DeriveTraversable
+  - DerivingStrategies
+  - DerivingVia
+  - EmptyCase
+  - FlexibleContexts
+  - FlexibleInstances
+  - FunctionalDependencies
+  - GADTs
+  - GeneralizedNewtypeDeriving
+  - ImportQualifiedPost
+  - LambdaCase
+  - MultiParamTypeClasses
+  - MultiWayIf
+  - NamedFieldPuns
+  - NegativeLiterals
+  - NumDecimals
+  - NumericUnderscores
+  - OverloadedLabels
+  - OverloadedStrings
+  - PatternSynonyms
+  - PolyKinds
+  - QuantifiedConstraints
+  - QuasiQuotes
+  - RankNTypes
+  - RecordWildCards
+  - RecursiveDo
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - StrictData
+  - TemplateHaskell
+  - TupleSections
+  - TypeApplications
+  - TypeFamilies
+  - TypeOperators
+  - UndecidableInstances
+  - UndecidableSuperClasses
+  - ViewPatterns
