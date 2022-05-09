@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds       #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators   #-}
 module Lib
     ( startApp
     , app
@@ -16,7 +13,7 @@ data User = User
   { userId        :: Int
   , userFirstName :: String
   , userLastName  :: String
-  } deriving (Eq, Show)
+  } deriving stock (Eq, Show)
 
 $(deriveJSON defaultOptions ''User)
 
