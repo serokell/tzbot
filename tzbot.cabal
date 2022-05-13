@@ -25,6 +25,7 @@ source-repository head
 library
   exposed-modules:
       Lib
+      TzBot.Slack.WebAPI.API
   other-modules:
       Paths_tzbot
   hs-source-dirs:
@@ -83,7 +84,13 @@ library
   build-depends:
       aeson
     , base >=4.7 && <5
+    , servant-auth
+    , servant-auth-client
+    , servant-client
     , servant-server
+    , text
+    , uri-bytestring
+    , uri-bytestring-aeson
     , wai
     , warp
   default-language: Haskell2010

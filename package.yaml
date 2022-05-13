@@ -23,7 +23,13 @@ library:
   dependencies:
   - aeson
   - base >= 4.7 && < 5
+  - servant-auth
+  - servant-auth-client
+  - servant-client
   - servant-server
+  - text
+  - uri-bytestring
+  - uri-bytestring-aeson
   - wai
   - warp
 
