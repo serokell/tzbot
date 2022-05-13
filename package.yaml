@@ -22,8 +22,13 @@ library:
   source-dirs: src
   dependencies:
   - aeson
+  - aeson-pretty
   - base >= 4.7 && < 5
+  - http-client
+  - http-client-tls
+  - lens
   - mtl
+  - network
   - nyan-interpolation
   - safe-exceptions
   - servant-auth
@@ -35,6 +40,8 @@ library:
   - uri-bytestring-aeson
   - wai
   - warp
+  - websockets
+  - wuss
 
 executables:
   tzbot-exe:
@@ -46,6 +53,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - base >= 4.7 && < 5
+    - text
     - tzbot
 
 tests:

@@ -25,6 +25,7 @@ source-repository head
 library
   exposed-modules:
       Lib
+      TzBot.Slack.SocketMode.Client
       TzBot.Slack.WebAPI.API
       TzBot.Slack.WebAPI.Class
       TzBot.Slack.WebAPI.Impl
@@ -85,8 +86,13 @@ library
   ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations
   build-depends:
       aeson
+    , aeson-pretty
     , base >=4.7 && <5
+    , http-client
+    , http-client-tls
+    , lens
     , mtl
+    , network
     , nyan-interpolation
     , safe-exceptions
     , servant-auth
@@ -98,6 +104,8 @@ library
     , uri-bytestring-aeson
     , wai
     , warp
+    , websockets
+    , wuss
   default-language: Haskell2010
 
 executable tzbot-exe
@@ -159,6 +167,7 @@ executable tzbot-exe
   ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , text
     , tzbot
   default-language: Haskell2010
 
