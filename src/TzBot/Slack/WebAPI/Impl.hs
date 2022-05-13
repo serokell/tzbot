@@ -3,6 +3,7 @@ module TzBot.Slack.WebAPI.Impl
   , runWebAPIM
   , runOrThrowWebAPIM
   , AppLevelToken(..)
+  , BotToken(..)
   , WebAPIConfig(..)
   , WebAPIException(..)
   ) where
@@ -21,9 +22,11 @@ import TzBot.Slack.WebAPI.API qualified as API
 import TzBot.Slack.WebAPI.Class (WebAPI(..))
 
 newtype AppLevelToken = AppLevelToken { unAppLevelToken :: Text }
+newtype BotToken = BotToken { unBotToken :: Text }
 
 data WebAPIConfig = WebAPIConfig
   { wacAppLevelToken :: AppLevelToken
+  , wacBotToken :: BotToken
   }
 
 -- | An implementation of `WebApi`.
