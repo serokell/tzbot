@@ -26,6 +26,8 @@ library
   exposed-modules:
       Lib
       TzBot.Slack.WebAPI.API
+      TzBot.Slack.WebAPI.Class
+      TzBot.Slack.WebAPI.Impl
   other-modules:
       Paths_tzbot
   hs-source-dirs:
@@ -84,6 +86,9 @@ library
   build-depends:
       aeson
     , base >=4.7 && <5
+    , mtl
+    , nyan-interpolation
+    , safe-exceptions
     , servant-auth
     , servant-auth-client
     , servant-client

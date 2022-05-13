@@ -5,3 +5,8 @@ packages:
 
 extra-deps:
 - hspec-wai-json-0.11.0@sha256:a992e6587468119a8092edc7a8af9153c718418c5d945ff3bf7a07916e4dd4a0
+- git: https://github.com/bitmappergit/nyan-interpolation.git
+  commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+  subdirs:
+   - full
+   - core

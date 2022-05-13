@@ -11,6 +11,32 @@ packages:
       sha256: b494c2cab92667d33155794b752a84c62737548cf6232a6e7156e5cd7962aa1d
   original:
     hackage: hspec-wai-json-0.11.0@sha256:a992e6587468119a8092edc7a8af9153c718418c5d945ff3bf7a07916e4dd4a0
+- completed:
+    subdir: full
+    name: nyan-interpolation
+    version: '0.9'
+    git: https://github.com/bitmappergit/nyan-interpolation.git
+    pantry-tree:
+      size: 714
+      sha256: bba420e826f49ea14b64f3d969f32c72bd8f14840b3884dfa11df134a5671a14
+    commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+  original:
+    subdir: full
+    git: https://github.com/bitmappergit/nyan-interpolation.git
+    commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+- completed:
+    subdir: core
+    name: nyan-interpolation-core
+    version: '0.9'
+    git: https://github.com/bitmappergit/nyan-interpolation.git
+    pantry-tree:
+      size: 1516
+      sha256: 59d1c732629b06d0035229dccce484d6b4c3078d6bb3e493317afddc9be233df
+    commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+  original:
+    subdir: core
+    git: https://github.com/bitmappergit/nyan-interpolation.git
+    commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
 snapshots:
 - completed:
     size: 618876
