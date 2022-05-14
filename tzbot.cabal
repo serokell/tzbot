@@ -24,10 +24,12 @@ source-repository head
 
 library
   exposed-modules:
+      TzBot.Parser
       TzBot.Slack.SocketMode.Client
       TzBot.Slack.WebAPI.API
       TzBot.Slack.WebAPI.Class
       TzBot.Slack.WebAPI.Impl
+      TzBot.TimeReference
   other-modules:
       Paths_tzbot
   hs-source-dirs:
@@ -99,6 +101,9 @@ library
     , servant-client
     , servant-server
     , text
+    , time
+    , time-compat
+    , tz
     , uri-bytestring
     , uri-bytestring-aeson
     , websockets

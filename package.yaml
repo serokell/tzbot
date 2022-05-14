@@ -36,6 +36,9 @@ library:
   - servant-client
   - servant-server
   - text
+  - time
+  - time-compat
+  - tz
   - uri-bytestring
   - uri-bytestring-aeson
   - websockets
