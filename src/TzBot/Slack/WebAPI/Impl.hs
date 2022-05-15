@@ -9,6 +9,7 @@ module TzBot.Slack.WebAPI.Impl
   ) where
 
 import Control.Exception.Safe (Exception(..), throwM)
+import Control.Monad (void)
 import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
 import Control.Monad.Reader (MonadReader, MonadTrans(lift), ReaderT, asks, runReaderT)
 import Data.Function ((&))
@@ -56,9 +57,28 @@ runOrThrowWebAPIM config env webApiM =
 
 instance WebAPI WebAPIM where
   genWebSocketsURI = WebAPIM do
-    AppLevelToken alt <- asks wacAppLevelToken
-    let authToken = Auth.Token $ T.encodeUtf8 alt
-    lift $ lift (API.openConnection authToken) >>= endpointFailed "apps.connections.open"
+    token <- getAppLevelToken
+    lift $ lift (API.openConnection token) >>= endpointFailed "apps.connections.open"
+  getUser userId = WebAPIM do
+    token <- getBotToken
+    lift $ lift (API.usersInfo token userId) >>= endpointFailed "users.info"
+  getChannelMembers channelId = WebAPIM do
+    token <- getBotToken
+    lift $ lift (API.conversationMembers token channelId) >>= endpointFailed "conversations.members"
+  postEphemeral userId channelId text = WebAPIM do
+    token <- getBotToken
+    void $ lift $ lift (API.postEphemeral token userId channelId text)
+      >>= endpointFailed "chat.postEphemeral"
+
+getAppLevelToken :: MonadReader WebAPIConfig m => m Auth.Token
+getAppLevelToken = do
+  AppLevelToken alt <- asks wacAppLevelToken
+  pure $ Auth.Token $ T.encodeUtf8 alt
+
+getBotToken :: MonadReader WebAPIConfig m => m Auth.Token
+getBotToken = do
+  BotToken bt <- asks wacBotToken
+  pure $ Auth.Token $ T.encodeUtf8 bt
 
 endpointFailed :: MonadError WebAPIException m => Text -> SlackResponse key a -> m a
 endpointFailed endpoint = \case

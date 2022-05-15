@@ -24,7 +24,9 @@ source-repository head
 
 library
   exposed-modules:
+      TzBot.Instances
       TzBot.Parser
+      TzBot.Slack.Core.Types
       TzBot.Slack.SocketMode.Client
       TzBot.Slack.WebAPI.API
       TzBot.Slack.WebAPI.Class
@@ -87,6 +89,7 @@ library
   ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations
   build-depends:
       aeson
+    , aeson-casing
     , aeson-pretty
     , base >=4.7 && <5
     , http-client
