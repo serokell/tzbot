@@ -1,9 +1,6 @@
 module TzBot.Slack.WebAPI.API
   ( API
-  , openConnection
-  , usersInfo
-  , postEphemeral
-  , conversationMembers
+  , api
   , SlackResponse(..)
   , User(..)
 
@@ -16,11 +13,8 @@ import Data.Aeson.TH
 import Data.Text (Text)
 import Data.Time.Zones.All (TZLabel)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
-import Servant
-  (Get, JSON, Post, Proxy(..), QueryParam', Required, Strict, type (:<|>)((:<|>)), type (:>))
+import Servant (Get, JSON, Post, Proxy(..), QueryParam', Required, Strict, type (:<|>), type (:>))
 import Servant.Auth (Auth, JWT)
-import Servant.Auth.Client qualified as Auth
-import Servant.Client (ClientM, client)
 import TzBot.Instances ()
 import TzBot.Slack.Core.Types (ChannelId, UserId)
 import URI.ByteString (URI)
@@ -54,6 +48,9 @@ type API =
     :> RequiredParam "channel" ChannelId
     :> RequiredParam "text" Text
     :> Post '[JSON] (SlackResponse "message_ts" Value)
+
+api :: Proxy API
+api = Proxy
 
 {- | Slack's responses are always wrapped in a json object with one of these two formats:
 
@@ -90,25 +87,3 @@ data User = User
   }
   deriving stock (Eq, Show)
 deriveFromJSON (aesonPrefix snakeCase) ''User
-
-----------------------------------------------------------------------------
--- Client
-----------------------------------------------------------------------------
-
-api :: Proxy API
-api = Proxy
-
-openConnection :: Auth.Token -> ClientM (SlackResponse "url" URI)
-usersInfo :: Auth.Token -> UserId -> ClientM (SlackResponse "user" User)
-conversationMembers
-  :: Auth.Token -> ChannelId
-  -> ClientM (SlackResponse "members" [UserId])
-postEphemeral
-  :: Auth.Token -> UserId -> ChannelId -> Text
-  -> ClientM (SlackResponse "message_ts" Value)
-
-openConnection
-  :<|> usersInfo
-  :<|> conversationMembers
-  :<|> postEphemeral
-   = client api

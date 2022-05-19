@@ -13,10 +13,9 @@ import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.Socket (HostName, PortNumber)
 import Network.WebSockets (ClientApp, receiveData)
-import Servant.Client (BaseUrl(..), Scheme(..), mkClientEnv)
 import Text.Interpolation.Nyan
 import TzBot.Slack.WebAPI.Class qualified as Slack
-import TzBot.Slack.WebAPI.Impl (WebAPIConfig)
+import TzBot.Slack.WebAPI.Impl (WebAPIConfig, WebAPIState(..))
 import TzBot.Slack.WebAPI.Impl qualified as Slack
 import URI.ByteString
 import Wuss (runSecureClient)
@@ -34,10 +33,10 @@ wsApp conn = do
 wsMain :: WebAPIConfig -> IO ()
 wsMain webApiConfig = do
   manager <- newManager tlsManagerSettings
-  let slackClientEnv = mkClientEnv manager (BaseUrl Https "slack.com" 443 "api")
+  let webApiState = WebAPIState webApiConfig manager
 
   -- Ask Slack to generate a wss URL for us to connect to.
-  wsURI <- Slack.runOrThrowWebAPIM webApiConfig slackClientEnv do
+  wsURI <- Slack.runOrThrowWebAPIM webApiState do
     Slack.genWebSocketsURI
 
   (host, port, pathAndQuery) <- splitURI wsURI

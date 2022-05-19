@@ -17,4 +17,4 @@ class Monad m => WebAPI m where
   getChannelMembers :: ChannelId -> m [UserId]
 
   -- | Post an "ephemeral message", a message only visible to the given user.
-  postEphemeral :: UserId -> ChannelId -> Text -> m ()
+  sendEphemeralMessage :: UserId -> ChannelId -> Text -> m ()
