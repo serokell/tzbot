@@ -26,6 +26,7 @@ library
   exposed-modules:
       TzBot.Instances
       TzBot.Parser
+      TzBot.ProcessEvent
       TzBot.Slack.Core.Types
       TzBot.Slack.SocketMode.Client
       TzBot.Slack.WebAPI.API
