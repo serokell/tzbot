@@ -11,7 +11,7 @@
 
 ## `time` library
 
-`TimeZone` from the `time` library is a misnomer.
+`TimeZone` from the `time` library is a [misnomer](https://mail.haskell.org/pipermail/haskell-cafe/2014-March/113364.html).
 It does NOT represent a timezone, which can observe different offsets at different times, like `Europe/London`.
 It represents a static "offset" with an optional name, like `UTC+01:00 (BST)`.
 

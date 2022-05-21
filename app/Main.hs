@@ -13,12 +13,8 @@ Usage:
 >  export SLACK_TZ_BOT_TOKEN='xoxb-***'
 >  stack run
 
-You can find your app-level token by going to your
-Slack App settings (at @https://api.slack.com/apps/@) and:
-  Basic Information > App-Level Tokens
+To generate app-level / bot tokens, see: <docs/development.md>
 
-You can find your bot token by going to:
-  OAuth & Permissions > OAuth Tokens for Your Workspace
 -}
 main :: IO ()
 main = do

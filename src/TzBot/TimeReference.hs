@@ -106,6 +106,8 @@ data TimeZoneAbbreviationInfo = TimeZoneAbbreviationInfo
 knownTimeZoneAbbreviations :: [TimeZoneAbbreviationInfo]
 knownTimeZoneAbbreviations =
   -- TODO: add more tz abbreviations.
+  --
+  -- NOTE: Remember to update `docs/timezone_abbreviations.md` when making changes to this list.
   [ TimeZoneAbbreviationInfo "UTC" 0 "UTC"
   , TimeZoneAbbreviationInfo "GMT" 0 "GMT"
   , TimeZoneAbbreviationInfo "HST"   (hours -10)       "Hawaii-Aleutian Standard Time"
