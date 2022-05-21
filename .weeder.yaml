@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+# We intentionally ignore some suggestions.
+- message:
+  - name: Redundant build-depends entry
+  - depends: base-noprelude
+
+- package:
+  - name: tzbot
+  - section:
+    - name: test:tzbot-test
+    - message:
+      - name: Weeds exported
+      - module:
+        - name: Tree
+        - identifier:
+          - ingredients
+          - main

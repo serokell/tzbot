@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+steps:
+  - label: check trailing whitespaces
+    command: nix-build ci.nix -A trailing-whitespace-check
+
+  - label: shellcheck
+    command: nix run -f ci.nix pkgs.shellcheck -c find . -name '*.sh' -exec shellcheck {} +
+
+  - label: validate cabal files
+    command: nix run -f ci.nix stack2cabal pkgs.diffutils -c ./scripts/validate-cabal-files.sh
+
+  - label: stylish
+    command: nix run -f ci.nix pkgs.gnumake pkgs-stylish.stylish-haskell -c ./scripts/validate-stylish.sh
+
+  - label: lint
+    command: nix run -f ci.nix pkgs.haskellPackages.hlint -c hlint .
+
+  - label: build
+    key: build
+    command: nix-build ci.nix -A lib -A server
+
+  - label: tests
+    depends_on: build
+    commands:
+      - nix-build ci.nix -A tests
+      - ./result/bin/tzbot-test
+
+  - label: haddock
+    depends_on: build
+    command: nix-build ci.nix -A haddock
+
+  - label: xrefcheck
+    command: nix run -f ci.nix xrefcheck -c xrefcheck --no-progress -m full --ignored dist-newstyle
+
+  - label: REUSE lint
+    command: nix run -f ci.nix pkgs.reuse -c reuse lint
+
+  - label: weeder
+    depends_on: build
+    commands:
+      - nix-build ci.nix -A weeder-script
+      - ./result

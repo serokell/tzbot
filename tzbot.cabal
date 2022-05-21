@@ -6,13 +6,13 @@ cabal-version: 1.12
 
 name:           tzbot
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/tzbot#readme>
-homepage:       https://github.com/githubuser/tzbot#readme
-bug-reports:    https://github.com/githubuser/tzbot/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2022 Author name here
-license:        BSD3
+description:    Please see the README on GitHub at <https://github.com/serokell/tzbot#readme>
+homepage:       https://github.com/serokell/tzbot#readme
+bug-reports:    https://github.com/serokell/tzbot/issues
+author:         Serokell
+maintainer:     Serokell <hi@serokell.io>
+copyright:      2022 Serokell <https://serokell.io>
+license:        MPL-2.0
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
@@ -20,7 +20,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/tzbot
+  location: https://github.com/serokell/tzbot
 
 library
   exposed-modules:
