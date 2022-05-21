@@ -1,3 +1,9 @@
+<!--
+-- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io/>
+--
+-- SPDX-License-Identifier: MPL-2.0
+-->
+
 # tzbot
 
 `tzbot` is a Slack bot that detects messages with references to some point in time,

@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io/>
+--
+-- SPDX-License-Identifier: MPL-2.0
 
 -- | Types shared across multiple Slack APIs (e.g. Web API, Events API, or socket mode).
 module TzBot.Slack.Core.Types where

@@ -1,3 +1,9 @@
+<!--
+-- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io/>
+--
+-- SPDX-License-Identifier: MPL-2.0
+-->
+
 # Timezone Abbreviations
 
 Timezone abbreviations are, in general[^1], not standardized.

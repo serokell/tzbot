@@ -1,3 +1,7 @@
+-- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io/>
+--
+-- SPDX-License-Identifier: MPL-2.0
+
 module TzBot.Slack.SocketMode.Client
   ( wsMain
   ) where
