@@ -8,8 +8,7 @@ import Data.Maybe (fromJust)
 import Data.String (IsString)
 import Data.Text (Text)
 import Data.Time (DayOfWeek, TimeOfDay, TimeZone, UTCTime)
-import Data.Time.Calendar.Compat (DayOfMonth)
-import Data.Time.Calendar.Month.Compat (Month)
+import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Data.Time.Zones.All (TZLabel)
 
@@ -41,7 +40,7 @@ data TimeReference = TimeReference
 data DateReference
   = DaysFromToday Int
   | DayOfWeekRef DayOfWeek
-  | DayOfMonthRef DayOfMonth (Maybe Month)
+  | DayOfMonthRef DayOfMonth (Maybe MonthOfYear)
   deriving stock (Eq, Show)
 
 data LocationReference
