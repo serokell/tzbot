@@ -32,6 +32,9 @@ endef
 dev:
 	stack build $(STACK_DEV_OPTIONS) $(STACK_BUILD_MORE_OPTIONS) $(PACKAGE)
 
+run:
+	stack run $(PACKAGE)
+
 # Run tests in all packages which have them.
 test:
 	$(call call_test,"",$(STACK_DEV_TEST_OPTIONS))

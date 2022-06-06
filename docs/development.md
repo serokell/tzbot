@@ -56,6 +56,11 @@ and query data via the Web API (see the `TzBot.Slack.WebAPI.*` modules).
 Since "apps using Socket Mode are not currently allowed in the public Slack App Directory”,
 we'll also add support for receiving events via the Events API in the future.
 
+## Makefile
+
+We have a [Makefile](/Makefile) which provides shortcuts for the most
+common developers' activities.
+
 ## Setting up a dev environment
 
 **NOTE**: Most [issues](https://github.com/serokell/tzbot/issues) (except #3)
@@ -81,8 +86,7 @@ do not require setting up a Slack workspace. They can be worked on in isolation.
     * Open up the Slack client and log into the workspace you created in step 1.
     * Right click on a channel name and select
       "Open channel details" > "Integrations" > "Add apps" > "tzbot"
-1. Run the bot with `cabal run tzbot-exe` or `stack run`.
-
+1. Run the bot with `make run` (or `cabal run tzbot-exe` / `stack run`).
 
  [time-zones-offsets]: https://spin.atomicobject.com/2016/07/06/time-zones-offsets
  [tzlabel]: https://hackage.haskell.org/package/tz-0.1.3.6/docs/Data-Time-Zones-All.html#t:TZLabel

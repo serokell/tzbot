@@ -23,6 +23,8 @@ haddock-no-deps:
 	$(MAKE_PACKAGE) haddock-no-deps
 clean:
 	$(MAKE_PACKAGE) clean
+run:
+	$(MAKEU) PACKAGE=tzbot-exe run
 
 stylish:
 	find . -name '.stack-work' -prune -o -name '.dist-newstyle' -prune -o -name '*.hs' -exec stylish-haskell -i '{}' \;

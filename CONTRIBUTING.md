@@ -27,12 +27,6 @@ See also:
   * [Development](docs/development.md)
   * [Edge cases & pitfalls](docs/pitfalls.md)
 
-## Makefile
-
-We have a [Makefile](/Makefile) which provides shortcuts for the most
-common developers' activities.
-
-
 ## Legal
 
 We want to make sure that our projects come with correct licensing information
