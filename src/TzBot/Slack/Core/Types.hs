@@ -16,3 +16,7 @@ newtype UserId = UserId { unUserId :: Text }
 newtype ChannelId = ChannelId { unChannelId :: Text }
   deriving stock (Eq, Show)
   deriving newtype (ToHttpApiData)
+
+newtype Limit = Limit { limitQ :: Int}
+  deriving stock (Eq, Show)
+  deriving newtype (FromJSON, ToHttpApiData)

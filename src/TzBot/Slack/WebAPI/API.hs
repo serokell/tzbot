@@ -20,7 +20,7 @@ import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import Servant (Get, JSON, Post, Proxy(..), QueryParam', Required, Strict, type (:<|>), type (:>))
 import Servant.Auth (Auth, JWT)
 import TzBot.Instances ()
-import TzBot.Slack.Core.Types (ChannelId, UserId)
+import TzBot.Slack.Core.Types (ChannelId, Limit, UserId)
 import URI.ByteString (URI)
 import URI.ByteString.Aeson ()
 
@@ -43,6 +43,7 @@ type API =
   Auth '[JWT] Text
     :> "conversations.members"
     :> RequiredParam "channel" ChannelId
+    :> RequiredParam "limit" Limit
     :> Get '[JSON] (SlackResponse "members" [UserId])
   :<|>
   -- See: https://api.slack.com/methods/chat.postEphemeral

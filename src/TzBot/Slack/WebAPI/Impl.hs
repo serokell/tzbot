@@ -29,7 +29,7 @@ import Servant.Client
   (BaseUrl(BaseUrl), ClientError, ClientM, Scheme(Https), client, hoistClient, mkClientEnv,
   runClientM)
 import Text.Interpolation.Nyan
-import TzBot.Slack.Core.Types (ChannelId(..), UserId(..))
+import TzBot.Slack.Core.Types (ChannelId(..), Limit(..), UserId(..))
 import TzBot.Slack.WebAPI.API (SlackResponse(..), User, api)
 import TzBot.Slack.WebAPI.Class (WebAPI(..))
 import URI.ByteString (URI)
@@ -76,7 +76,8 @@ instance WebAPI WebAPIM where
     usersInfo token userId >>= endpointFailed "users.info"
   getChannelMembers channelId = do
     token <- getBotToken
-    conversationMembers token channelId >>= endpointFailed "conversations.members"
+    let limit = Limit {limitQ = 200}
+    conversationMembers token channelId limit >>= endpointFailed "conversations.members"
   sendEphemeralMessage userId channelId text = do
     token <- getBotToken
     void $ (postEphemeral token userId channelId text) >>= endpointFailed "chat.postEphemeral"
@@ -103,7 +104,7 @@ endpointFailed endpoint = \case
 openConnection :: Auth.Token -> WebAPIM (SlackResponse "url" URI)
 usersInfo :: Auth.Token -> UserId -> WebAPIM (SlackResponse "user" User)
 conversationMembers
-  :: Auth.Token -> ChannelId
+  :: Auth.Token -> ChannelId -> Limit
   -> WebAPIM (SlackResponse "members" [UserId])
 postEphemeral
   :: Auth.Token -> UserId -> ChannelId -> Text
