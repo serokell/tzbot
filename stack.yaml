@@ -13,3 +13,18 @@ extra-deps:
   subdirs:
    - full
    - core
+- git: https://github.com/serokell/slacker
+  commit: ce9df4e3bc7383a1c83c3bd507048894cd5bf287
+- git: https://github.com/jship/monad-logger-aeson
+  commit: fa87cb7d829c8edb0aaebd5f84c064942b0b9411
+  subdirs:
+   - monad-logger-aeson
+- git: https://github.com/jship/context/
+  commit: ac965bdfc47b33c6b5a8c47ae1396752a6b0e2b5
+  subdirs:
+   - context
+
+nix:
+  enable: true
+  packages: [ zlib ]
+  pure: false
