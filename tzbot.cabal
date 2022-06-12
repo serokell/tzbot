@@ -28,7 +28,6 @@ library
       TzBot.Parser
       TzBot.ProcessEvent
       TzBot.Slack.Core.Types
-      TzBot.Slack.SocketMode.Client
       TzBot.Slack.WebAPI.API
       TzBot.Slack.WebAPI.Class
       TzBot.Slack.WebAPI.Impl
@@ -87,17 +86,15 @@ library
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
-  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations
   build-depends:
       aeson
     , aeson-casing
-    , aeson-pretty
     , base >=4.7 && <5
     , http-client
-    , http-client-tls
     , lens
+    , lens-aeson
     , mtl
-    , network
     , nyan-interpolation
     , safe-exceptions
     , servant-auth
@@ -110,8 +107,6 @@ library
     , tz
     , uri-bytestring
     , uri-bytestring-aeson
-    , websockets
-    , wuss
   default-language: Haskell2010
 
 executable tzbot-exe
@@ -170,9 +165,12 @@ executable tzbot-exe
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
-  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , http-client
+    , http-client-tls
+    , slacker
     , text
     , tzbot
   default-language: Haskell2010
@@ -235,7 +233,7 @@ test-suite tzbot-test
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
-  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded -rtsopts -with-rtsopts=-N
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:
