@@ -21,13 +21,11 @@ library:
   dependencies:
   - aeson
   - aeson-casing
-  - aeson-pretty
   - base >= 4.7 && < 5
   - http-client
-  - http-client-tls
   - lens
+  - lens-aeson
   - mtl
-  - network
   - nyan-interpolation
   - safe-exceptions
   - servant-auth
@@ -40,8 +38,6 @@ library:
   - tz
   - uri-bytestring
   - uri-bytestring-aeson
-  - websockets
-  - wuss
 
 executables:
   tzbot-exe:
@@ -53,6 +49,9 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - base >= 4.7 && < 5
+    - http-client
+    - http-client-tls
+    - slacker
     - text
     - tzbot
 
@@ -73,8 +72,8 @@ ghc-options:
   - -Weverything
   - -Wno-implicit-prelude
   - -Wno-name-shadowing
-  - -Wno-missing-import-lists
   - -Wno-missing-export-lists
+  - -Wno-missing-import-lists
   - -Wno-unsafe
   - -Wno-safe
   - -Wno-missing-safe-haskell-mode

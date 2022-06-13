@@ -5,34 +5,71 @@
 
 packages:
 - completed:
-    subdir: full
     name: nyan-interpolation
-    version: '0.9'
-    git: https://github.com/bitmappergit/nyan-interpolation.git
+    subdir: full
     pantry-tree:
-      size: 714
       sha256: bba420e826f49ea14b64f3d969f32c72bd8f14840b3884dfa11df134a5671a14
+      size: 714
     commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+    git: https://github.com/bitmappergit/nyan-interpolation.git
+    version: '0.9'
   original:
     subdir: full
-    git: https://github.com/bitmappergit/nyan-interpolation.git
     commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+    git: https://github.com/bitmappergit/nyan-interpolation.git
 - completed:
-    subdir: core
     name: nyan-interpolation-core
-    version: '0.9'
-    git: https://github.com/bitmappergit/nyan-interpolation.git
+    subdir: core
     pantry-tree:
-      size: 1516
       sha256: 59d1c732629b06d0035229dccce484d6b4c3078d6bb3e493317afddc9be233df
+      size: 1516
     commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+    git: https://github.com/bitmappergit/nyan-interpolation.git
+    version: '0.9'
   original:
     subdir: core
-    git: https://github.com/bitmappergit/nyan-interpolation.git
     commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+    git: https://github.com/bitmappergit/nyan-interpolation.git
+- completed:
+    name: slacker
+    pantry-tree:
+      sha256: 40a6cd804ddea3ebe679f031573b65ea13681de007d81043607cee463c92d101
+      size: 1823
+    commit: ce9df4e3bc7383a1c83c3bd507048894cd5bf287
+    git: https://github.com/serokell/slacker
+    version: 0.1.0.0
+  original:
+    commit: ce9df4e3bc7383a1c83c3bd507048894cd5bf287
+    git: https://github.com/serokell/slacker
+- completed:
+    name: monad-logger-aeson
+    subdir: monad-logger-aeson
+    pantry-tree:
+      sha256: f221efc9a29a358c63b571cc3fb8e86cdcab3ee6aa29c8d4395ca85adb8fe2af
+      size: 5103
+    commit: fa87cb7d829c8edb0aaebd5f84c064942b0b9411
+    git: https://github.com/jship/monad-logger-aeson
+    version: 0.2.0.1
+  original:
+    subdir: monad-logger-aeson
+    commit: fa87cb7d829c8edb0aaebd5f84c064942b0b9411
+    git: https://github.com/jship/monad-logger-aeson
+- completed:
+    name: context
+    subdir: context
+    pantry-tree:
+      sha256: b041ec197787d7cef078a2de33a74853179821e3083882f22b6d185e5764d75e
+      size: 952
+    commit: ac965bdfc47b33c6b5a8c47ae1396752a6b0e2b5
+    git: https://github.com/jship/context/
+    version: 0.2.0.0
+  original:
+    subdir: context
+    commit: ac965bdfc47b33c6b5a8c47ae1396752a6b0e2b5
+    git: https://github.com/jship/context/
 snapshots:
 - completed:
+    sha256: fb634b19f31da06684bb07ce02a20c75a3162138f279b388905b03ebd57bb50f
     size: 618876
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/6.yaml
-    sha256: fb634b19f31da06684bb07ce02a20c75a3162138f279b388905b03ebd57bb50f
   original: lts-19.6

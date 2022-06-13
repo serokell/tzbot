@@ -50,7 +50,7 @@ Slack supports [these APIs](https://api.slack.com/apis/connections):
       receive events *and* post slack messages via a websocket connection.
       Deprecated, new apps can’t use this mode.
 
-At the moment, `tzbot` is setup to receive events via Socket mode (see the `TzBot.Slack.SocketMode.*` modules),
+At the moment, `tzbot` is setup to receive events via Socket mode (using [`slacker`](https://github.com/velveteer/slacker)),
 and query data via the Web API (see the `TzBot.Slack.WebAPI.*` modules).
 
 Since "apps using Socket Mode are not currently allowed in the public Slack App Directory”,
