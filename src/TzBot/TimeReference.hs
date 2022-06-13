@@ -4,12 +4,14 @@
 
 module TzBot.TimeReference where
 
-import Data.Maybe (fromJust)
+import Data.Foldable (find)
 import Data.String (IsString)
 import Data.Text (Text)
 import Data.Time (DayOfWeek, TimeOfDay, TimeZone, UTCTime)
-import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
-import Data.Time.Format.ISO8601 (iso8601ParseM)
+import Data.Time.LocalTime (LocalTime(..), localTimeToUTC, minutesToTimeZone, utcToLocalTime)
+import Data.Time.Calendar (fromGregorian, toGregorian)
+import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear, firstDayOfWeekOnAfter)
+import Data.Time.Calendar.OrdinalDate (fromOrdinalDate, toOrdinalDate)
 import Data.Time.Zones.All (TZLabel)
 
 {- | An offset from UTC (e.g. @UTC+01:00@) with an optional timezone abbreviation (e.g. @BST@).
@@ -65,17 +67,92 @@ newtype Offset = Offset { unOffset :: Int }
 -- | Converts a time reference to a moment in time (expressed in UTC).
 --
 -- If the time reference contains a timezone abbreviation, and if that abbreviation
--- is invalid or not supported, this returns a `Left`.
+-- is invalid or not supported, this returns a 'TRTUInvalidTimeZoneAbbrev'.
 timeReferenceToUTC
   :: TZLabel -- ^ The timezone of the sender of the Slack message.
   -> UTCTime -- ^ The time at which the message was sent.
   -> TimeReference -- ^ A time reference to translate to UTC.
   -> TimeReferenceToUTCResult
-timeReferenceToUTC sendersTimezone _eventTimestamp _timeRef =
-  -- TODO [#2]
-  TRTUSuccess
-    (fromJust $ iso8601ParseM @_ @UTCTime "2022-03-12T13:00:00Z")
-    (Left sendersTimezone)
+timeReferenceToUTC sendersTimezone eventTimestamp timeRef =
+  case getTimeOffset sendersTimezone timeRef of
+    Left timeZoneAbbr -> TRTUInvalidTimeZoneAbbrev timeZoneAbbr
+    Right tzOffsetSource ->
+      -- the 'TimeReference' will be:
+      -- * relative to the sender's timezone or to one given in the message
+      -- * relative to the message time and date
+      let tzOffset = either tZLabelToOffset id tzOffsetSource
+          eventLocalTime = utcToLocalTime' tzOffset eventTimestamp
+          localTimeRef = localTimeReference eventLocalTime (trTimeOfDay timeRef) (trDateRef timeRef)
+          utcTimeRef = localTimeToUTC' tzOffset localTimeRef
+      in TRTUSuccess utcTimeRef tzOffsetSource
+
+-- | Finds an offset source for the 'TimeReference' conversion.
+--
+-- This returns:
+-- * a'TimeZoneAbbreviation' if an unknown one was encountered
+-- * an 'Offset' if it was possible to derive it from the 'TimeReference'
+-- * the Slack sender's 'TZLabel' otherwise
+getTimeOffset
+  :: TZLabel -- ^ The timezone of the sender of the Slack message.
+  -> TimeReference -- ^ A time reference to translate to UTC.
+  -> Either TimeZoneAbbreviation (Either TZLabel Offset)
+getTimeOffset sendersTimezone timeRef = case trLocationRef timeRef of
+  Nothing -> Right $ Left sendersTimezone
+  Just locationRef -> case locationRef of
+    TimeZoneRef tZLabel -> Right . Right $ tZLabelToOffset tZLabel
+    OffsetRef offset -> Right $ Right offset
+    TimeZoneAbbreviationRef timeZoneAbbr ->
+      let findTZA tzaInfo = timeZoneAbbr == tzaiAbbreviation tzaInfo in
+      case find findTZA knownTimeZoneAbbreviations of
+        Nothing -> Left timeZoneAbbr
+        Just tzaInfo -> Right . Right $ tzaiOffsetMinutes tzaInfo
+
+tZLabelToOffset :: TZLabel -> Offset
+tZLabelToOffset _ = Offset 0 -- TODO
+
+localTimeReference
+  :: LocalTime -- ^ The time at which the message was sent, "local" to an offset
+  -> TimeOfDay -- ^ A time of day reference, to be converted
+  -> Maybe DateReference -- ^ A possible date reference, to be converted
+  -> LocalTime  -- ^ The converted time reference, relative to same "local" offset
+localTimeReference eventLocalTime timeOfDay = \case
+    Nothing ->
+      -- if the reference is only to a time and that time has already passed
+      -- in that day, then it refers to the day after
+      if localTimeOfDay eventLocalTime > timeOfDay
+      then
+        let (year, dayOfYear) = toOrdinalDate (localDay eventLocalTime)
+            nextLocalDay = fromOrdinalDate year $ dayOfYear + 1
+        in eventLocalTime {localTimeOfDay = timeOfDay, localDay = nextLocalDay}
+      else eventLocalTime {localTimeOfDay = timeOfDay}
+    Just dateRef ->
+      let newLocalDay = case dateRef of
+            DaysFromToday dayDiff ->
+              let (year, dayOfYear) = toOrdinalDate (localDay eventLocalTime)
+              in fromOrdinalDate year $ dayOfYear + dayDiff
+            DayOfWeekRef givenDayOfWeek ->
+              firstDayOfWeekOnAfter givenDayOfWeek (localDay eventLocalTime)
+            DayOfMonthRef givenDayOfMonth givenMonthOfYear ->
+              let (year, monthOfYear, dayOfMonth) = toGregorian (localDay eventLocalTime)
+                  (newYear, newMonthOfYear, newDayOfMonth) = case givenMonthOfYear of
+                    Nothing | dayOfMonth > givenDayOfMonth ->
+                      (year, monthOfYear + 1, givenDayOfMonth)
+                    Nothing ->
+                      (year, monthOfYear, givenDayOfMonth)
+                    Just mOfYear | monthOfYear > mOfYear ->
+                      (year + 1, mOfYear, givenDayOfMonth)
+                    Just mOfYear ->
+                      (year, mOfYear, givenDayOfMonth)
+              in fromGregorian newYear newMonthOfYear newDayOfMonth
+      in LocalTime newLocalDay timeOfDay
+
+-- | Like 'utcToLocalTime' but using 'Offset' instead of 'NamedOffset'
+utcToLocalTime' :: Offset -> UTCTime -> LocalTime
+utcToLocalTime' (Offset mins) = utcToLocalTime (minutesToTimeZone mins)
+
+-- | Like 'localTimeToUTC' but using 'Offset' instead of 'NamedOffset'
+localTimeToUTC' :: Offset -> LocalTime -> UTCTime
+localTimeToUTC' (Offset mins) = localTimeToUTC (minutesToTimeZone mins)
 
 data TimeReferenceToUTCResult
   = TRTUSuccess
