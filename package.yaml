@@ -22,9 +22,11 @@ library:
   - aeson
   - aeson-casing
   - base >= 4.7 && < 5
+  - containers
   - http-client
   - lens
   - lens-aeson
+  - megaparsec
   - mtl
   - nyan-interpolation
   - safe-exceptions
