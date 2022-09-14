@@ -13,7 +13,7 @@ import System.Environment (getEnv)
 
 import Slacker
   (SlackConfig, SocketModeEvent(..), defaultSlackConfig, handleThreadExceptionSensibly,
-  pattern Event, runSocketMode, setApiToken, setAppToken, setOnException)
+  pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
 
 import TzBot.ProcessEvent (constructEventSummary, processEvent)
 import TzBot.Slack.WebAPI.Impl
@@ -51,5 +51,5 @@ main = do
 
 handler :: WebAPIState -> SlackConfig -> SocketModeEvent -> IO ()
 handler wstate _cfg = \case
-  Event "message" evt -> void . runWebAPIM wstate $ processEvent (constructEventSummary evt)
+  EventValue "message" evt -> void . runWebAPIM wstate $ processEvent (constructEventSummary evt)
   _ -> pure ()

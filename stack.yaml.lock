@@ -8,65 +8,53 @@ packages:
     subdir: full
     name: nyan-interpolation
     version: '0.9'
-    git: https://github.com/bitmappergit/nyan-interpolation.git
+    git: https://github.com/serokell/nyan-interpolation
     pantry-tree:
       size: 714
-      sha256: bba420e826f49ea14b64f3d969f32c72bd8f14840b3884dfa11df134a5671a14
-    commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+      sha256: ede424e6010640f31a223865f2136570ca1870b5ae5ffeeebfc499c4f7043482
+    commit: 5e158057b167275d2150454e2bb731cfe686ea7a
   original:
     subdir: full
-    git: https://github.com/bitmappergit/nyan-interpolation.git
-    commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+    git: https://github.com/serokell/nyan-interpolation
+    commit: 5e158057b167275d2150454e2bb731cfe686ea7a
 - completed:
     subdir: core
     name: nyan-interpolation-core
     version: '0.9'
-    git: https://github.com/bitmappergit/nyan-interpolation.git
+    git: https://github.com/serokell/nyan-interpolation
     pantry-tree:
       size: 1516
       sha256: 59d1c732629b06d0035229dccce484d6b4c3078d6bb3e493317afddc9be233df
-    commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+    commit: 5e158057b167275d2150454e2bb731cfe686ea7a
   original:
     subdir: core
-    git: https://github.com/bitmappergit/nyan-interpolation.git
-    commit: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+    git: https://github.com/serokell/nyan-interpolation
+    commit: 5e158057b167275d2150454e2bb731cfe686ea7a
 - completed:
     name: slacker
     version: 0.1.0.0
-    git: https://github.com/serokell/slacker
+    git: https://github.com/velveteer/slacker
     pantry-tree:
-      size: 1823
-      sha256: 40a6cd804ddea3ebe679f031573b65ea13681de007d81043607cee463c92d101
-    commit: ce9df4e3bc7383a1c83c3bd507048894cd5bf287
+      size: 2306
+      sha256: ef957747f26a8bd00587a30644e63788295e659a334953d9a79c8680bbfa3e0d
+    commit: bf8e13bbc566f92f900d2cc92ebd8a6f1e46334f
   original:
-    git: https://github.com/serokell/slacker
-    commit: ce9df4e3bc7383a1c83c3bd507048894cd5bf287
+    git: https://github.com/velveteer/slacker
+    commit: bf8e13bbc566f92f900d2cc92ebd8a6f1e46334f
 - completed:
-    subdir: monad-logger-aeson
-    name: monad-logger-aeson
-    version: 0.2.0.1
-    git: https://github.com/jship/monad-logger-aeson
+    hackage: monad-logger-aeson-0.3.1.0@sha256:dbb1f816d00a820982094362551e20582de0a27c337d430fa7080dcacbe66f34,5193
     pantry-tree:
       size: 5103
-      sha256: f221efc9a29a358c63b571cc3fb8e86cdcab3ee6aa29c8d4395ca85adb8fe2af
-    commit: fa87cb7d829c8edb0aaebd5f84c064942b0b9411
+      sha256: 6e213a5fd0d3cd17fb4011b0c7181373bd836a86ae82fea5700b44cfc3d9eb01
   original:
-    subdir: monad-logger-aeson
-    git: https://github.com/jship/monad-logger-aeson
-    commit: fa87cb7d829c8edb0aaebd5f84c064942b0b9411
+    hackage: monad-logger-aeson-0.3.1.0@sha256:dbb1f816d00a820982094362551e20582de0a27c337d430fa7080dcacbe66f34,5193
 - completed:
-    subdir: context
-    name: context
-    version: 0.2.0.0
-    git: https://github.com/jship/context/
+    hackage: context-0.2.0.1@sha256:b5a1390a5ad11b7edd0449c9ef96823f082bff4988bd09583e37a4e93e9aad10,1891
     pantry-tree:
       size: 952
-      sha256: b041ec197787d7cef078a2de33a74853179821e3083882f22b6d185e5764d75e
-    commit: ac965bdfc47b33c6b5a8c47ae1396752a6b0e2b5
+      sha256: ebb043dd007864588c6b1676a0d30e521deab4353a3f19716f6f6f7d52b62817
   original:
-    subdir: context
-    git: https://github.com/jship/context/
-    commit: ac965bdfc47b33c6b5a8c47ae1396752a6b0e2b5
+    hackage: context-0.2.0.1@sha256:b5a1390a5ad11b7edd0449c9ef96823f082bff4988bd09583e37a4e93e9aad10,1891
 snapshots:
 - completed:
     size: 619399
