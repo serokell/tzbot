@@ -7,27 +7,15 @@ packages:
 
 source-repository-package
     type: git
-    location: https://github.com/bitmappergit/nyan-interpolation.git
-    tag: 60fce24eb01cfb693d1def533bdaa0dad00f72e4
+    location: https://github.com/serokell/nyan-interpolation.git
+    tag: 5e158057b167275d2150454e2bb731cfe686ea7a
     subdir: core
             full
 
 source-repository-package
     type: git
-    location: https://github.com/jship/context/
-    tag: ac965bdfc47b33c6b5a8c47ae1396752a6b0e2b5
-    subdir: context
-
-source-repository-package
-    type: git
-    location: https://github.com/jship/monad-logger-aeson
-    tag: fa87cb7d829c8edb0aaebd5f84c064942b0b9411
-    subdir: monad-logger-aeson
-
-source-repository-package
-    type: git
-    location: https://github.com/serokell/slacker
-    tag: ce9df4e3bc7383a1c83c3bd507048894cd5bf287
+    location: https://github.com/velveteer/slacker.git
+    tag: bf8e13bbc566f92f900d2cc92ebd8a6f1e46334f
 
 allow-older: *
 allow-newer: *
