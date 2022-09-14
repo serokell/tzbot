@@ -25,6 +25,6 @@ extra-deps:
    - context
 
 nix:
-  enable: true
+  enable: false
   packages: [ zlib ]
   pure: false
