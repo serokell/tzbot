@@ -28,6 +28,7 @@ import Servant.Client
   (BaseUrl(BaseUrl), ClientM, Scheme(Https), client, hoistClient, mkClientEnv, runClientM)
 import URI.ByteString (URI)
 
+import Data.Text qualified as T
 import TzBot.RunMonad
 import TzBot.Slack.API
 
@@ -51,25 +52,27 @@ getChannelMembers channelId = do
   conversationMembers token channelId limit >>= endpointFailed "conversations.members"
 
 -- | Post an "ephemeral message", a message only visible to the given user.
-sendEphemeralMessage :: UserId -> ChannelId -> Text -> BotM ()
-sendEphemeralMessage userId channelId text = do
+sendEphemeralMessage :: ChannelId -> Maybe ThreadId -> Text -> UserId -> BotM ()
+sendEphemeralMessage channelId threadId text userId = do
   token <- getBotToken
-  void $ postEphemeral token userId channelId text >>= endpointFailed "chat.postEphemeral"
+  void $ postEphemeral token userId channelId threadId text >>= endpointFailed "chat.postEphemeral"
 
 getAppLevelToken :: BotM Auth.Token
 getAppLevelToken = do
-  AppLevelToken alt <- asks $ wacAppLevelToken . wasConfig
+  AppLevelToken alt <- asks $ bcAppLevelToken . bsConfig
   pure $ Auth.Token $ T.encodeUtf8 alt
 
 getBotToken :: BotM Auth.Token
 getBotToken = do
-  BotToken bt <- asks $ wacBotToken . wasConfig
+  BotToken bt <- asks $ bcBotToken . bsConfig
   pure $ Auth.Token $ T.encodeUtf8 bt
 
 endpointFailed :: Text -> SlackResponse key a -> BotM a
 endpointFailed endpoint = \case
   SRSuccess a -> pure a
-  SRError err -> throwError $ EndpointFailed endpoint err
+  SRError err -> do
+    log' $ endpoint <> " error: " <> T.pack (show err)
+    throwError $ EndpointFailed endpoint err
 
 ----------------------------------------------------------------------------
 -- Endpoints
@@ -81,7 +84,7 @@ conversationMembers
   :: Auth.Token -> ChannelId -> Limit
   -> BotM (SlackResponse "members" [UserId])
 postEphemeral
-  :: Auth.Token -> UserId -> ChannelId -> Text
+  :: Auth.Token -> UserId -> ChannelId -> Maybe ThreadId -> Text
   -> BotM (SlackResponse "message_ts" Value)
 
 openConnection
@@ -94,7 +97,7 @@ openConnection
 
     naturalTransformation :: ClientM a -> BotM a
     naturalTransformation act = BotM do
-      manager <- asks wasManager
+      manager <- asks bsManager
       let clientEnv = mkClientEnv manager baseUrl
       liftIO (runClientM act clientEnv) >>= \case
         Right a -> pure a

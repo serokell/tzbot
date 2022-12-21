@@ -4,7 +4,7 @@
 
 module TzBot.Parser where
 
-import Universum hiding (try, toList)
+import Universum hiding (toList, try)
 
 import Data.Char (digitToInt)
 import Data.Map qualified as M
@@ -12,8 +12,7 @@ import Data.Time (DayOfWeek(..))
 import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
 import Data.Time.LocalTime (TimeOfDay(..))
 import Data.Time.Zones.All (tzNameLabelMap)
-import Text.Megaparsec
-  (Parsec, anySingle, choice, match, parseMaybe, takeRest, try)
+import Text.Megaparsec (Parsec, anySingle, choice, match, parseMaybe, takeRest, try)
 import Text.Megaparsec.Char (char, digitChar, space, space1, string')
 import Text.Megaparsec.Char.Lexer (decimal)
 import TzBot.TimeReference

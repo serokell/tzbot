@@ -6,17 +6,19 @@ module TzBot.BotMain where
 
 import Universum
 
+import Data.Aeson.Types
+import Data.Map qualified as M
 import Data.Text qualified as T
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
-import System.Environment (getEnv)
-
 import Slacker
   (SlackConfig, SocketModeEvent(..), defaultSlackConfig, handleThreadExceptionSensibly,
   pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
+import System.Environment (getEnv)
 
-import TzBot.ProcessEvent (constructEventSummary, processEvent)
-import TzBot.Slack (AppLevelToken(..), BotConfig(..), BotState(..), BotToken(..), runBotM)
+import TzBot.ProcessEvent (processEvent)
+import TzBot.RunMonad
+
 {- |
 
 Usage:
@@ -38,17 +40,20 @@ main = do
             & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
 
   let wCfg = BotConfig {
-    wacAppLevelToken = AppLevelToken appLevelToken
-  , wacBotToken = BotToken botToken
+    bcAppLevelToken = AppLevelToken appLevelToken
+  , bcBotToken = BotToken botToken
   }
 
   manager <- newManager tlsManagerSettings
-  let wState = BotState wCfg manager
+  refSetMapIORef <- newIORef M.empty
+  let wState = BotState wCfg manager refSetMapIORef
 
   runSocketMode sCfg (handler wState) -- auto-acknowledge received messages
 
 handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
 handler wstate _cfg = \e -> do
   case e of
-    EventValue "message" evt -> void . runBotM wstate $ processEvent (constructEventSummary evt)
+    EventValue "message" evtRaw -> case parseEither parseJSON evtRaw of
+      Left err -> log' $ T.pack err
+      Right evt -> void . runBotM wstate $ processEvent evt
     _ -> pure ()

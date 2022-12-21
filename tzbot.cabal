@@ -26,12 +26,16 @@ library
   exposed-modules:
       TzBot.BotMain
       TzBot.Instances
+      TzBot.Orphans
       TzBot.Parser
       TzBot.ProcessEvent
       TzBot.RunMonad
       TzBot.Slack
       TzBot.Slack.API
+      TzBot.Slack.EphemeralMessage
+      TzBot.Slack.Events
       TzBot.TimeReference
+      TzBot.Util
   other-modules:
       Paths_tzbot
   hs-source-dirs:
@@ -93,11 +97,12 @@ library
     , aeson-casing
     , base >=4.7 && <5
     , containers
+    , formatting
     , http-client
     , http-client-tls
-    , lens
-    , lens-aeson
+    , lifted-async
     , megaparsec
+    , monad-control
     , mtl
     , nyan-interpolation
     , servant-auth
@@ -108,7 +113,9 @@ library
     , text
     , time
     , time-compat
+    , transformers-base
     , tz
+    , tztime
     , universum
     , uri-bytestring
     , uri-bytestring-aeson
@@ -243,4 +250,5 @@ test-suite tzbot-test
   build-depends:
       base >=4.7 && <5
     , tasty
+    , universum
   default-language: Haskell2010

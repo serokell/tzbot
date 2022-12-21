@@ -1,23 +1,36 @@
+-- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io/>
+--
+-- SPDX-License-Identifier: MPL-2.0
+
 module TzBot.RunMonad where
 
 import Universum
 
+import Control.Monad.Base (MonadBase)
 import Control.Monad.Except (MonadError)
+import Control.Monad.Trans.Control
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text.IO qualified as T
 import Network.HTTP.Client (Manager)
 import Servant.Client (ClientError)
 import Text.Interpolation.Nyan
+
+import TzBot.Slack.API
+import TzBot.TimeReference
 
 newtype AppLevelToken = AppLevelToken { unAppLevelToken :: Text }
 newtype BotToken = BotToken { unBotToken :: Text }
 
 data BotConfig = BotConfig
-  { wacAppLevelToken :: AppLevelToken
-  , wacBotToken :: BotToken
+  { bcAppLevelToken :: AppLevelToken
+  , bcBotToken :: BotToken
   }
 
 data BotState = BotState
-  { wasConfig :: BotConfig
-  , wasManager :: Manager
+  { bsConfig :: BotConfig
+  , bsManager :: Manager
+  , bsMessagesReferences :: IORef (M.Map MessageId (S.Set TimeReferenceText))
   }
 
 newtype BotM a = BotM
@@ -26,19 +39,23 @@ newtype BotM a = BotM
   deriving newtype
     ( Functor, Applicative, Monad
     , MonadReader BotState, MonadError BotException
+    , MonadIO, MonadBaseControl IO, MonadBase IO
     )
 
 runBotM :: BotState -> BotM a -> IO (Either BotException a)
-runBotM state webApiM =
-  webApiM
+runBotM state action =
+  action
     & unBotM
     & flip runReaderT state
     & runExceptT
 
 runOrThrowBotM :: BotState -> BotM a -> IO a
-runOrThrowBotM state webApiM =
-  runBotM state webApiM >>= either throwM pure
+runOrThrowBotM state action =
+  runBotM state action >>= either throwM pure
 
+-- This ugly logging is only temporary
+log' :: MonadIO m => Text -> m ()
+log' msg = liftIO $ T.putStrLn $ "Bot> " <> msg
 ----------------------------------------------------------------------------
 -- Exceptions
 ----------------------------------------------------------------------------

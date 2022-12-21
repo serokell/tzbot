@@ -24,11 +24,12 @@ library:
   - aeson-casing
   - base >= 4.7 && < 5
   - containers
+  - formatting
   - http-client
   - http-client-tls
-  - lens
-  - lens-aeson
+  - lifted-async
   - megaparsec
+  - monad-control
   - mtl
   - nyan-interpolation
   - servant-auth
@@ -39,7 +40,9 @@ library:
   - text
   - time
   - time-compat
+  - transformers-base
   - tz
+  - tztime
   - uri-bytestring
   - uri-bytestring-aeson
 
@@ -68,6 +71,7 @@ tests:
     dependencies:
     - base >= 4.7 && < 5
     - tasty
+    - universum
 
 ghc-options:
   - -Weverything

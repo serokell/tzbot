@@ -9,6 +9,8 @@ module TzBot.Slack.API
   , User(..)
   , UserId(..)
   , ChannelId(..)
+  , ThreadId(..)
+  , MessageId(..)
   , Limit(..)
   ) where
 
@@ -21,7 +23,8 @@ import Data.Aeson.TH
 import Data.Time.Zones.All (TZLabel)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import Servant
-  (Get, JSON, Post, QueryParam', Required, Strict, ToHttpApiData, type (:<|>), type (:>))
+  (Get, JSON, Post, QueryParam, QueryParam', Required, Strict, ToHttpApiData, type (:<|>),
+  type (:>))
 import Servant.Auth (Auth, JWT)
 import TzBot.Instances ()
 import URI.ByteString (URI)
@@ -58,6 +61,7 @@ type API =
     :> "chat.postEphemeral"
     :> RequiredParam "user" UserId
     :> RequiredParam "channel" ChannelId
+    :> QueryParam "thread_ts" ThreadId
     :> RequiredParam "text" Text
     :> Post '[JSON] (SlackResponse "message_ts" Value)
 
@@ -98,11 +102,19 @@ instance (KnownSymbol key, FromJSON a) => FromJSON (SlackResponse key a) where
 
 newtype UserId = UserId { unUserId :: Text }
   deriving stock (Eq, Show)
-  deriving newtype (FromJSON, ToHttpApiData)
+  deriving newtype (ToHttpApiData, FromJSON)
 
 newtype ChannelId = ChannelId { unChannelId :: Text }
   deriving stock (Eq, Show)
-  deriving newtype (ToHttpApiData)
+  deriving newtype (ToHttpApiData, FromJSON)
+
+newtype ThreadId = ThreadId { unThreadId :: Text }
+  deriving stock (Eq, Show)
+  deriving newtype (ToHttpApiData, FromJSON)
+
+newtype MessageId = MessageId { unMessageId :: Text }
+  deriving stock (Eq, Show, Ord)
+  deriving newtype (ToHttpApiData, FromJSON)
 
 newtype Limit = Limit { limitQ :: Int}
   deriving stock (Eq, Show)
