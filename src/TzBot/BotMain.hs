@@ -16,8 +16,7 @@ import Slacker
   pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
 
 import TzBot.ProcessEvent (constructEventSummary, processEvent)
-import TzBot.Slack
-  (AppLevelToken(..), BotToken(..), WebAPIConfig(..), WebAPIState(..), runWebAPIM)
+import TzBot.Slack (AppLevelToken(..), BotConfig(..), BotState(..), BotToken(..), runBotM)
 {- |
 
 Usage:
@@ -38,17 +37,18 @@ main = do
             & setAppToken appLevelToken
             & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
 
-  let wCfg = WebAPIConfig {
+  let wCfg = BotConfig {
     wacAppLevelToken = AppLevelToken appLevelToken
   , wacBotToken = BotToken botToken
   }
 
   manager <- newManager tlsManagerSettings
-  let wState = WebAPIState wCfg manager
+  let wState = BotState wCfg manager
 
   runSocketMode sCfg (handler wState) -- auto-acknowledge received messages
 
-handler :: WebAPIState -> SlackConfig -> SocketModeEvent -> IO ()
-handler wstate _cfg = \case
-    EventValue "message" evt -> void . runWebAPIM wstate $ processEvent (constructEventSummary evt)
-    _ -> undefined
+handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
+handler wstate _cfg = \e -> do
+  case e of
+    EventValue "message" evt -> void . runBotM wstate $ processEvent (constructEventSummary evt)
+    _ -> pure ()

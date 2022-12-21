@@ -19,7 +19,8 @@ import Data.Aeson.TH
 import Data.Text (Text)
 import Data.Time.Zones.All (TZLabel)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
-import Servant (Get, JSON, Post, Proxy(..), QueryParam', Required, Strict, type (:<|>), type (:>), ToHttpApiData)
+import Servant
+  (Get, JSON, Post, Proxy(..), QueryParam', Required, Strict, ToHttpApiData, type (:<|>), type (:>))
 import Servant.Auth (Auth, JWT)
 import TzBot.Instances ()
 import URI.ByteString (URI)

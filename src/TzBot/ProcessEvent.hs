@@ -10,8 +10,8 @@ import Data.Aeson.Lens
 import Data.Maybe (fromJust)
 import Data.Text (Text, unpack)
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeOrError)
-import TzBot.Slack.Core.Types (ChannelId(..), UserId(..))
 import TzBot.Slack
+import TzBot.Slack.API (ChannelId(..), UserId(..))
 
 data EventSummary = EventSummary
   { esMessage :: Text
@@ -50,7 +50,7 @@ constructEventSummary evt = EventSummary message previousMessage uid (extractCha
           Nothing  -> extractUserId evt
           Just obj -> extractUserId obj
 
-processEvent :: EventSummary -> WebAPIM ()
+processEvent :: EventSummary -> BotM ()
 processEvent _evt = do
   -- TODO [#4]
   pure ()
