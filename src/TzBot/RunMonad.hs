@@ -1,10 +1,8 @@
 module TzBot.RunMonad where
 
-import Control.Exception.Safe (Exception(..), throwM)
-import Control.Monad.Except (ExceptT, MonadError, runExceptT)
-import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
-import Data.Function ((&))
-import Data.Text (Text)
+import Universum
+
+import Control.Monad.Except (MonadError)
 import Network.HTTP.Client (Manager)
 import Servant.Client (ClientError)
 import Text.Interpolation.Nyan

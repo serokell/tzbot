@@ -4,8 +4,8 @@
 
 module TzBot.BotMain where
 
-import Control.Monad (void)
-import Data.Function ((&))
+import Universum
+
 import Data.Text qualified as T
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)

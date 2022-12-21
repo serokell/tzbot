@@ -4,11 +4,13 @@
 
 module TzBot.ProcessEvent where
 
-import Control.Lens ((^?!), (^?))
+import Universum
+
+import Control.Lens ((^?!))
 import Data.Aeson
 import Data.Aeson.Lens
 import Data.Maybe (fromJust)
-import Data.Text (Text, unpack)
+import Data.Text (unpack)
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeOrError)
 import TzBot.Slack
 import TzBot.Slack.API (ChannelId(..), UserId(..))

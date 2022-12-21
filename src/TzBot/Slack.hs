@@ -17,12 +17,10 @@ module TzBot.Slack
   , sendEphemeralMessage
   ) where
 
-import Control.Monad (void)
+import Universum
+
 import Control.Monad.Except (throwError)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (asks)
 import Data.Aeson (Value)
-import Data.Text (Text)
 import Data.Text.Encoding qualified as T
 import Servant ((:<|>)(..))
 import Servant.Auth.Client qualified as Auth

@@ -7,6 +7,8 @@ resolver: lts-19.23
 packages:
 - .
 
+system-ghc: true
+
 extra-deps:
 - git: https://github.com/serokell/nyan-interpolation.git
   commit: 5e158057b167275d2150454e2bb731cfe686ea7a

@@ -19,6 +19,7 @@ description:         Please see the README on GitHub at <https://github.com/sero
 library:
   source-dirs: src
   dependencies:
+  - universum
   - aeson
   - aeson-casing
   - base >= 4.7 && < 5
@@ -30,7 +31,6 @@ library:
   - megaparsec
   - mtl
   - nyan-interpolation
-  - safe-exceptions
   - servant-auth
   - servant-auth-client
   - servant-client
@@ -53,6 +53,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - base >= 4.7 && < 5
+    - universum
     - tzbot
 
 tests:
@@ -110,6 +111,7 @@ default-extensions:
   - MultiWayIf
   - NamedFieldPuns
   - NegativeLiterals
+  - NoImplicitPrelude
   - NumDecimals
   - NumericUnderscores
   - OverloadedLabels

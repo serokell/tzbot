@@ -4,19 +4,16 @@
 
 module TzBot.Parser where
 
+import Universum hiding (try, toList)
 
 import Data.Char (digitToInt)
-import Data.Map (toList)
-import Data.Maybe (fromMaybe, isJust)
-import Data.Text (Text)
-import Data.Text.Encoding (decodeUtf8)
+import Data.Map qualified as M
 import Data.Time (DayOfWeek(..))
 import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
 import Data.Time.LocalTime (TimeOfDay(..))
 import Data.Time.Zones.All (tzNameLabelMap)
-import Data.Void (Void)
 import Text.Megaparsec
-  (Parsec, anySingle, choice, empty, match, optional, parseMaybe, takeRest, try, (<|>))
+  (Parsec, anySingle, choice, match, parseMaybe, takeRest, try)
 import Text.Megaparsec.Char (char, digitChar, space, space1, string')
 import Text.Megaparsec.Char.Lexer (decimal)
 import TzBot.TimeReference
@@ -240,7 +237,7 @@ tzRefParser :: TzParser LocationReference
 tzRefParser =
   fmap TimeZoneRef . choice' .
     map (\(str, tzLabel) -> string' (decodeUtf8 str) >> pure tzLabel) $
-      toList tzNameLabelMap
+      M.toList tzNameLabelMap
 
 offsetRefParser :: TzParser LocationReference
 offsetRefParser = do

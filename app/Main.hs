@@ -4,6 +4,8 @@
 
 module Main where
 
+import Universum
+
 import TzBot.BotMain qualified as BotMain
 
 main :: IO ()

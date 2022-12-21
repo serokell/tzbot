@@ -4,9 +4,9 @@
 
 module TzBot.TimeReference where
 
+import Universum
+
 import Data.Maybe (fromJust)
-import Data.String (IsString)
-import Data.Text (Text)
 import Data.Time (DayOfWeek, TimeOfDay, TimeZone, UTCTime)
 import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
 import Data.Time.Format.ISO8601 (iso8601ParseM)

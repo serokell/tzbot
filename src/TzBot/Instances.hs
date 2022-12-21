@@ -7,6 +7,8 @@
 -- | A module with orphan instances.
 module TzBot.Instances where
 
+import Universum
+
 import Data.Aeson
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
