@@ -28,10 +28,9 @@ library
       TzBot.Instances
       TzBot.Parser
       TzBot.ProcessEvent
-      TzBot.Slack.Core.Types
-      TzBot.Slack.WebAPI.API
-      TzBot.Slack.WebAPI.Class
-      TzBot.Slack.WebAPI.Impl
+      TzBot.RunMonad
+      TzBot.Slack
+      TzBot.Slack.API
       TzBot.TimeReference
   other-modules:
       Paths_tzbot

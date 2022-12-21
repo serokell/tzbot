@@ -16,7 +16,7 @@ import Slacker
   pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
 
 import TzBot.ProcessEvent (constructEventSummary, processEvent)
-import TzBot.Slack.WebAPI.Impl
+import TzBot.Slack
   (AppLevelToken(..), BotToken(..), WebAPIConfig(..), WebAPIState(..), runWebAPIM)
 {- |
 

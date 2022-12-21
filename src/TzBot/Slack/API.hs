@@ -2,12 +2,14 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module TzBot.Slack.WebAPI.API
+module TzBot.Slack.API
   ( API
   , api
   , SlackResponse(..)
   , User(..)
-
+  , UserId(..)
+  , ChannelId(..)
+  , Limit(..)
   ) where
 
 import Data.Aeson
@@ -17,12 +19,15 @@ import Data.Aeson.TH
 import Data.Text (Text)
 import Data.Time.Zones.All (TZLabel)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
-import Servant (Get, JSON, Post, Proxy(..), QueryParam', Required, Strict, type (:<|>), type (:>))
+import Servant (Get, JSON, Post, Proxy(..), QueryParam', Required, Strict, type (:<|>), type (:>), ToHttpApiData)
 import Servant.Auth (Auth, JWT)
 import TzBot.Instances ()
-import TzBot.Slack.Core.Types (ChannelId, Limit, UserId)
 import URI.ByteString (URI)
 import URI.ByteString.Aeson ()
+
+----------------------------------------------------------------------------
+-- API
+----------------------------------------------------------------------------
 
 type RequiredParam = QueryParam' [Required, Strict]
 
@@ -83,6 +88,23 @@ instance (KnownSymbol key, FromJSON a) => FromJSON (SlackResponse key a) where
       False -> SRError <$> obj .: "error"
     where
       key = Key.fromString $ symbolVal (Proxy @key)
+
+
+----------------------------------------------------------------------------
+-- Types
+----------------------------------------------------------------------------
+
+newtype UserId = UserId { unUserId :: Text }
+  deriving stock (Eq, Show)
+  deriving newtype (FromJSON, ToHttpApiData)
+
+newtype ChannelId = ChannelId { unChannelId :: Text }
+  deriving stock (Eq, Show)
+  deriving newtype (ToHttpApiData)
+
+newtype Limit = Limit { limitQ :: Int}
+  deriving stock (Eq, Show)
+  deriving newtype (FromJSON, ToHttpApiData)
 
 -- | See: https://api.slack.com/types/user
 data User = User

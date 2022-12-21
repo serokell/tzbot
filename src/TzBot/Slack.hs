@@ -2,7 +2,7 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module TzBot.Slack.WebAPI.Impl
+module TzBot.Slack
   ( WebAPIM(..)
   , runWebAPIM
   , runOrThrowWebAPIM
@@ -11,6 +11,10 @@ module TzBot.Slack.WebAPI.Impl
   , WebAPIState(..)
   , WebAPIConfig(..)
   , WebAPIException(..)
+  , genWebSocketsURI
+  , getUser
+  , getChannelMembers
+  , sendEphemeralMessage
   ) where
 
 import Control.Exception.Safe (Exception(..), throwM)
@@ -29,9 +33,7 @@ import Servant.Client
   (BaseUrl(BaseUrl), ClientError, ClientM, Scheme(Https), client, hoistClient, mkClientEnv,
   runClientM)
 import Text.Interpolation.Nyan
-import TzBot.Slack.Core.Types (ChannelId(..), Limit(..), UserId(..))
-import TzBot.Slack.WebAPI.API (SlackResponse(..), User, api)
-import TzBot.Slack.WebAPI.Class (WebAPI(..))
+import TzBot.Slack.API
 import URI.ByteString (URI)
 
 newtype AppLevelToken = AppLevelToken { unAppLevelToken :: Text }
@@ -67,32 +69,42 @@ runOrThrowWebAPIM :: WebAPIState -> WebAPIM a -> IO a
 runOrThrowWebAPIM state webApiM =
   runWebAPIM state webApiM >>= either throwM pure
 
-instance WebAPI WebAPIM where
-  genWebSocketsURI = do
-    token <- getAppLevelToken
-    openConnection token >>= endpointFailed "apps.connections.open"
-  getUser userId = do
-    token <- getBotToken
-    usersInfo token userId >>= endpointFailed "users.info"
-  getChannelMembers channelId = do
-    token <- getBotToken
-    let limit = Limit {limitQ = 200}
-    conversationMembers token channelId limit >>= endpointFailed "conversations.members"
-  sendEphemeralMessage userId channelId text = do
-    token <- getBotToken
-    void $ (postEphemeral token userId channelId text) >>= endpointFailed "chat.postEphemeral"
+-- | Generate a temporary Socket Mode WebSocket URL to connect to and receive events.
+genWebSocketsURI :: WebAPIM URI
+genWebSocketsURI = do
+  token <- getAppLevelToken
+  openConnection token >>= endpointFailed "apps.connections.open"
 
-getAppLevelToken :: MonadReader WebAPIState m => m Auth.Token
+-- | Get a user's info.
+getUser :: UserId -> WebAPIM User
+getUser userId = do
+  token <- getBotToken
+  usersInfo token userId >>= endpointFailed "users.info"
+
+-- | Get a list of a channel's members.
+getChannelMembers :: ChannelId -> WebAPIM [UserId]
+getChannelMembers channelId = do
+  token <- getBotToken
+  let limit = Limit {limitQ = 200}
+  conversationMembers token channelId limit >>= endpointFailed "conversations.members"
+
+-- | Post an "ephemeral message", a message only visible to the given user.
+sendEphemeralMessage :: UserId -> ChannelId -> Text -> WebAPIM ()
+sendEphemeralMessage userId channelId text = do
+  token <- getBotToken
+  void $ postEphemeral token userId channelId text >>= endpointFailed "chat.postEphemeral"
+
+getAppLevelToken :: WebAPIM Auth.Token
 getAppLevelToken = do
   AppLevelToken alt <- asks $ wacAppLevelToken . wasConfig
   pure $ Auth.Token $ T.encodeUtf8 alt
 
-getBotToken :: MonadReader WebAPIState m => m Auth.Token
+getBotToken :: WebAPIM Auth.Token
 getBotToken = do
   BotToken bt <- asks $ wacBotToken . wasConfig
   pure $ Auth.Token $ T.encodeUtf8 bt
 
-endpointFailed :: MonadError WebAPIException m => Text -> SlackResponse key a -> m a
+endpointFailed :: Text -> SlackResponse key a -> WebAPIM a
 endpointFailed endpoint = \case
   SRSuccess a -> pure a
   SRError err -> throwError $ EndpointFailed endpoint err
