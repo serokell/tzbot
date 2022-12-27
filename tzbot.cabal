@@ -24,14 +24,18 @@ source-repository head
 
 library
   exposed-modules:
+      TzBot.BotMain
       TzBot.Instances
+      TzBot.Orphans
       TzBot.Parser
       TzBot.ProcessEvent
-      TzBot.Slack.Core.Types
-      TzBot.Slack.WebAPI.API
-      TzBot.Slack.WebAPI.Class
-      TzBot.Slack.WebAPI.Impl
+      TzBot.RunMonad
+      TzBot.Slack
+      TzBot.Slack.API
+      TzBot.Slack.EphemeralMessage
+      TzBot.Slack.Events
       TzBot.TimeReference
+      TzBot.Util
   other-modules:
       Paths_tzbot
   hs-source-dirs:
@@ -64,6 +68,7 @@ library
       MultiWayIf
       NamedFieldPuns
       NegativeLiterals
+      NoImplicitPrelude
       NumDecimals
       NumericUnderscores
       OverloadedLabels
@@ -92,21 +97,26 @@ library
     , aeson-casing
     , base >=4.7 && <5
     , containers
+    , formatting
     , http-client
-    , lens
-    , lens-aeson
+    , http-client-tls
+    , lifted-async
     , megaparsec
+    , monad-control
     , mtl
     , nyan-interpolation
-    , safe-exceptions
     , servant-auth
     , servant-auth-client
     , servant-client
     , servant-server
+    , slacker
     , text
     , time
     , time-compat
+    , transformers-base
     , tz
+    , tztime
+    , universum
     , uri-bytestring
     , uri-bytestring-aeson
   default-language: Haskell2010
@@ -145,6 +155,7 @@ executable tzbot-exe
       MultiWayIf
       NamedFieldPuns
       NegativeLiterals
+      NoImplicitPrelude
       NumDecimals
       NumericUnderscores
       OverloadedLabels
@@ -170,11 +181,8 @@ executable tzbot-exe
   ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , http-client
-    , http-client-tls
-    , slacker
-    , text
     , tzbot
+    , universum
   default-language: Haskell2010
 
 test-suite tzbot-test
@@ -213,6 +221,7 @@ test-suite tzbot-test
       MultiWayIf
       NamedFieldPuns
       NegativeLiterals
+      NoImplicitPrelude
       NumDecimals
       NumericUnderscores
       OverloadedLabels
@@ -241,4 +250,5 @@ test-suite tzbot-test
   build-depends:
       base >=4.7 && <5
     , tasty
+    , universum
   default-language: Haskell2010

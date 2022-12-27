@@ -2,27 +2,37 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module TzBot.Slack.WebAPI.API
+module TzBot.Slack.API
   ( API
   , api
   , SlackResponse(..)
   , User(..)
-
+  , UserId(..)
+  , ChannelId(..)
+  , ThreadId(..)
+  , MessageId(..)
+  , Limit(..)
   ) where
+
+import Universum
 
 import Data.Aeson
 import Data.Aeson.Casing (aesonPrefix, snakeCase)
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.TH
-import Data.Text (Text)
 import Data.Time.Zones.All (TZLabel)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
-import Servant (Get, JSON, Post, Proxy(..), QueryParam', Required, Strict, type (:<|>), type (:>))
+import Servant
+  (Get, JSON, Post, QueryParam, QueryParam', Required, Strict, ToHttpApiData, type (:<|>),
+  type (:>))
 import Servant.Auth (Auth, JWT)
 import TzBot.Instances ()
-import TzBot.Slack.Core.Types (ChannelId, Limit, UserId)
 import URI.ByteString (URI)
 import URI.ByteString.Aeson ()
+
+----------------------------------------------------------------------------
+-- API
+----------------------------------------------------------------------------
 
 type RequiredParam = QueryParam' [Required, Strict]
 
@@ -51,6 +61,7 @@ type API =
     :> "chat.postEphemeral"
     :> RequiredParam "user" UserId
     :> RequiredParam "channel" ChannelId
+    :> QueryParam "thread_ts" ThreadId
     :> RequiredParam "text" Text
     :> Post '[JSON] (SlackResponse "message_ts" Value)
 
@@ -83,6 +94,31 @@ instance (KnownSymbol key, FromJSON a) => FromJSON (SlackResponse key a) where
       False -> SRError <$> obj .: "error"
     where
       key = Key.fromString $ symbolVal (Proxy @key)
+
+
+----------------------------------------------------------------------------
+-- Types
+----------------------------------------------------------------------------
+
+newtype UserId = UserId { unUserId :: Text }
+  deriving stock (Eq, Show)
+  deriving newtype (ToHttpApiData, FromJSON)
+
+newtype ChannelId = ChannelId { unChannelId :: Text }
+  deriving stock (Eq, Show)
+  deriving newtype (ToHttpApiData, FromJSON)
+
+newtype ThreadId = ThreadId { unThreadId :: Text }
+  deriving stock (Eq, Show)
+  deriving newtype (ToHttpApiData, FromJSON)
+
+newtype MessageId = MessageId { unMessageId :: Text }
+  deriving stock (Eq, Show, Ord)
+  deriving newtype (ToHttpApiData, FromJSON)
+
+newtype Limit = Limit { limitQ :: Int}
+  deriving stock (Eq, Show)
+  deriving newtype (FromJSON, ToHttpApiData)
 
 -- | See: https://api.slack.com/types/user
 data User = User

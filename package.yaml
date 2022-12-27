@@ -19,25 +19,30 @@ description:         Please see the README on GitHub at <https://github.com/sero
 library:
   source-dirs: src
   dependencies:
+  - universum
   - aeson
   - aeson-casing
   - base >= 4.7 && < 5
   - containers
+  - formatting
   - http-client
-  - lens
-  - lens-aeson
+  - http-client-tls
+  - lifted-async
   - megaparsec
+  - monad-control
   - mtl
   - nyan-interpolation
-  - safe-exceptions
   - servant-auth
   - servant-auth-client
   - servant-client
   - servant-server
+  - slacker
   - text
   - time
   - time-compat
+  - transformers-base
   - tz
+  - tztime
   - uri-bytestring
   - uri-bytestring-aeson
 
@@ -51,10 +56,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - base >= 4.7 && < 5
-    - http-client
-    - http-client-tls
-    - slacker
-    - text
+    - universum
     - tzbot
 
 tests:
@@ -69,6 +71,7 @@ tests:
     dependencies:
     - base >= 4.7 && < 5
     - tasty
+    - universum
 
 ghc-options:
   - -Weverything
@@ -112,6 +115,7 @@ default-extensions:
   - MultiWayIf
   - NamedFieldPuns
   - NegativeLiterals
+  - NoImplicitPrelude
   - NumDecimals
   - NumericUnderscores
   - OverloadedLabels

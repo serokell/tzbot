@@ -2,11 +2,9 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module Main where
+module TzBot.Util where
 
 import Universum
 
-import TzBot.BotMain qualified as BotMain
-
-main :: IO ()
-main = BotMain.main
+attach :: (Functor f) => (a -> b) -> f a -> f (a, b)
+attach f = fmap (\x -> (x, f x))

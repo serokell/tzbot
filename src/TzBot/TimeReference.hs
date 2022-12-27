@@ -4,13 +4,14 @@
 
 module TzBot.TimeReference where
 
+import Universum
+
 import Data.Maybe (fromJust)
-import Data.String (IsString)
-import Data.Text (Text)
 import Data.Time (DayOfWeek, TimeOfDay, TimeZone, UTCTime)
 import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Data.Time.Zones.All (TZLabel)
+import Formatting (Buildable)
 
 {- | An offset from UTC (e.g. @UTC+01:00@) with an optional timezone abbreviation (e.g. @BST@).
 
@@ -28,9 +29,11 @@ We use this type alias to make this distinction a bit more clear.
 -}
 type NamedOffset = TimeZone
 
+type TimeReferenceText = Text
+
 -- | A reference to a point in time, e.g. "tuesday at 10am", "3pm CST on July 7th"
 data TimeReference = TimeReference
-  { trText :: Text -- ^ The original section of the text from where this `TimeReference` was parsed.
+  { trText :: TimeReferenceText -- ^ The original section of the text from where this `TimeReference` was parsed.
   , trTimeOfDay :: TimeOfDay
   , trDateRef :: Maybe DateReference
   , trLocationRef :: Maybe LocationReference
@@ -56,7 +59,7 @@ data LocationReference
 -- Usually composed of 2-5 uppercase letters.
 -- See: https://en.wikipedia.org/wiki/List_of_time_zone_abbreviations
 newtype TimeZoneAbbreviation = TimeZoneAbbreviation { unTimeZoneAbbreviation :: Text }
-  deriving newtype (Eq, Show, IsString)
+  deriving newtype (Eq, Show, IsString, Buildable)
 
 -- | An offset from UTC measured in minutes.
 newtype Offset = Offset { unOffset :: Int }
