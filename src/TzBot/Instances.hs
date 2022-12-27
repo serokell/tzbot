@@ -12,8 +12,13 @@ import Universum
 import Data.Aeson
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
-import Data.Time.Zones.All (TZLabel)
+import Data.Time.Zones.All (TZLabel, toTZName)
 import Data.Time.Zones.All qualified as TZ
+import Formatting.Buildable
+import Time
+
+instance Buildable TZLabel where
+  build = build . T.decodeUtf8 . toTZName
 
 instance FromJSON TZLabel where
   parseJSON =
@@ -21,3 +26,11 @@ instance FromJSON TZLabel where
       case TZ.fromTZName (T.encodeUtf8 t) of
         Just tzLabel -> pure tzLabel
         Nothing -> fail $ "Invalid timezone: '" <> T.unpack t <> "'"
+
+instance KnownRatName unit => FromJSON (Time unit) where
+  parseJSON = withText "Time string" $ \t -> case unitsP @unit (toString t) of
+    Just x  -> pure x
+    Nothing -> fail "Invalid time"
+
+instance KnownRatName unit => ToJSON (Time unit) where
+  toJSON = String . fromString . unitsF

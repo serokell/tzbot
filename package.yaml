@@ -24,6 +24,7 @@ library:
   - aeson-casing
   - base >= 4.7 && < 5
   - containers
+  - fmt
   - formatting
   - http-client
   - http-client-tls
@@ -32,17 +33,22 @@ library:
   - monad-control
   - mtl
   - nyan-interpolation
+  - o-clock
   - servant-auth
   - servant-auth-client
   - servant-client
   - servant-server
   - slacker
+  - string-conversions
+  - template-haskell
   - text
   - time
   - time-compat
   - transformers-base
   - tz
   - tztime
+  - validation
+  - yaml
 
 executables:
   tzbot-exe:
@@ -68,7 +74,11 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - base >= 4.7 && < 5
+    - tzbot
+    - containers
+    - hspec
     - tasty
+    - tasty-hspec
     - universum
 
 ghc-options:

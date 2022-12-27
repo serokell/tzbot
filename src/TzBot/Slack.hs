@@ -27,6 +27,7 @@ import Servant.Client
   (BaseUrl(BaseUrl), ClientM, Scheme(Https), client, hoistClient, mkClientEnv, runClientM)
 
 import Data.Text qualified as T
+import TzBot.Config
 import TzBot.RunMonad
 import TzBot.Slack.API
 

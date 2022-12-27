@@ -14,8 +14,9 @@ import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Slacker
   (SlackConfig, SocketModeEvent(..), defaultSlackConfig, handleThreadExceptionSensibly,
   pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
-import System.Environment (getEnv)
+import System.Environment (getArgs)
 
+import TzBot.Config (AppLevelToken(..), BotToken(..), Config(cAppToken, cBotToken), readConfig)
 import TzBot.ProcessEvent (processEvent)
 import TzBot.RunMonad
 
@@ -23,26 +24,28 @@ import TzBot.RunMonad
 
 Usage:
 
->  export SLACK_TZ_APP_TOKEN='xapp-***'
->  export SLACK_TZ_BOT_TOKEN='xoxb-***'
->  stack run
-
+See @Config.Default.defaultConfigText@ to get what options
+are available and how to set them via config or via envvars.
 To generate app-level / bot tokens, see: <docs/development.md>
 
 -}
 main :: IO ()
 main = do
-  appLevelToken <- T.pack <$> getEnv "SLACK_TZ_APP_TOKEN"
-  botToken <- T.pack <$> getEnv "SLACK_TZ_BOT_TOKEN"
+  -- TODO: add optparse
+  (configFilePath :: Maybe FilePath) <- safeHead <$> getArgs
+  config <- readConfig configFilePath
+
+  let appLevelToken = cAppToken config
+      botToken = cBotToken config
   let sCfg = defaultSlackConfig
-            & setApiToken botToken
-            & setAppToken appLevelToken
+            & setApiToken (unBotToken botToken)
+            & setAppToken (unAppLevelToken appLevelToken)
             & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
 
-  let wCfg = BotConfig {
-    bcAppLevelToken = AppLevelToken appLevelToken
-  , bcBotToken = BotToken botToken
-  }
+  let wCfg = BotConfig
+        { bcAppLevelToken = appLevelToken
+        , bcBotToken = botToken
+        }
 
   manager <- newManager tlsManagerSettings
   refSetMapIORef <- newIORef M.empty
