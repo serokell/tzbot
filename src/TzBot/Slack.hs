@@ -11,7 +11,6 @@ module TzBot.Slack
   , BotState(..)
   , BotConfig(..)
   , BotException(..)
-  , genWebSocketsURI
   , getUser
   , getChannelMembers
   , sendEphemeralMessage
@@ -26,17 +25,10 @@ import Servant ((:<|>)(..))
 import Servant.Auth.Client qualified as Auth
 import Servant.Client
   (BaseUrl(BaseUrl), ClientM, Scheme(Https), client, hoistClient, mkClientEnv, runClientM)
-import URI.ByteString (URI)
 
 import Data.Text qualified as T
 import TzBot.RunMonad
 import TzBot.Slack.API
-
--- | Generate a temporary Socket Mode WebSocket URL to connect to and receive events.
-genWebSocketsURI :: BotM URI
-genWebSocketsURI = do
-  token <- getAppLevelToken
-  openConnection token >>= endpointFailed "apps.connections.open"
 
 -- | Get a user's info.
 getUser :: UserId -> BotM User
@@ -57,11 +49,6 @@ sendEphemeralMessage channelId threadId text userId = do
   token <- getBotToken
   void $ postEphemeral token userId channelId threadId text >>= endpointFailed "chat.postEphemeral"
 
-getAppLevelToken :: BotM Auth.Token
-getAppLevelToken = do
-  AppLevelToken alt <- asks $ bcAppLevelToken . bsConfig
-  pure $ Auth.Token $ T.encodeUtf8 alt
-
 getBotToken :: BotM Auth.Token
 getBotToken = do
   BotToken bt <- asks $ bcBotToken . bsConfig
@@ -78,7 +65,6 @@ endpointFailed endpoint = \case
 -- Endpoints
 ----------------------------------------------------------------------------
 
-openConnection :: Auth.Token -> BotM (SlackResponse "url" URI)
 usersInfo :: Auth.Token -> UserId -> BotM (SlackResponse "user" User)
 conversationMembers
   :: Auth.Token -> ChannelId -> Limit
@@ -87,8 +73,7 @@ postEphemeral
   :: Auth.Token -> UserId -> ChannelId -> Maybe ThreadId -> Text
   -> BotM (SlackResponse "message_ts" Value)
 
-openConnection
-  :<|> usersInfo
+usersInfo
   :<|> conversationMembers
   :<|> postEphemeral =
   hoistClient api naturalTransformation (client api)

@@ -117,8 +117,6 @@ library
     , tz
     , tztime
     , universum
-    , uri-bytestring
-    , uri-bytestring-aeson
   default-language: Haskell2010
 
 executable tzbot-exe

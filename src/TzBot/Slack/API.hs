@@ -27,8 +27,6 @@ import Servant
   type (:>))
 import Servant.Auth (Auth, JWT)
 import TzBot.Instances ()
-import URI.ByteString (URI)
-import URI.ByteString.Aeson ()
 
 ----------------------------------------------------------------------------
 -- API
@@ -38,11 +36,6 @@ type RequiredParam = QueryParam' [Required, Strict]
 
 -- | A type describing Slack's Web API: https://api.slack.com/web
 type API =
-  -- See: https://api.slack.com/methods/apps.connections.open
-  Auth '[JWT] Text
-    :> "apps.connections.open"
-    :> Post '[JSON] (SlackResponse "url" URI)
-  :<|>
   -- See: https://api.slack.com/methods/users.info
   Auth '[JWT] Text
     :> "users.info"
