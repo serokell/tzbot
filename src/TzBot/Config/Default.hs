@@ -9,11 +9,11 @@ module TzBot.Config.Default (
 
 import Universum
 
-import Text.Interpolation.Nyan
+import Text.Interpolation.Nyan (int, rmode')
 
-import TzBot.Config.Types
+import TzBot.Config.Types qualified as CT
 import TzBot.Instances ()
-import TzBot.Util
+import TzBot.Util (Trick, thTrickYaml)
 
 defaultConfigText :: ByteString
 defaultConfigText = [int||
@@ -26,34 +26,34 @@ defaultConfigText = [int||
 
 # Slack application token,
 # see https://api.slack.com/apps/[application_id] for details.
-# Envvar: #{appTokenEnv}
+# Envvar: #{CT.appTokenEnv}
 #
 # appToken: <app-token>
 
 # Bot authentication token,
 # see https://api.slack.com/apps/[application_id]/oauth for details.
-# Envvar: #{botTokenEnv}
+# Envvar: #{CT.botTokenEnv}
 #
 # botToken: <bot-token>
 
 # Maximum allowed times to retry on 429 error before giving up.
-# Envvar: #{maxRetriesEnv}
+# Envvar: #{CT.maxRetriesEnv}
 #
 maxRetries: 3
 
 # Caching expiration time for user profile info.
 # Format examples: 2d18h40m, 3m20s, 20m.
-# Envvar: #{cacheUsersEnv}
+# Envvar: #{CT.cacheUsersEnv}
 #
 cacheUsersInfo: 3m
 
 # Caching expiration time for channel members info.
 # Format examples: 2d18h40m, 3m20s, 20m.
-# Envvar: #{cacheConvMembersEnv}
+# Envvar: #{CT.cacheConvMembersEnv}
 #
 cacheConversationMembers: 3m
   |]
 
 -- This prevents Config.Default.defaultConfigText to be incorrect on compiling.
-defaultConfigTrick :: Trick (Config 'CSInterm)
+defaultConfigTrick :: Trick (CT.Config 'CT.CSInterm)
 defaultConfigTrick = thTrickYaml defaultConfigText

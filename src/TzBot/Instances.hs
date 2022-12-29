@@ -5,17 +5,17 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | A module with orphan instances.
-module TzBot.Instances where
+module TzBot.Instances () where
 
 import Universum
 
-import Data.Aeson
+import Data.Aeson (FromJSON(parseJSON), ToJSON(toJSON), Value(String), withText)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Data.Time.Zones.All (TZLabel, toTZName)
 import Data.Time.Zones.All qualified as TZ
-import Formatting.Buildable
-import Time
+import Formatting.Buildable (Buildable(..))
+import Time (KnownRatName, Time, unitsF, unitsP)
 
 instance Buildable TZLabel where
   build = build . T.decodeUtf8 . toTZName

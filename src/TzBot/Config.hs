@@ -2,13 +2,13 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module TzBot.Config (
-  readConfig,
-  module Types,
+module TzBot.Config
+  ( readConfig
+  , module Types
 
-  -- * These two are needed only for tests
-  readConfigWithEnv,
-  LoadConfigError (..)
+    -- * These two are needed only for tests
+  , readConfigWithEnv
+  , LoadConfigError (..)
   ) where
 
 import Universum hiding (lift)
@@ -16,18 +16,20 @@ import Universum hiding (lift)
 import Control.Exception (evaluate, handle)
 import Data.List (singleton)
 import Data.Map qualified as M
-import Data.String.Conversions
-import Data.Validation
+import Data.String.Conversions (cs)
+import Data.Validation (Validation, bindValidation, fromEither, toEither, validate)
 import Data.Yaml (FromJSON, decodeEither', toJSON)
 import Data.Yaml qualified as Y
 import Data.Yaml.Config (ignoreEnv, loadYamlSettings)
-import Fmt
+import Fmt (Buildable(..), pretty)
 import System.Environment qualified as Env
 import System.IO.Unsafe (unsafePerformIO)
-import Text.Interpolation.Nyan
+import Text.Interpolation.Nyan (int, rmode')
 
-import TzBot.Config.Default
+import TzBot.Config.Default (defaultConfigTrick)
 import TzBot.Config.Types as Types
+  (AppLevelToken(..), BotToken(..), Config(..), ConfigField, ConfigStage(..), Env, EnvVarName,
+  FieldName, appTokenEnv, botTokenEnv, cacheConvMembersEnv, cacheUsersEnv, maxRetriesEnv)
 import TzBot.Instances ()
 
 data LoadConfigError =

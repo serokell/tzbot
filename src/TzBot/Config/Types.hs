@@ -8,12 +8,12 @@ module TzBot.Config.Types where
 
 import Universum
 
-import Data.Aeson
-import Data.Data
-import Time
+import Data.Aeson (FromJSON(parseJSON), ToJSON(toJSON), genericParseJSON, genericToJSON)
+import Data.Data (Data)
+import Time (Minute, Time)
 
 import TzBot.Instances ()
-import TzBot.Util
+import TzBot.Util (aesonConfigOptions)
 
 type FieldName = String
 type EnvVarName = String
@@ -63,11 +63,11 @@ data Config f = Config
 deriving stock instance Eq (Config 'CSInterm)
 deriving stock instance Show (Config 'CSInterm)
 instance FromJSON (Config 'CSInterm) where
-  parseJSON = genericParseJSON aesonConfigOption
+  parseJSON = genericParseJSON aesonConfigOptions
 instance ToJSON (Config 'CSInterm) where
-  toJSON = genericToJSON aesonConfigOption
+  toJSON = genericToJSON aesonConfigOptions
 
 deriving stock instance Eq (Config 'CSFinal)
 deriving stock instance Show (Config 'CSFinal)
 instance FromJSON (Config 'CSFinal) where
-  parseJSON = genericParseJSON aesonConfigOption
+  parseJSON = genericParseJSON aesonConfigOptions

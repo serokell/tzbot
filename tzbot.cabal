@@ -25,6 +25,7 @@ source-repository head
 library
   exposed-modules:
       TzBot.BotMain
+      TzBot.Cache
       TzBot.Config
       TzBot.Config.Default
       TzBot.Config.Types
@@ -98,6 +99,8 @@ library
       aeson
     , aeson-casing
     , base >=4.7 && <5
+    , cache
+    , clock
     , containers
     , dlist
     , fmt
@@ -106,11 +109,13 @@ library
     , http-client-tls
     , http-types
     , lifted-async
+    , managed
     , megaparsec
     , monad-control
     , mtl
     , nyan-interpolation
     , o-clock
+    , random
     , servant-auth
     , servant-auth-client
     , servant-client
@@ -126,6 +131,7 @@ library
     , tz
     , tztime
     , universum
+    , unordered-containers
     , utf8-string
     , validation
     , yaml
