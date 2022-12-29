@@ -6,9 +6,11 @@ module TzBot.Slack.API
   ( API
   , api
   , SlackResponse(..)
+  , SlackContents(..)
   , User(..)
   , UserId(..)
   , ChannelId(..)
+  , Cursor(..)
   , ThreadId(..)
   , MessageId(..)
   , Limit(..)
@@ -40,14 +42,15 @@ type API =
   Auth '[JWT] Text
     :> "users.info"
     :> RequiredParam "user" UserId
-    :> Post '[JSON] (SlackResponse "user" User)
+    :> Post '[JSON] (SlackResponse $ SlackContents "user" User)
   :<|>
   -- See: https://api.slack.com/methods/conversations.members
   Auth '[JWT] Text
     :> "conversations.members"
     :> RequiredParam "channel" ChannelId
     :> RequiredParam "limit" Limit
-    :> Get '[JSON] (SlackResponse "members" [UserId])
+    :> QueryParam "cursor" Cursor
+    :> Get '[JSON] (SlackResponse $ SlackContents "members" $ [UserId])
   :<|>
   -- See: https://api.slack.com/methods/chat.postEphemeral
   Auth '[JWT] Text
@@ -56,7 +59,7 @@ type API =
     :> RequiredParam "channel" ChannelId
     :> QueryParam "thread_ts" ThreadId
     :> RequiredParam "text" Text
-    :> Post '[JSON] (SlackResponse "message_ts" Value)
+    :> Post '[JSON] (SlackResponse $ SlackContents "message_ts" Value)
 
 api :: Proxy API
 api = Proxy
@@ -75,19 +78,31 @@ api = Proxy
 
 This data type helps abstract over that pattern.
 -}
-data SlackResponse (key :: Symbol) a
+data SlackResponse a
   = SRSuccess a
   | SRError Text
   deriving stock (Show)
 
-instance (KnownSymbol key, FromJSON a) => FromJSON (SlackResponse key a) where
-  parseJSON = withObject "SlackResponse" \obj -> do
+instance (FromJSON a) => FromJSON (SlackResponse a) where
+  parseJSON val = ($ val) $ withObject "SlackResponse" \obj -> do
     obj .: "ok" >>= \case
-      True  -> SRSuccess <$> obj .: key
+      True  -> SRSuccess <$> parseJSON val
       False -> SRError <$> obj .: "error"
-    where
-      key = Key.fromString $ symbolVal (Proxy @key)
 
+data SlackContents (key :: Symbol) a = SlackContents
+  { scContents :: a
+  , scCursor :: Maybe Cursor
+  } deriving stock (Show)
+
+instance (KnownSymbol key, FromJSON a) => FromJSON (SlackContents key a) where
+  parseJSON = withObject "SlackContents" \obj -> do
+    scCursor <- runMaybeT $ do
+      cursor <- MaybeT (obj .:? "response_metadata") >>= MaybeT . (.:? "next_cursor")
+      guard $ not $ null $ unCursor cursor
+      pure cursor
+    let key = Key.fromString $ symbolVal (Proxy @key)
+    scContents <- obj .: key
+    pure SlackContents {..}
 
 ----------------------------------------------------------------------------
 -- Types
@@ -110,6 +125,10 @@ newtype MessageId = MessageId { unMessageId :: Text }
   deriving newtype (ToHttpApiData, FromJSON)
 
 newtype Limit = Limit { limitQ :: Int}
+  deriving stock (Eq, Show)
+  deriving newtype (FromJSON, ToHttpApiData)
+
+newtype Cursor = Cursor { unCursor :: Text }
   deriving stock (Eq, Show)
   deriving newtype (FromJSON, ToHttpApiData)
 

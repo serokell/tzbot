@@ -23,6 +23,7 @@ import Control.Concurrent (threadDelay)
 import Control.Monad.Except (throwError)
 import Data.Aeson (Value)
 import Data.ByteString.UTF8 (toString)
+import Data.DList qualified as DList
 import Data.Sequence qualified as Seq
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
@@ -42,44 +43,58 @@ import TzBot.Slack.API
 getUser :: UserId -> BotM User
 getUser userId = do
   token <- getBotToken
-  usersInfo token userId >>= endpointFailed "users.info"
+  usersInfo token userId >>= handleSlackErrorSingle "users.info"
 
 -- | Get a list of a channel's members.
 getChannelMembers :: ChannelId -> BotM [UserId]
 getChannelMembers channelId = do
   token <- getBotToken
   let limit = Limit {limitQ = 200}
-  conversationMembers token channelId limit >>= endpointFailed "conversations.members"
+  getPaginatedObjects "conversation.members" $ conversationMembers token channelId limit
 
 -- | Post an "ephemeral message", a message only visible to the given user.
 sendEphemeralMessage :: ChannelId -> Maybe ThreadId -> Text -> UserId -> BotM ()
 sendEphemeralMessage channelId threadId text userId = do
   token <- getBotToken
-  void $ postEphemeral token userId channelId threadId text >>= endpointFailed "chat.postEphemeral"
+  void $ postEphemeral token userId channelId threadId text >>= handleSlackErrorSingle "chat.postEphemeral"
 
 getBotToken :: BotM Auth.Token
 getBotToken = do
   BotToken bt <- asks $ cBotToken . bsConfig
   pure $ Auth.Token $ T.encodeUtf8 bt
 
-endpointFailed :: Text -> SlackResponse key a -> BotM a
-endpointFailed endpoint = \case
+handleSlackError :: Text -> SlackResponse a -> BotM a
+handleSlackError endpoint = \case
   SRSuccess a -> pure a
   SRError err -> do
     log' $ endpoint <> " error: " <> T.pack (show err)
     throwError $ EndpointFailed endpoint err
 
+handleSlackErrorSingle :: Text -> SlackResponse $ SlackContents key a -> BotM a
+handleSlackErrorSingle endpoint = fmap scContents . handleSlackError endpoint
+
+getPaginatedObjects :: Text -> (Maybe Cursor -> BotM $ SlackResponse $ SlackContents key [a]) -> BotM [a]
+getPaginatedObjects endpoint action = DList.toList <$> go mempty Nothing
+  where
+    go acc mbCursor = do
+      eithRes <- action mbCursor
+      res <- handleSlackError endpoint eithRes
+      let newAcc = acc <> DList.fromList (scContents res)
+      case scCursor res of
+        Nothing -> pure newAcc
+        newMbCursor@(Just _) -> go newAcc newMbCursor
+
 ----------------------------------------------------------------------------
 -- Endpoints
 ----------------------------------------------------------------------------
 
-usersInfo :: Auth.Token -> UserId -> BotM (SlackResponse "user" User)
+usersInfo :: Auth.Token -> UserId -> BotM (SlackResponse $ SlackContents "user" User)
 conversationMembers
-  :: Auth.Token -> ChannelId -> Limit
-  -> BotM (SlackResponse "members" [UserId])
+  :: Auth.Token -> ChannelId -> Limit -> Maybe Cursor
+  -> BotM (SlackResponse $ SlackContents "members" [UserId])
 postEphemeral
   :: Auth.Token -> UserId -> ChannelId -> Maybe ThreadId -> Text
-  -> BotM (SlackResponse "message_ts" Value)
+  -> BotM (SlackResponse $ SlackContents "message_ts" Value)
 
 usersInfo
   :<|> conversationMembers
