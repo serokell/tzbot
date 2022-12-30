@@ -43,8 +43,6 @@ library:
   - transformers-base
   - tz
   - tztime
-  - uri-bytestring
-  - uri-bytestring-aeson
 
 executables:
   tzbot-exe:
