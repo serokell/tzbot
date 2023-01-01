@@ -36,6 +36,8 @@ configLoadingSpec =
             , (maxRetriesEnv, "3")
             , (cacheUsersEnv, "3m")
             , (cacheConvMembersEnv, "3m")
+            , (feedbackChannelEnv, "C13FQHWLQS2")
+            , (feedbackFileEnv, "feedback.log")
             ]
       eithConfig <- readConfigWithEnv env (Just "config/nonexistent.yaml")
       eithConfig `shouldSatisfy` isRight

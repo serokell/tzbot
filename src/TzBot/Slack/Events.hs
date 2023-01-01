@@ -7,36 +7,13 @@ module TzBot.Slack.Events where
 import Universum
 
 import Data.Aeson
-import Data.Aeson.Key qualified as AeKey
-import Data.Aeson.Types
 import Data.Time
 import Text.Interpolation.Nyan
 
+import TzBot.Feedback.Dialog.Types
 import TzBot.Slack.API
-
-data Message = Message
-  { mUser :: UserId
-  , mText :: Text
-  , mMessageId :: MessageId
-  , mThreadId :: Maybe ThreadId
-  , mEdited :: Bool
-  , mSubType :: Maybe Text
-  } deriving stock (Eq, Show, Generic)
-
-instance FromJSON Message where
-  parseJSON = withObject "Message" parseMessage
-
-parseMessage :: Object -> Parser Message
-parseMessage o = do
-    mUser <- o .: "user"
-    mText <- o .: "text"
-    mMessageId <- o .: "ts"
-    mThreadId <- o .:? "thread_ts"
-    mSubType <- o .:? "subtype"
-    -- FIXME: use lenses
-    mEdited <- fmap (isJust @Text) . runMaybeT $
-      MaybeT (o .:? "edited") >>= MaybeT . (.:? "ts")
-    pure Message {..}
+import TzBot.Slack.Fixtures qualified as Fixtures
+import TzBot.Util
 
 data MessageEvent = MessageEvent
   { meChannel :: ChannelId
@@ -83,13 +60,61 @@ instance FromJSON MessageEvent where
       Just unknownSubtype -> fail $ "unknown subtype " <> toString unknownSubtype
     pure MessageEvent {..}
 
-tsToUTC :: String -> Maybe UTCTime
-tsToUTC = parseTimeM False defaultTimeLocale "%s%Q"
+--
+data CallbackType = CTView | CTReport
+  deriving stock (Eq, Show, Read, Generic)
 
-parseSlackTimestamp :: AeKey.Key -> String -> Parser UTCTime
-parseSlackTimestamp fieldName tsStr = do
-  let failMessage = [int||Failed to parse timestamp "#{AeKey.toString fieldName}"|]
-  maybe (fail failMessage) pure $ tsToUTC tsStr
+instance FromJSON CallbackType where
+  parseJSON = withText "CallbackType" $ \case
+    e | e == Fixtures.viewEntrypointCallbackId -> pure CTView
+      | e == Fixtures.reportEntrypointCallbackId -> pure CTReport
+      | otherwise -> fail [int||unknown callback type #{e}|]
 
-fetchSlackTimestamp :: AeKey.Key -> Object -> Parser UTCTime
-fetchSlackTimestamp key o = o .: key >>= parseSlackTimestamp key
+{-
+>>> parseEither parseJSON "tz_report" :: Either String CallbackType
+Right CTReport
+ -}
+
+-- | See https://api.slack.com/reference/interaction-payloads/shortcuts
+data InteractiveMessageEvent = InteractiveMessageEvent
+  { imeCallbackId :: CallbackType
+  , imeMessage :: Message
+  , imeUser :: ShortUser
+  , imeTriggerId :: TriggerId
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper InteractiveMessageEvent
+
+data ShortUser = ShortUser
+  { suId :: UserId
+  , suName :: Text
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper ShortUser
+
+data ShortChannel = ShortChannel
+  { scId :: ChannelId
+  , scName :: Text
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper ShortChannel
+
+data ReportEphemeralEvent = ReportEphemeralEvent
+  { reeTriggerId :: TriggerId
+  , reeUser :: ShortUser
+  , reeChannel :: ShortChannel
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper ReportEphemeralEvent
+
+-- | See
+data ViewActionEvent = ViewActionEvent
+  { vaeView :: View
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper ViewActionEvent
+
+-- | See https://api.slack.com/reference/interaction-payloads/views
+data View = View
+  { vId :: ViewId
+  , vRootViewId :: ViewId
+  , vCallbackId :: Text
+  , vPrivateMetadata :: ReportDialogId
+  , vState :: Value
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper View

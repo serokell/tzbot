@@ -13,6 +13,7 @@ import Data.Data
 import Time
 
 import TzBot.Instances ()
+import TzBot.Slack.API
 import TzBot.Util
 
 type FieldName = String
@@ -37,12 +38,19 @@ type family ConfigField (k :: ConfigStage) a where
   ConfigField 'CSInterm a = Maybe a
   ConfigField 'CSFinal a = a
 
-appTokenEnv, botTokenEnv, maxRetriesEnv, cacheUsersEnv, cacheConvMembersEnv :: EnvVarName
+type ConfigInterm = Config 'CSInterm
+type ConfigFinal = Config 'CSFinal
+
+appTokenEnv, botTokenEnv, maxRetriesEnv,
+  cacheUsersEnv, cacheConvMembersEnv,
+  feedbackChannelEnv, feedbackFileEnv :: EnvVarName
 appTokenEnv = "SLACK_TZ_APP_TOKEN"
 botTokenEnv = "SLACK_TZ_BOT_TOKEN"
 maxRetriesEnv = "SLACK_TZ_MAX_RETRIES"
 cacheUsersEnv = "SLACK_TZ_CACHE_USERS_INFO"
 cacheConvMembersEnv = "SLACK_TZ_CACHE_CONVERSATION_MEMBERS"
+feedbackChannelEnv = "SLACK_TZ_FEEDBACK_CHANNEL"
+feedbackFileEnv = "SLACK_TZ_FEEDBACK_FILE"
 
 -- | Overall config.
 data Config f = Config
@@ -56,6 +64,10 @@ data Config f = Config
     -- ^ Caching expiration time for user profile info.
   , cCacheConversationMembers :: Time Minute
     -- ^ Caching expiration time for channel members info.
+  , cFeedbackChannel          :: Maybe ChannelId
+    -- ^ Slack channel to send collected user feedback
+  , cFeedbackFile             :: Maybe FilePath
+    -- ^ File path to record collected user feedback
   } deriving stock (Generic)
 
 deriving stock instance Eq (Config 'CSInterm)

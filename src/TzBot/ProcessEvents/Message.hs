@@ -2,24 +2,25 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module TzBot.ProcessEvent (
-  processEvent
+module TzBot.ProcessEvents.Message (
+  processMessageEvent,
   ) where
 
 import Universum
 
 import Control.Concurrent.Async.Lifted (forConcurrently_)
+import Data.List qualified as L
 import Data.List.NonEmpty qualified as NE
 import Data.Map qualified as M
 import Data.Set qualified as S
 
 import TzBot.Parser (parseTimeRefs)
+import TzBot.Render
 import TzBot.Slack
 import TzBot.Slack.API
-import TzBot.Slack.EphemeralMessage
-import TzBot.Slack.Events (Message(..), MessageDetails(..), MessageEvent(..))
-import TzBot.TimeReference (TimeReference(trText), TimeReferenceText, timeReferenceToUTC)
-import TzBot.Util (attach)
+import TzBot.Slack.Events
+import TzBot.Slack.Fixtures qualified as Fixtures
+import TzBot.TimeReference (TimeReference(trText), TimeReferenceText)
 
 -- Helper function for `filterNewReferencesAndMemorize`
 filterNewReferencesAndMemorizePure :: [TimeReference] -> S.Set TimeReferenceText -> (S.Set TimeReferenceText, [TimeReference])
@@ -65,24 +66,44 @@ newMessageOrEditedMessage evt = case meMessageDetails evt of
 --
 -- "message_edited" event is processed similarly, but only most recently added time
 -- references are processed and sent via ephemerals.
-processEvent :: MessageEvent -> BotM ()
-processEvent evt = when (newMessageOrEditedMessage evt) $ do
-  let message = meMessage evt
+processMessageEvent :: MessageEvent -> BotM ()
+processMessageEvent evt = when (newMessageOrEditedMessage evt) $ do
+  let msg = meMessage evt
 
   -- TODO: use some "transactions here"? Or just lookup the map multiple times.
-  mbReferencesToCheck <- filterNewReferencesAndMemorize (mMessageId message) (parseTimeRefs $ mText message)
+  mbReferencesToCheck <- filterNewReferencesAndMemorize (mMessageId msg) (parseTimeRefs $ mText msg)
   whenJust mbReferencesToCheck $ \timeRefs-> do
-    sender <- getUser $ mUser message
+    sender <- getUser $ mUser msg
     let now = meTs evt
-        timeRefsUtc = attach (timeReferenceToUTC (uTz sender) now) timeRefs
         channelId = meChannel evt
-    let sendAction = sendEphemeralMessage channelId (mThreadId message)
+    let sendAction :: TranslationPairs -> UserId -> BotM ()
+        sendAction transl userId = do
+          let req = PostEphemeralReq
+                { perUser = userId
+                , perChannel = channelId
+                , perThreadTs = mThreadId msg
+                , perText = joinTranslationPairs transl
+                , perBlocks = NE.nonEmpty $
+                  [ renderSlackBlock $ Just transl
+                  , BSection $ textSection (PlainText "Something wrong?") Nothing
+                  , BActions Actions
+                    { aBlockId = Fixtures.reportFromEphemeralBlockId
+                    , aElements = L.singleton $ Button
+                      { bText = "Report here"
+                      , bActionId =
+                          Fixtures.reportFromEphemeralActionId
+                            (mMessageId msg)
+                            (mThreadId msg)
+                      }
+                    }
+                  ]
+                }
+          sendEphemeralMessage req
 
-    -- TODO: We definitely need some caching here
     usersInChannelIds <- getChannelMembers channelId
-    let ephemeralTemplate = NE.map (renderEphemeralMessageTemplate now sender) timeRefsUtc
+    let ephemeralTemplate = renderTemplate now sender timeRefs
 
-    whenJust (renderErrorsForSender ephemeralTemplate) $ \errorsMsg ->
+    whenJust (renderErrorsTP ephemeralTemplate) $ \errorsMsg ->
       sendAction errorsMsg (uId sender)
 
     let notBotAndSameTimeZone u = not (uIsBot u) && uTz u /= uTz sender
@@ -91,5 +112,5 @@ processEvent evt = when (newMessageOrEditedMessage evt) $ do
 --    usersToNotify <- mapM getUser usersInChannelIds -- dev
 
     forConcurrently_ usersToNotify $ \userToNotify -> do
-      let ephemeralMessage = renderEphemeralMessageForOthers userToNotify ephemeralTemplate
+      let ephemeralMessage = renderAllTP userToNotify ephemeralTemplate
       sendAction ephemeralMessage (uId userToNotify)

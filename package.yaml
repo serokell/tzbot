@@ -26,8 +26,10 @@ library:
   - containers
   - fmt
   - formatting
+  - guid
   - http-client
   - http-client-tls
+  - lens-aeson
   - lifted-async
   - megaparsec
   - monad-control

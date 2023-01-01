@@ -28,14 +28,24 @@ library
       TzBot.Config
       TzBot.Config.Default
       TzBot.Config.Types
+      TzBot.Feedback.Dialog
+      TzBot.Feedback.Dialog.Types
+      TzBot.Feedback.Save
       TzBot.Instances
       TzBot.Parser
-      TzBot.ProcessEvent
+      TzBot.ProcessEvents.BlockAction
+      TzBot.ProcessEvents.Common
+      TzBot.ProcessEvents.Interactive
+      TzBot.ProcessEvents.Message
+      TzBot.Render
       TzBot.RunMonad
       TzBot.Slack
       TzBot.Slack.API
-      TzBot.Slack.EphemeralMessage
+      TzBot.Slack.API.Block
+      TzBot.Slack.API.Common
       TzBot.Slack.Events
+      TzBot.Slack.Fixtures
+      TzBot.Slack.Modal
       TzBot.TimeReference
       TzBot.Util
   other-modules:
@@ -101,8 +111,10 @@ library
     , containers
     , fmt
     , formatting
+    , guid
     , http-client
     , http-client-tls
+    , lens-aeson
     , lifted-async
     , megaparsec
     , monad-control

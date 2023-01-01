@@ -14,19 +14,24 @@ module TzBot.Slack
   , getUser
   , getChannelMembers
   , sendEphemeralMessage
+  , sendMessage
+  , retrieveOneMessage
+  , startModal
+  , updateModal
+  , retrieveOneMessageFromThread
   ) where
 
 import Universum
 
 import Control.Monad.Except (throwError)
-import Data.Aeson (Value)
+import Data.Aeson
 import Data.Text.Encoding qualified as T
 import Servant ((:<|>)(..))
 import Servant.Auth.Client qualified as Auth
 import Servant.Client
   (BaseUrl(BaseUrl), ClientM, Scheme(Https), client, hoistClient, mkClientEnv, runClientM)
 
-import Data.Text qualified as T
+import Text.Interpolation.Nyan
 import TzBot.Config
 import TzBot.RunMonad
 import TzBot.Slack.API
@@ -45,10 +50,81 @@ getChannelMembers channelId = do
   conversationMembers token channelId limit >>= endpointFailed "conversations.members"
 
 -- | Post an "ephemeral message", a message only visible to the given user.
-sendEphemeralMessage :: ChannelId -> Maybe ThreadId -> Text -> UserId -> BotM ()
-sendEphemeralMessage channelId threadId text userId = do
+sendEphemeralMessage :: PostEphemeralReq -> BotM ()
+sendEphemeralMessage req = do
   token <- getBotToken
-  void $ postEphemeral token userId channelId threadId text >>= endpointFailed "chat.postEphemeral"
+  void $ postEphemeral token req >>= endpointFailed "chat.postEphemeral"
+
+-- | Post a message to a given channel.
+sendMessage :: PostMessageReq -> BotM ()
+sendMessage req = do
+  token <- getBotToken
+  void $ postMessage token req >>= endpointFailed "chat.postMessage"
+
+-- | Get a message by its id and channel id
+retrieveOneMessage :: ChannelId -> MessageId -> BotM Message
+retrieveOneMessage channelId messageId = do
+  token <- getBotToken
+  let endpointName = "conversations.history"
+      functionName = "retrieveOneMessage"
+  let inclusive = Just True
+      limit = Just $ Limit 1
+      oldest = Just messageId
+      latest = Nothing :: Maybe MessageId
+  msgs <- conversationHistory token channelId inclusive limit oldest latest
+    >>= endpointFailed "conversations.history"
+  case safeHead msgs of
+    Just msg -> pure msg
+    Nothing ->
+      throwError $
+        UnexpectedResult endpointName functionName
+          $ mkErrorMessage messageId Nothing
+
+-- | Get a message by its id, channel id and thread id
+retrieveOneMessageFromThread
+  :: ChannelId
+  -> ThreadId
+  -> MessageId
+  -> BotM Message
+retrieveOneMessageFromThread channelId threadId messageId = do
+  token <- getBotToken
+  let endpointName = "conversations.replies"
+      functionName = "retrieveOneMessageFromThread"
+      inclusive = Just True
+      limit = Just $ Limit 1
+      oldest = Just messageId
+      latest = Nothing :: Maybe MessageId
+  msgs <- conversationReplies token channelId threadId inclusive limit oldest latest
+    >>= endpointFailed endpointName
+  -- For some reason, even if the limit equals to 1, this method
+  -- returns the required thread reply together with the original
+  -- channel message (-_-)
+  case find (\m -> mMessageId m == messageId) msgs of
+    Just msg -> pure msg
+    Nothing ->
+      throwError $
+        UnexpectedResult endpointName functionName
+          $ mkErrorMessage messageId $ Just threadId
+
+mkErrorMessage :: MessageId -> Maybe ThreadId -> ErrorDescription
+mkErrorMessage messageId mbThreadId = do
+  let threadAddition =
+        fromMaybe "" $
+          fmap (\tId -> [int|| and threadId=#{tId}|]) mbThreadId :: Text
+  [int||expected to find the message \
+        with searched id=#{messageId}#{threadAddition}|]
+
+-- | Start dialog with user.
+startModal :: OpenViewReq -> BotM ()
+startModal req = do
+  token <- getBotToken
+  void $ openView token req >>= endpointFailed "views.open"
+
+-- | Proceed dialog with user.
+updateModal :: UpdateViewReq -> BotM ()
+updateModal req = do
+  token <- getBotToken
+  void $ updateView token req >>= endpointFailed "views.update"
 
 getBotToken :: BotM Auth.Token
 getBotToken = do
@@ -58,8 +134,8 @@ getBotToken = do
 endpointFailed :: Text -> SlackResponse key a -> BotM a
 endpointFailed endpoint = \case
   SRSuccess a -> pure a
-  SRError err -> do
-    log' $ endpoint <> " error: " <> T.pack (show err)
+  SRError err metadata -> do
+    log' [int||#{endpoint} error: #{err}; metadata: #{(show metadata :: Text)}|]
     throwError $ EndpointFailed endpoint err
 
 ----------------------------------------------------------------------------
@@ -71,12 +147,47 @@ conversationMembers
   :: Auth.Token -> ChannelId -> Limit
   -> BotM (SlackResponse "members" [UserId])
 postEphemeral
-  :: Auth.Token -> UserId -> ChannelId -> Maybe ThreadId -> Text
+  :: Auth.Token
+  -> PostEphemeralReq
   -> BotM (SlackResponse "message_ts" Value)
+postMessage
+  :: Auth.Token
+  -> PostMessageReq
+  -> BotM (SlackResponse "ts" MessageId)
+
+conversationHistory
+  :: Auth.Token
+  -> ChannelId
+  -> Maybe Bool
+  -> Maybe Limit
+  -> Maybe MessageId
+  -> Maybe MessageId
+  -> BotM (SlackResponse "messages" [Message])
+
+conversationReplies
+  :: Auth.Token
+  -> ChannelId
+  -> ThreadId
+  -> Maybe Bool
+  -> Maybe Limit
+  -> Maybe MessageId
+  -> Maybe MessageId
+  -> BotM (SlackResponse "messages" [Message])
+
+
+openView
+  :: Auth.Token -> OpenViewReq -> BotM (SlackResponse "view" Value)
+updateView
+  :: Auth.Token -> UpdateViewReq -> BotM (SlackResponse "view" Value)
 
 usersInfo
   :<|> conversationMembers
-  :<|> postEphemeral =
+  :<|> postEphemeral
+  :<|> postMessage
+  :<|> conversationHistory
+  :<|> conversationReplies
+  :<|> openView
+  :<|> updateView =
   hoistClient api naturalTransformation (client api)
   where
     baseUrl = BaseUrl Https "slack.com" 443 "api"

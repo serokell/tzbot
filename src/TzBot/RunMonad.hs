@@ -17,8 +17,14 @@ import Servant.Client (ClientError)
 import Text.Interpolation.Nyan
 
 import TzBot.Config
+import TzBot.Feedback.Dialog.Types
 import TzBot.Slack.API
 import TzBot.TimeReference
+
+data FeedbackConfig = FeedbackConfig
+  { fcFeedbackChannel :: Maybe ChannelId
+  , fcFeedbackFile    :: Maybe Handle
+  }
 
 data BotConfig = BotConfig
   { bcAppLevelToken :: AppLevelToken
@@ -28,7 +34,9 @@ data BotConfig = BotConfig
 data BotState = BotState
   { bsConfig :: BotConfig
   , bsManager :: Manager
+  , bsFeedbackConfig :: FeedbackConfig
   , bsMessagesReferences :: IORef (M.Map MessageId (S.Set TimeReferenceText))
+  , bsReportEntries :: IORef (M.Map ReportDialogId ReportDialogEntry)
   }
 
 newtype BotM a = BotM
@@ -54,21 +62,31 @@ runOrThrowBotM state action =
 -- This ugly logging is only temporary
 log' :: MonadIO m => Text -> m ()
 log' msg = liftIO $ T.putStrLn $ "Bot> " <> msg
+
 ----------------------------------------------------------------------------
 -- Exceptions
 ----------------------------------------------------------------------------
 
+type FunctionName = Text
+type EndpointName = Text
+type ErrorDescription = Text
+
 data BotException
   = EndpointFailed Text Text
+  | UnexpectedResult Text Text Text
   | ServantError ClientError
-  deriving stock Show
+  deriving stock (Show, Generic)
 
 instance Exception BotException where
   displayException = \case
     EndpointFailed endpoint err ->
       [int|s|
-        '#{endpoint}' failed:
+        '#{endpoint}' failed: \
           #{err}
+      |]
+    UnexpectedResult endpoint funcName err ->
+      [int|s|
+        '#{funcName}', unexpected result from endpoint '#{endpoint}': #{err}
       |]
     ServantError clientError ->
       displayException clientError

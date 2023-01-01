@@ -6,19 +6,22 @@ module TzBot.BotMain where
 
 import Universum
 
-import Data.Aeson.Types
 import Data.Map qualified as M
-import Data.Text qualified as T
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Slacker
   (SlackConfig, SocketModeEvent(..), defaultSlackConfig, handleThreadExceptionSensibly,
-  pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
+  pattern BlockAction, pattern EventValue, pattern Interactive, runSocketMode, setApiToken,
+  setAppToken, setOnException)
 import System.Environment (getArgs)
 
-import TzBot.Config (AppLevelToken(..), BotToken(..), Config(cAppToken, cBotToken), readConfig)
-import TzBot.ProcessEvent (processEvent)
+import Text.Interpolation.Nyan
+import TzBot.Config (AppLevelToken(..), BotToken(..), Config(..), ConfigFinal, readConfig)
+import TzBot.ProcessEvents.BlockAction
+import TzBot.ProcessEvents.Interactive
+import TzBot.ProcessEvents.Message (processMessageEvent)
 import TzBot.RunMonad
+import TzBot.Util
 
 {- |
 
@@ -35,28 +38,58 @@ main = do
   (configFilePath :: Maybe FilePath) <- safeHead <$> getArgs
   config <- readConfig configFilePath
 
-  let appLevelToken = cAppToken config
-      botToken = cBotToken config
-  let sCfg = defaultSlackConfig
-            & setApiToken (unBotToken botToken)
-            & setAppToken (unAppLevelToken appLevelToken)
-            & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
+  withFeedbackConfig config $ \feedbackConfig -> do
 
-  let wCfg = BotConfig
-        { bcAppLevelToken = appLevelToken
-        , bcBotToken = botToken
-        }
+    let appLevelToken = cAppToken config
+        botToken = cBotToken config
+    let sCfg = defaultSlackConfig
+              & setApiToken (unBotToken botToken)
+              & setAppToken (unAppLevelToken appLevelToken)
+              & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
 
-  manager <- newManager tlsManagerSettings
-  refSetMapIORef <- newIORef M.empty
-  let wState = BotState wCfg manager refSetMapIORef
+    let wCfg = BotConfig
+          { bcAppLevelToken = appLevelToken
+          , bcBotToken = botToken
+          }
 
-  runSocketMode sCfg (handler wState) -- auto-acknowledge received messages
+    manager <- newManager tlsManagerSettings
+    refSetMapIORef <- newIORef M.empty
+    dialogMapIORef <- newIORef M.empty
+    let wState = BotState wCfg manager feedbackConfig refSetMapIORef dialogMapIORef
+
+    runSocketMode sCfg (handler wState) -- auto-acknowledge received messages
+
+withFeedbackConfig :: ConfigFinal -> (FeedbackConfig -> IO a) -> IO a
+withFeedbackConfig Config {..} action = do
+  fcFeedbackFile <- traverse (\path -> openFile path AppendMode) cFeedbackFile
+  let fcFeedbackChannel = cFeedbackChannel
+  action FeedbackConfig {..} `finally` whenJust fcFeedbackFile hClose
 
 handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
 handler wstate _cfg = \e -> do
-  case e of
-    EventValue "message" evtRaw -> case parseEither parseJSON evtRaw of
-      Left err -> log' $ T.pack err
-      Right evt -> void . runBotM wstate $ processEvent evt
+  run $ case e of
+    EventValue "message" evtRaw
+      | Just evt <- decodeMaybe evtRaw -> processMessageEvent evt
+
+    Interactive interactiveType interactiveRaw
+      | Just interactiveAction <- getInteractive interactiveType interactiveRaw ->
+        case interactiveAction of
+          IEMessageEvent ime -> processInteractive ime
+          IEReportViewSubmitted (viewSubmittedEvent, input)
+            -> processViewSubmission input viewSubmittedEvent
+
+    BlockAction actionId blockActionRaw
+      | Just blockActionEvent <- getBlockAction actionId blockActionRaw ->
+        case blockActionEvent of
+          BAReportButtonToggled reportButtonToggledEvent
+            -> processReportButtonToggled reportButtonToggledEvent
+          BAReportButtonFromEphemeral reportButtonEphemeralEvent
+            -> processReportButtonFromEphemeral reportButtonEphemeralEvent
     _ -> pure ()
+  where
+    run :: BotM a -> IO ()
+    run action = do
+      eithRes <- runBotM wstate action
+      case eithRes of
+        Left err -> log' [int||Error occured: #{show @Text err}|]
+        Right _ -> pure ()

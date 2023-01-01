@@ -52,6 +52,16 @@ cacheUsersInfo: 3m
 # Envvar: #{cacheConvMembersEnv}
 #
 cacheConversationMembers: 3m
+
+# Defines what Slack channel will be used for collecting user feedback.
+# Envvar: #{feedbackChannelEnv}
+#
+# feedbackChannel: C13FQHWLQS2
+
+# Defines what file will be used for collecting user feedback.
+# Envvar: #{feedbackFileEnv}
+#
+feedbackFile: feedback.log
   |]
 
 -- This prevents Config.Default.defaultConfigText to be incorrect on compiling.
