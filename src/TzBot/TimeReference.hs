@@ -6,10 +6,14 @@ module TzBot.TimeReference where
 
 import Universum
 
-import Data.Maybe (fromJust)
-import Data.Time (DayOfWeek, TimeOfDay, TimeZone, UTCTime)
+import Control.Arrow ((>>>))
+import Data.List.NonEmpty qualified as NE
+import Data.Time
+  (DayOfWeek, LocalTime(localDay), NominalDiffTime, TimeOfDay, TimeZone, UTCTime, addLocalTime,
+  diffLocalTime, localTimeToUTC, nominalDay, toGregorian, utc, utcToLocalTime)
 import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
-import Data.Time.Format.ISO8601 (iso8601ParseM)
+import Data.Time.TZInfo qualified as TZI
+import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
 import Formatting (Buildable)
 
@@ -18,7 +22,7 @@ import Formatting (Buildable)
 Note: The `TimeZone` data type from the @time@ package is a misnomer, it doesn't actually represent a timezone.
 
 A timezone contains a set of rules dictating which offset(s) is/are observed throughout the year.
-For example: under current law, the “Europe/London” timezone observes the offset BST (UTC+01:00)
+For example: under current law, the "Europe/London" timezone observes the offset BST (UTC+01:00)
 during summer and the offset GMT (UTC+00:00) otherwise.
 These rules change over time by governmental decree.
 
@@ -65,20 +69,141 @@ newtype TimeZoneAbbreviation = TimeZoneAbbreviation { unTimeZoneAbbreviation :: 
 newtype Offset = Offset { unOffset :: Int }
   deriving newtype (Eq, Show, Num)
 
--- | Converts a time reference to a moment in time (expressed in UTC).
---
--- If the time reference contains a timezone abbreviation, and if that abbreviation
--- is invalid or not supported, this returns a `Left`.
+secondsPerMinute :: Int
+secondsPerMinute = 60
+
+offsetToNominalDiffTime :: Offset -> NominalDiffTime
+offsetToNominalDiffTime (Offset minutes) =
+  fromIntegral @Int @NominalDiffTime (minutes * secondsPerMinute)
+
+utcToUtcLocalTime :: UTCTime -> LocalTime
+utcToUtcLocalTime = utcToLocalTime utc
+
+utcLocalTimeToUTC :: LocalTime -> UTCTime
+utcLocalTimeToUTC = localTimeToUTC utc
+
+{- | Converts a time reference to a moment in time (expressed in UTC).
+
+  If the time reference contains a timezone abbreviation, and if that abbreviation\
+  is invalid or not supported, this returns an error.
+
+  If the timezone abbreviation is valid and supported, we assume that
+  the user prefers to use it as a reference timezone, so we ignore
+  their own timezone from their profile settings.
+-}
 timeReferenceToUTC
   :: TZLabel -- ^ The timezone of the sender of the Slack message.
   -> UTCTime -- ^ The time at which the message was sent.
   -> TimeReference -- ^ A time reference to translate to UTC.
   -> TimeReferenceToUTCResult
-timeReferenceToUTC sendersTimezone _eventTimestamp _timeRef =
-  -- TODO [#2]
-  TRTUSuccess
-    (fromJust $ iso8601ParseM @_ @UTCTime "2022-03-12T13:00:00Z")
-    (Left sendersTimezone)
+timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
+  case mbEitherTzOrOffset of
+    Left abbrev -> TRTUInvalidTimeZoneAbbrev abbrev
+    Right (Right offset) -> do
+      -- In the case of rigid offset we don't need the `modifyLocal` from
+      -- from the `tztime` package because there are no timeshifts that
+      -- we should take into account. So we just use plain LocalTime.
+      let eventTimeUTC = utcToUtcLocalTime eventTimestamp
+          offsetNominal = offsetToNominalDiffTime offset
+      let refTimeUTC = eventTimeUTC & (
+            addLocalTime offsetNominal
+            >>> dayTransition
+            >>> TZT.atTimeOfDay trTimeOfDay
+            >>> addLocalTime (negate offsetNominal)
+            )
+      TRTUSuccess (utcLocalTimeToUTC refTimeUTC) (Right offset)
+    Right (Left tzLabel) -> do
+      let eventLocalTime = TZT.fromUTC (TZI.fromLabel tzLabel) eventTimestamp
+      let eithRefTime = eventLocalTime & TZT.modifyLocalStrict (
+            dayTransition >>> TZT.atTimeOfDay trTimeOfDay
+            )
+      case eithRefTime of
+        Left err -> tzErrorToResult err
+        Right refTime -> TRTUSuccess (TZT.toUTC refTime) (Left tzLabel)
+
+  where
+  tzErrorToResult :: TZT.TZError -> TimeReferenceToUTCResult
+  tzErrorToResult TZT.TZOverlap {} = TRTUAmbiguous
+  tzErrorToResult TZT.TZGap {}     = TRTUInvalid
+
+  -- This doesn't include setting time, only date changes
+  dayTransition :: LocalTime -> LocalTime
+  dayTransition eventLocalTime = case trDateRef of
+    Nothing -> do
+      let thatTimeOfCurrentDay = TZT.atTimeOfDay trTimeOfDay eventLocalTime
+      if thatTimeOfCurrentDay >= eventLocalTime
+        then eventLocalTime
+        else TZT.addCalendarClip (TZT.calendarDays 1) eventLocalTime
+    Just (DaysFromToday n) ->
+      TZT.addCalendarClip (TZT.calendarDays $ fromIntegral @Int @Integer n) eventLocalTime
+    Just (DayOfWeekRef dayOfWeek) ->
+      TZT.atFirstDayOfWeekOnAfter dayOfWeek eventLocalTime
+    Just (DayOfMonthRef dayOfMonth mbMonthOfYear) -> case mbMonthOfYear of
+      Nothing -> chooseBestMonth dayOfMonth eventLocalTime
+      Just monthOfYear -> chooseBestYear dayOfMonth monthOfYear eventLocalTime
+
+  -- The outer `Either` acts like an error carrier, so for it we use `pure` and `<$>`,
+  -- and the inner `Either` carries one of the possible equitable results, so
+  -- for it we use `Right` or `Left`.
+  mbEitherTzOrOffset :: Either TimeZoneAbbreviation (Either TZLabel Offset)
+  mbEitherTzOrOffset = case trLocationRef of
+    Nothing -> pure $ Left sendersTZLabel
+    Just (TimeZoneRef tzLabel) -> pure $ Left tzLabel
+    Just (OffsetRef offset) -> pure $ Right offset
+    Just (TimeZoneAbbreviationRef abbrev) ->
+      Right . tzaiOffsetMinutes <$>
+        maybe (Left abbrev) pure (find (\e -> tzaiAbbreviation e == abbrev) knownTimeZoneAbbreviations)
+
+-- | Given a day of month and current time, try to figure out what day was really meant.
+-- Algorithm:
+--
+-- 1. Take current month and its neighbors and take the given day of month
+--    for that months (clip if there's no such day in this month);
+-- 2. Calculate absolute difference between that days and current day,
+--    obtaining some scores;
+-- 3. Our goal is to pick the day with the lowest score; but we prefer
+--    future, so we add some additional score to the days in the past;
+-- 4. Try to pick the date which day of month is the same as mentioned
+--    by the user, with the lowest score;
+-- 5. If it's not found, pick just the day with the lowest score
+--    (normally this shouldn't occur, only for errors like 32th January.
+chooseBestMonth :: DayOfMonth -> LocalTime -> LocalTime
+chooseBestMonth dayOfMonth now = do
+  let candidateDiffs = 0 :| [-1, 1]
+      candidates = flip NE.map candidateDiffs $ \x ->
+        TZT.atDayOfMonth dayOfMonth $ TZT.addCalendarClip (TZT.calendarMonths x) now
+      preferFuture = 10 * nominalDay
+      calcWeight x = let diff = diffLocalTime x now
+                      in if diff > 0
+                         then diff
+                         else negate diff + preferFuture
+      sortedCandidates = NE.sortBy (compare `on` calcWeight) candidates
+      getDayOfMonth x = let (_, _, day) = toGregorian $ localDay x in day
+      isDayOfMonthTheSame c = getDayOfMonth c == dayOfMonth
+  case find isDayOfMonthTheSame sortedCandidates of
+    Just res -> res
+    Nothing -> NE.head sortedCandidates
+
+-- | Given a day of month, a month of year and current time, try to figure out
+--   what day was really meant. The algorithm is essentially the same as
+--   for the `chooseBestMonth` function, except for the precise matching check,
+--   i.e. if user mentions 29 February and now it's 1 January of non-leap year,
+--   the result will be 28 February of that year.
+chooseBestYear :: DayOfMonth -> MonthOfYear -> LocalTime -> LocalTime
+chooseBestYear dayOfMonth monthOfYear now = do
+  -- month first, then day
+  let thatDayAndMonthOfCurrentYear = now &
+        (TZT.atMonthOfYear monthOfYear >>> TZT.atDayOfMonth dayOfMonth)
+      lastYear = TZT.addCalendarClip (TZT.calendarYears (-1)) thatDayAndMonthOfCurrentYear
+      nextYear = TZT.addCalendarClip (TZT.calendarYears 1) thatDayAndMonthOfCurrentYear
+      candidates = thatDayAndMonthOfCurrentYear :| [lastYear, nextYear]
+      preferFuture = 6 * 30 * nominalDay -- 6 months
+      calcWeight x = let diff = diffLocalTime x now
+                      in if diff > 0
+                         then diff
+                         else negate diff + preferFuture
+      sortedCandidates = NE.sortBy (compare `on` calcWeight) candidates
+  NE.head sortedCandidates
 
 data TimeReferenceToUTCResult
   = TRTUSuccess
@@ -97,7 +222,7 @@ data TimeReferenceToUTCResult
   -- See [Edge cases & pitfalls](https://github.com/serokell/tzbot/blob/main/docs/pitfalls.md#invalid-times).
   | TRTUInvalidTimeZoneAbbrev TimeZoneAbbreviation
   -- ^ The timezone abbreviation used is not supported / does not exist.
-
+  deriving stock (Eq, Show)
 ----------------------------------------------------------------------------
 -- Timezone abbreviations
 ----------------------------------------------------------------------------
@@ -132,8 +257,8 @@ knownTimeZoneAbbreviations =
   , TimeZoneAbbreviationInfo "AMST"  (hours -03)       "Amazon Summer Time"
   , TimeZoneAbbreviationInfo "CLT"   (hours -04)       "Chile Standard Time"
   , TimeZoneAbbreviationInfo "CLST"  (hours -03)       "Chile Summer Time"
-  , TimeZoneAbbreviationInfo "BRT"   (hours -03)       "Brasília Time"
-  , TimeZoneAbbreviationInfo "BRST"  (hours -02)       "Brasília Summer Time"
+  , TimeZoneAbbreviationInfo "BRT"   (hours -03)       "Brasilia Time"
+  , TimeZoneAbbreviationInfo "BRST"  (hours -02)       "Brasilia Summer Time"
   , TimeZoneAbbreviationInfo "WET"   (hours  00)       "Western European Time"
   , TimeZoneAbbreviationInfo "WEST"  (hours  01)       "Western European Summer Time"
   , TimeZoneAbbreviationInfo "BST"   (hours  01)       "British Summer Time"

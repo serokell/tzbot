@@ -79,6 +79,9 @@ tests:
     - hspec
     - tasty
     - tasty-hspec
+    - tasty-hunit
+    - time
+    - tztime
     - universum
 
 ghc-options:

@@ -196,6 +196,7 @@ test-suite tzbot-test
   main-is: Main.hs
   other-modules:
       Test.TzBot.ConfigSpec
+      Test.TzBot.TimeReferenceToUtcSpec
       Tree
       Paths_tzbot
   hs-source-dirs:
@@ -260,6 +261,9 @@ test-suite tzbot-test
     , hspec
     , tasty
     , tasty-hspec
+    , tasty-hunit
+    , time
     , tzbot
+    , tztime
     , universum
   default-language: Haskell2010
