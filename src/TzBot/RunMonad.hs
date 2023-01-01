@@ -16,11 +16,9 @@ import Network.HTTP.Client (Manager)
 import Servant.Client (ClientError)
 import Text.Interpolation.Nyan
 
+import TzBot.Config
 import TzBot.Slack.API
 import TzBot.TimeReference
-
-newtype AppLevelToken = AppLevelToken { unAppLevelToken :: Text }
-newtype BotToken = BotToken { unBotToken :: Text }
 
 data BotConfig = BotConfig
   { bcAppLevelToken :: AppLevelToken

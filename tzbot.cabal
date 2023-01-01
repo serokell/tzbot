@@ -25,8 +25,10 @@ source-repository head
 library
   exposed-modules:
       TzBot.BotMain
+      TzBot.Config
+      TzBot.Config.Default
+      TzBot.Config.Types
       TzBot.Instances
-      TzBot.Orphans
       TzBot.Parser
       TzBot.ProcessEvent
       TzBot.RunMonad
@@ -97,6 +99,7 @@ library
     , aeson-casing
     , base >=4.7 && <5
     , containers
+    , fmt
     , formatting
     , http-client
     , http-client-tls
@@ -105,11 +108,14 @@ library
     , monad-control
     , mtl
     , nyan-interpolation
+    , o-clock
     , servant-auth
     , servant-auth-client
     , servant-client
     , servant-server
     , slacker
+    , string-conversions
+    , template-haskell
     , text
     , time
     , time-compat
@@ -117,6 +123,8 @@ library
     , tz
     , tztime
     , universum
+    , validation
+    , yaml
   default-language: Haskell2010
 
 executable tzbot-exe
@@ -187,6 +195,7 @@ test-suite tzbot-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Test.TzBot.ConfigSpec
       Tree
       Paths_tzbot
   hs-source-dirs:
@@ -247,6 +256,10 @@ test-suite tzbot-test
       tasty-discover:tasty-discover
   build-depends:
       base >=4.7 && <5
+    , containers
+    , hspec
     , tasty
+    , tasty-hspec
+    , tzbot
     , universum
   default-language: Haskell2010

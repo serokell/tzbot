@@ -15,7 +15,7 @@ import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
 import Text.Interpolation.Nyan
 
-import TzBot.Orphans ()
+import TzBot.Instances ()
 import TzBot.Slack.API (User(uTz))
 import TzBot.TimeReference
 

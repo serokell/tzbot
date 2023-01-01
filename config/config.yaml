@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+# Some of these settings can be provided by environment variables (envvars),
+# which have highest priority.
+
+# Slack application token,
+# see https://api.slack.com/apps/[application_id] for details.
+# Envvar: SLACK_TZ_APP_TOKEN
+#
+# appToken: <app-token>
+
+# Bot authentication token,
+# see https://api.slack.com/apps/[application_id]/oauth for details.
+# Envvar: SLACK_TZ_BOT_TOKEN
+#
+# botToken: <bot-token>
+
+# Maximum allowed times to retry on 429 error before giving up.
+# Envvar: SLACK_TZ_MAX_RETRIES
+#
+maxRetries: 3
+
+# Caching expiration time for user profile info.
+# Format examples: 2d18h40m, 3m20s, 20m.
+# Envvar: SLACK_TZ_CACHE_USERS_INFO
+#
+cacheUsersInfo: 3m
+
+# Caching expiration time for channel members info.
+# Format examples: 2d18h40m, 3m20s, 20m.
+# Envvar: SLACK_TZ_CACHE_CONVERSATION_MEMBERS
+#
+cacheConversationMembers: 3m
