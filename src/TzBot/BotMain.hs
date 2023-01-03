@@ -7,25 +7,27 @@ module TzBot.BotMain where
 import Universum
 
 import Control.Monad.Managed (managed, runManaged)
-import Data.Aeson.Types (FromJSON(parseJSON), parseEither)
 import Data.ByteString qualified as BS
 import Data.Map qualified as M
-import Data.Text qualified as T
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Options.Applicative (execParser)
 import Slacker
-  (SlackConfig, SocketModeEvent(..), defaultSlackConfig, handleThreadExceptionSensibly,
-  pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
+  (defaultSlackConfig, handleThreadExceptionSensibly, runSocketMode, setApiToken, setAppToken,
+  setOnException)
 import System.Directory (doesFileExist)
 import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Cache
-import TzBot.Config (AppLevelToken(..), BotToken(..), Config(..), readConfig)
+  (TzCacheSettings(tcsExpiryRandomAmplitudeFraction), defaultTzCacheSettings, withTzCache,
+  withTzCacheDefault)
+import TzBot.Config
 import TzBot.Config.Default (defaultConfigText)
+import TzBot.Config.Types (BotConfig)
 import TzBot.Options
-import TzBot.ProcessEvent
-import TzBot.RunMonad (BotState(..), log', runBotM)
+import TzBot.ProcessEvents (handler)
+import TzBot.RunMonad
+import TzBot.Util (withMaybe)
 
 {- |
 
@@ -50,42 +52,46 @@ dumpConfig = \case
     let writeAction = BS.writeFile path defaultConfigText
     if force
     then writeAction
-    else do
-      ifM
-        (doesFileExist path)
-        (hPutStrLn @Text stderr [int||File #{path} already exists, \
+    else ifM
+      (doesFileExist path)
+      (hPutStrLn @Text stderr [int||File #{path} already exists, \
                                 use --force to overwrite|] >> exitFailure)
-        writeAction
+      writeAction
 
 run :: Options -> IO ()
 run opts = do
   let mbConfigFilePath = oConfigFile opts
   bsConfig@Config {..} <- readConfig mbConfigFilePath
-
-  let sCfg = defaultSlackConfig
-            & setApiToken (unBotToken cBotToken)
-            & setAppToken (unAppLevelToken cAppToken)
-            & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
-
-  bsManager <- newManager tlsManagerSettings
-  bsMessagesReferences <- newIORef M.empty
   runManaged $ do
+
+    let fifteenPercentAmplitudeSettings = defaultTzCacheSettings
+          { tcsExpiryRandomAmplitudeFraction = Just 0.15
+          }
+    let sCfg = defaultSlackConfig
+              & setApiToken (unBotToken cBotToken)
+              & setAppToken (unAppLevelToken cAppToken)
+              & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
+
+    bsManager <- liftIO $ newManager tlsManagerSettings
+    bsMessagesReferences <- newIORef M.empty
+    bsFeedbackConfig <-
+      managed $ withFeedbackConfig bsConfig
     bsUserInfoCache <-
-      managed $ withRandomizedCacheDefault cCacheUsersInfo
+      managed $ withTzCache fifteenPercentAmplitudeSettings cCacheUsersInfo
     bsConversationMembersCache <-
-      managed $ withRandomizedCacheDefault cCacheConversationMembers
+      managed $ withTzCache fifteenPercentAmplitudeSettings cCacheConversationMembers
+    bsReportEntries <-
+      managed $ withTzCacheDefault cCacheReportDialog
+    -- auto-acknowledge received messages
     liftIO $ runSocketMode sCfg $ handler BotState {..}
 
-handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
-handler bState _cfg = \e -> do
-  case e of
-    EventValue "message" evtRaw -> case parseEither parseJSON evtRaw of
-      Left err -> log' $ T.pack err
-      Right evt -> void . runBotM bState $ processMessageEvent evt
-    EventValue "member_joined_channel" evtRaw -> case parseEither parseJSON evtRaw of
-      Left err -> log' $ T.pack err
-      Right evt -> void . runBotM bState $ processMemberJoinedChannel evt
-    EventValue "member_left_channel" evtRaw -> case parseEither parseJSON evtRaw of
-      Left err -> log' $ T.pack err
-      Right evt -> void . runBotM bState $ processMemberLeftChannel evt
-    _ -> pure ()
+withFeedbackConfig :: BotConfig -> (FeedbackConfig -> IO a) -> IO a
+withFeedbackConfig Config {..} action = do
+  let fcFeedbackChannel = cFeedbackChannel
+  withFeedbackFile cFeedbackFile $ \fcFeedbackFile ->
+    action FeedbackConfig {..}
+  where
+    withFeedbackFile :: Maybe FilePath -> (Maybe Handle -> IO a) -> IO a
+    withFeedbackFile mbPath action =
+      withMaybe mbPath (action Nothing) $ \path ->
+        withFile path AppendMode (action . Just)

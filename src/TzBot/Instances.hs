@@ -27,6 +27,9 @@ instance FromJSON TZLabel where
         Just tzLabel -> pure tzLabel
         Nothing -> fail $ "Invalid timezone: '" <> T.unpack t <> "'"
 
+instance ToJSON TZLabel where
+  toJSON = String . T.decodeUtf8 . TZ.toTZName
+
 instance KnownRatName unit => FromJSON (Time unit) where
   parseJSON = withText "Time string" $ \t -> case unitsP @unit (toString t) of
     Just x  -> pure x

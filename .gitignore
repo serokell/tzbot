@@ -9,3 +9,4 @@
 hie.yaml
 .vscode/
 result
+*.txt

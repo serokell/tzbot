@@ -29,11 +29,12 @@ import Text.Interpolation.Nyan (int, rmode')
 import TzBot.Config.Default (defaultConfigTrick)
 import TzBot.Config.Types as Types
   (AppLevelToken(..), BotToken(..), Config(..), ConfigField, ConfigStage(..), Env, EnvVarName,
-  FieldName, appTokenEnv, botTokenEnv, cacheConvMembersEnv, cacheUsersEnv, maxRetriesEnv)
+  FieldName, appTokenEnv, botTokenEnv, cacheConvMembersEnv, cacheReportDialogEnv, cacheUsersEnv,
+  feedbackChannelEnv, feedbackFileEnv, maxRetriesEnv)
 import TzBot.Instances ()
 
-data LoadConfigError =
-  LCEBothEnvAndConfigFieldMissing FieldName EnvVarName
+data LoadConfigError
+  = LCEBothEnvAndConfigFieldMissing FieldName EnvVarName
   | LCEEnvVarParseError EnvVarName String
   | LCEYamlParseError Y.ParseException
   | LCEInvalidValue FieldName String
@@ -99,22 +100,17 @@ readConfigWithEnv env mbPath =
   -- has strict fields (because of the @StrictData@ extension), so `evaluate`
   -- causes all of its fields to be evaluated at least to the WHNF.
   -- After this, we catch yaml exception in order to pretty-print it later.
-  handle handleFunc $ traverse evaluate $ toEither $ do
-  let cfg :: Config 'CSInterm
-      -- The most easy way to read file on demand, acceptable here.
-      cfg = unsafePerformIO $
-        loadYamlSettings (maybeToList mbPath) [toJSON defaultConfig] ignoreEnv
-  cAppToken <- toValidation $
-    parseEnvFieldRequiredOverriding env "appToken" appTokenEnv (cAppToken cfg)
-  cBotToken <- toValidation $
-    parseEnvFieldRequiredOverriding env "botToken" botTokenEnv (cBotToken cfg)
-  cMaxRetries <- (fromMaybe (cMaxRetries cfg) <$>
-    toValidation (parseEnvField env maxRetriesEnv)) `bindValidation` validateMaxTries
-  cCacheUsersInfo <- fromMaybe (cCacheUsersInfo cfg) <$>
-    toValidation (parseEnvField env cacheUsersEnv)
-  cCacheConversationMembers <- fromMaybe (cCacheConversationMembers cfg) <$>
-    toValidation (parseEnvField env cacheConvMembersEnv)
-  pure $ Config {..}
+  handle handleFunc $ traverse evaluate $ toEither
+    $ do
+  cAppToken <- fetchRequired "appToken" appTokenEnv cAppToken
+  cBotToken <- fetchRequired "botToken" botTokenEnv cBotToken
+  cMaxRetries <- fetchOptional maxRetriesEnv cMaxRetries `bindValidation` validateMaxTries
+  cCacheUsersInfo           <- fetchOptional cacheUsersEnv        cCacheUsersInfo
+  cCacheConversationMembers <- fetchOptional cacheConvMembersEnv  cCacheConversationMembers
+  cFeedbackChannel          <- fetchOptional feedbackChannelEnv   cFeedbackChannel
+  cFeedbackFile             <- fetchOptional feedbackFileEnv      cFeedbackFile
+  cCacheReportDialog        <- fetchOptional cacheReportDialogEnv cCacheReportDialog
+  pure Config {..}
   where
     handleFunc :: Y.ParseException -> IO (Either [LoadConfigError] $ Config 'CSFinal)
     handleFunc = pure . Left . singleton . LCEYamlParseError
@@ -126,6 +122,24 @@ readConfigWithEnv env mbPath =
           if v < 0 || v > 3
             then Nothing
             else Just v
+
+    _cfg :: Config 'CSInterm
+    -- The most easy way to read file on demand, acceptable here.
+    _cfg@Config {..} = unsafePerformIO $
+        loadYamlSettings (maybeToList mbPath) [toJSON defaultConfig] ignoreEnv
+
+    fetchRequired
+      :: (FromJSON a)
+      => FieldName
+      -> EnvVarName
+      -> Maybe a
+      -> Validation [LoadConfigError] a
+    fetchRequired fieldName envvarName defaultVal =
+      toValidation $ parseEnvFieldRequiredOverriding env fieldName envvarName defaultVal
+
+    fetchOptional :: (FromJSON a) => EnvVarName -> a -> Validation [LoadConfigError] a
+    fetchOptional envvarName defaultVal =
+      fromMaybe defaultVal <$> toValidation (parseEnvField env envvarName)
 
 -- | Read config from environment, given filepath, filling up missing fields
 -- with default values. Priorities:

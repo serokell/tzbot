@@ -4,22 +4,41 @@
 
 module TzBot.Util where
 
-import Universum
+import Universum hiding (last)
 
-import Data.Aeson (FromJSON(..))
+import Data.Aeson
+import Data.Aeson qualified as AeKey
 import Data.Aeson qualified as Aeson
-import Data.Aeson.Casing (aesonPrefix, camelCase, snakeCase)
+import Data.Aeson.Casing (aesonPrefix, camelCase)
+import Data.Aeson.Key qualified as AeKey
+import Data.Aeson.Types (Parser, parseMaybe)
+import Data.Char (isLower)
+import Data.String.Conversions (cs)
+import Data.Time (UTCTime, defaultTimeLocale, parseTimeM)
 import Data.Yaml qualified as Y
-import Language.Haskell.TH (Exp, Q)
+import GHC.Generics
+import Language.Haskell.TH
 import System.Clock (TimeSpec, fromNanoSecs, toNanoSecs)
 import System.Random (randomRIO)
+import Text.Interpolation.Nyan (int, rmode')
 import Time (KnownDivRat, Nanosecond, Time, floorRat, ns, toUnit)
 
 attach :: (Functor f) => (a -> b) -> f a -> f (a, b)
 attach f = fmap (\x -> (x, f x))
 
-aesonStripLowercasePrefixOptions :: Aeson.Options
-aesonStripLowercasePrefixOptions = aesonPrefix snakeCase
+withMaybe :: Maybe a -> b -> (a -> b) -> b
+withMaybe mbVal nothing just = maybe nothing just mbVal
+
+tsToUTC :: String -> Maybe UTCTime
+tsToUTC = parseTimeM False defaultTimeLocale "%s%Q"
+
+parseSlackTimestamp :: AeKey.Key -> String -> Parser UTCTime
+parseSlackTimestamp fieldName tsStr = do
+  let failMessage = [int||Failed to parse timestamp "#{AeKey.toString fieldName}"|]
+  maybe (fail failMessage) pure $ tsToUTC tsStr
+
+fetchSlackTimestamp :: AeKey.Key -> Object -> Parser UTCTime
+fetchSlackTimestamp key o = o .: key >>= parseSlackTimestamp key
 
 -- | Options that we use to derive JSON instances for config types.
 aesonConfigOptions :: Aeson.Options
@@ -40,16 +59,73 @@ timeToTimespec = fromNanoSecs . floorRat . toUnit @Nanosecond
 timespecToTime :: KnownDivRat Nanosecond k => TimeSpec -> Time k
 timespecToTime = toUnit . ns . fromIntegral . toNanoSecs
 
-{-
->>> import Time
->>> let Just time = unitsP "30m" :: Maybe (Time Minute)
->>> (timespecToTime $ timeToTimespec time :: Time Minute) == time
-True
- -}
-
 randomTimeSpec :: (TimeSpec, TimeSpec) -> IO TimeSpec
 randomTimeSpec (min, max) =
   fromNanoSecs <$> randomRIO (toNanoSecs min, toNanoSecs max)
 
+multTimeSpec :: Double -> TimeSpec -> TimeSpec
+multTimeSpec mult =
+  fromNanoSecs . floor . (* mult) . fromIntegral . toNanoSecs
+
 (+-) :: Num a => a -> a -> (a, a)
 x +- y = (x - y, x + y)
+
+-- aeson utils
+decodeMaybe :: FromJSON a => Value -> Maybe a
+decodeMaybe = parseMaybe parseJSON
+
+defaultRecordOptions :: Options
+defaultRecordOptions = defaultOptions
+  { fieldLabelModifier = camelTo2 '_' . dropWhile isLower
+  , omitNothingFields = True
+  }
+
+newtype RecordWrapper a = RecordWrapper a
+
+instance (Generic a, GToJSON' Value Zero (Rep a)) => ToJSON (RecordWrapper a) where
+  toJSON (RecordWrapper x) = genericToJSON defaultRecordOptions x
+
+instance (Generic a, GFromJSON Zero (Rep a)) => FromJSON (RecordWrapper a) where
+  parseJSON val = RecordWrapper <$> genericParseJSON defaultRecordOptions val
+
+----
+defaultTypedOptions :: Options
+defaultTypedOptions = defaultOptions
+  { fieldLabelModifier = camelTo2 '_' . dropWhile isLower
+  , constructorTagModifier = camelTo2 '_'
+  , tagSingleConstructors = True
+  , sumEncoding = TaggedObject "type" "contents"
+  , omitNothingFields = True
+  }
+
+newtype TypedWrapper a = TypedWrapper a
+
+instance (Generic a, GToJSON' Value Zero (Rep a)) => ToJSON (TypedWrapper a) where
+  toJSON (TypedWrapper x) = genericToJSON defaultTypedOptions x
+
+----
+defaultSumOptions :: Options
+defaultSumOptions = defaultOptions
+  { sumEncoding = UntaggedValue
+  }
+
+newtype SumWrapper a = SumWrapper a
+
+instance (Generic a, GToJSON' Value Zero (Rep a)) => ToJSON (SumWrapper a) where
+  toJSON (SumWrapper x) = genericToJSON defaultSumOptions x
+
+----
+encodeText :: ToJSON a => a -> Text
+encodeText = cs . encode
+
+decodeText :: FromJSON a => Text -> Maybe a
+decodeText = decode . cs
+
+----
+neConcatMap :: (a -> NonEmpty b) -> NonEmpty a -> NonEmpty b
+neConcatMap func ns = foldr1 (<>) $ fmap func ns
+
+{-
+>>> neConcatMap (\x -> x :| [x + 1]) $ 1 :| [2,3]
+1 :| [2,2,3,3,4]
+ -}

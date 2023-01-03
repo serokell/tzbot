@@ -4,11 +4,16 @@
 
 module TzBot.Cache
   ( -- * Types
-    RandomizedCache
+    TzCache
 
     -- * Cache creation
-  , withRandomizedCache
-  , withRandomizedCacheDefault
+  , TzCacheSettings (..)
+  , defaultTzCacheSettings
+  , withTzCache
+  , withTzCacheDefault
+
+    -- * Inspect
+  , lookup
 
     -- * Altering cache
   , insertRandomized
@@ -26,71 +31,75 @@ import Data.HashMap.Strict qualified as HM
 import System.Clock (TimeSpec)
 import Time (Hour, KnownDivRat, Nanosecond, Time(..), hour, threadDelay, toUnit)
 
-import TzBot.Util (randomTimeSpec, timeToTimespec, (+-))
+import TzBot.Util (multTimeSpec, randomTimeSpec, timeToTimespec, (+-))
 
 -- | This datatype uses `Cache` datatype inside, but also
 --   provides a possibility to slightly vary expiration
 --   time randomly around the configured mean value.
 --   Use it when you don't want a bunch of cached data
---   to expire at once.
+--   to expire at once. Also can be used without randomizing.
 --
 --   Automatic periodical cleaning is also included.
-data RandomizedCache k v = RandomizedCache
+data TzCache k v = TzCache
   { rcCache  :: Cache k v
   , rcExpiry :: TimeSpec
-  , rcExpiryRandomAmplitude :: TimeSpec
+  , rcExpiryRandomAmplitude :: Maybe TimeSpec
   }
 
--- | Like `withRandomizedCache` but with reasonable defaults.
--- Expiry random amplitude is 15% of the expiry time,
--- default cleaning period of 24 hours is used.
-withRandomizedCacheDefault
+data TzCacheSettings = TzCacheSettings
+  { tcsExpiryRandomAmplitudeFraction :: Maybe Double
+    -- ^ Should be 0 < f < 1, `Nothing` means no randomizing.
+  , tcsCleaningPeriod :: Time Hour
+    -- ^ How frequently to purge expired items.
+  }
+
+defaultTzCacheSettings :: TzCacheSettings
+defaultTzCacheSettings = TzCacheSettings
+  { tcsExpiryRandomAmplitudeFraction = Nothing -- no randomizing
+  , tcsCleaningPeriod = hour 24
+  }
+
+-- | `withTzCache` with `defaultTzCacheSettings`.
+withTzCacheDefault
   :: ( KnownDivRat u Nanosecond
      , Eq k, Hashable k
      )
   => Time u -- ^ Expiration time
-  -> (RandomizedCache k v -> IO a) -- ^ Action that uses the cache
+  -> (TzCache k v -> IO a) -- ^ Action that uses the cache
   -> IO a
-withRandomizedCacheDefault expiry =
-  withRandomizedCache expiry (get15PerCent expiry) Nothing
-  where
-    get15PerCent :: Time k -> Time k
-    get15PerCent (Time r) = Time $ r * 0.15
+withTzCacheDefault = withTzCache defaultTzCacheSettings
 
 -- | Create randomized cache and run the passed action with it.
--- Raises `error` on incorrect use.
-withRandomizedCache
+-- Raises `error` on incorrect use, check `TzCacheSettings` for
+-- constraints on its fields.
+withTzCache
   :: ( KnownDivRat u Nanosecond
      , Eq k, Hashable k
      , HasCallStack
      )
-  => Time u -- ^ Expiration time
-  -> Time u -- ^ Expiration time amplitude (should be less than expiration time)
-  -> Maybe (Time Hour) -- ^ How frequently to purge all expired items
-  -> (RandomizedCache k v -> IO a) -- ^ Action that uses the cache
+  => TzCacheSettings -- ^ Settings
+  -> Time u -- ^ Expiration time
+  -> (TzCache k v -> IO a) -- ^ Action that uses the cache
   -> IO a
-withRandomizedCache
+withTzCache
+    TzCacheSettings {..}
     (timeToTimespec -> rcExpiry)
-    (timeToTimespec -> rcExpiryRandomAmplitude)
-    cleaningPeriod
     action
   = do
-  when (rcExpiry - rcExpiryRandomAmplitude <= 0) $
-    error "Expiry random amplitude should be lower than the expiry"
+  let isRandAmpValid :: Double -> Bool
+      isRandAmpValid x = x > 0 && x < 1
+  when (fmap isRandAmpValid tcsExpiryRandomAmplitudeFraction == Just False) $
+    error "Expiry random amplitude should be <1 and >0"
+  let rcExpiryRandomAmplitude = (flip multTimeSpec rcExpiry) <$> tcsExpiryRandomAmplitudeFraction
   rcCache <- Cache.newCache $ Just rcExpiry
   withAsync
-    (cleaningThread (toUnit <$> cleaningPeriod) rcCache)
-    (\_ -> action RandomizedCache {..})
+    (cleaningThread (toUnit tcsCleaningPeriod) rcCache)
+    (\_ -> action TzCache {..})
 
-defaultCleaningPeriod :: Time Hour
-defaultCleaningPeriod = hour 24
-
-cleaningThread :: (Eq k, Hashable k) => Maybe (Time Hour) -> Cache k v -> IO ()
-cleaningThread mbCleaningPeriod cache = forever $ do
+cleaningThread :: (Eq k, Hashable k) => Time Hour -> Cache k v -> IO ()
+cleaningThread cleaningPeriod cache = forever $ do
   Time.threadDelay cleaningPeriod
   Cache.purgeExpired cache
-  where
-    cleaningPeriod = fromMaybe defaultCleaningPeriod mbCleaningPeriod
 
 -- | Generate a random expiry time and insert a key/value pair into
 -- the cache with that expiry time.
@@ -98,12 +107,15 @@ insertRandomized
   :: (Eq k, Hashable k, MonadIO m)
   => k
   -> v
-  -> RandomizedCache k v
+  -> TzCache k v
   -> m ()
-insertRandomized key val RandomizedCache {..} = do
-  let (minTimeSpec, maxTimeSpec) = rcExpiry +- rcExpiryRandomAmplitude
-  rndVal <- liftIO $ randomTimeSpec (minTimeSpec, maxTimeSpec)
-  liftIO $ Cache.insert' rcCache (Just rndVal) key val
+insertRandomized key val TzCache {..} = do
+  expiry <- case rcExpiryRandomAmplitude of
+    Nothing -> pure rcExpiry
+    Just randAmp -> do
+      let (minTimeSpec, maxTimeSpec) = rcExpiry +- randAmp
+      liftIO $ randomTimeSpec (minTimeSpec, maxTimeSpec)
+  liftIO $ Cache.insert' rcCache (Just expiry) key val
 
 -- | Try to get a value by the key from the cache, delete if it is expired.
 -- If the value is either absent or expired, perform given fetch action
@@ -113,7 +125,7 @@ fetchWithCacheRandomized
   :: (Eq k, Hashable k, MonadIO m)
   => k
   -> (k -> m v)
-  -> RandomizedCache k v
+  -> TzCache k v
   -> m v
 fetchWithCacheRandomized key fetchAction cache = do
   mv <- liftIO $ Cache.lookup (rcCache cache) key
@@ -124,14 +136,21 @@ fetchWithCacheRandomized key fetchAction cache = do
       insertRandomized key v cache
       pure v
 
+lookup
+  :: (Eq k, Hashable k, MonadIO m)
+  => k
+  -> TzCache k v
+  -> m (Maybe v)
+lookup key TzCache {..} = liftIO $ Cache.lookup rcCache key
+
 -- | Update the value by the key, expiration is not taken into account.
 update
   :: forall k v m. (Eq k, Hashable k, MonadIO m)
   => k
   -> (v -> v)
-  -> RandomizedCache k v
+  -> TzCache k v
   -> m ()
-update key valFunc RandomizedCache {..} = do
+update key valFunc TzCache {..} = do
   atomically $ modifyTVar' (CacheI.container rcCache) $ \hm ->
     HM.adjust itemFunc key hm
   where

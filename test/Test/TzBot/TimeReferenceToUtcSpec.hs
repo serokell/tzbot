@@ -233,7 +233,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ DaysFromToday 2) (Just $ TimeZoneRef labelHavana)
           , teUserLabel = labelHavana
           , teCurrentTime = time2
-          , teResult = TRTUInvalid
+          , teResult = TRTUInvalid False labelHavana
           }
     , testCase "Turn on DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
@@ -262,7 +262,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ DaysFromToday 2) (Just $ TimeZoneRef labelHavana)
           , teUserLabel = labelHavana
           , teCurrentTime = time3
-          , teResult = TRTUAmbiguous
+          , teResult = TRTUAmbiguous False labelHavana
           }
     , testCase "Turn off DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)

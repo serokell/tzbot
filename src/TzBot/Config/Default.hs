@@ -2,9 +2,9 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module TzBot.Config.Default (
-  defaultConfigTrick,
-  defaultConfigText,
+module TzBot.Config.Default
+  ( defaultConfigTrick
+  , defaultConfigText
   ) where
 
 import Universum
@@ -52,6 +52,21 @@ cacheUsersInfo: 3m
 # Envvar: #{CT.cacheConvMembersEnv}
 #
 cacheConversationMembers: 3m
+
+# Defines what Slack channel will be used for collecting user feedback.
+# Envvar: #{CT.feedbackChannelEnv}
+#
+# feedbackChannel: C13FQHWLQS2
+
+# Defines what file will be used for collecting user feedback.
+# Envvar: #{CT.feedbackFileEnv}
+#
+feedbackFile: feedback.log
+
+# Defines how long a report dialog is valid after its opening.
+# Envvar: #{CT.cacheReportDialogEnv}
+#
+cacheReportDialog: 1h
   |]
 
 -- This prevents Config.Default.defaultConfigText to be incorrect on compiling.

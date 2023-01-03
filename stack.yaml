@@ -21,6 +21,8 @@ extra-deps:
 - git: https://github.com/martijnbastiaan/doctest-parallel
   commit: 112b85b55c63dae1cc52b5216efe03873f1acc06
 
+- guid-0.1.0@sha256:a7c975be473f6f142d5cc1b39bc807a99043d20b1bb0873fdfe7a3ce84d2faf1,1078
+
 # Slacker's deps
 - monad-logger-aeson-0.3.1.0@sha256:dbb1f816d00a820982094362551e20582de0a27c337d430fa7080dcacbe66f34,5193
 - context-0.2.0.1@sha256:b5a1390a5ad11b7edd0449c9ef96823f082bff4988bd09583e37a4e93e9aad10,1891
