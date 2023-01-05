@@ -88,7 +88,7 @@ processEvent evt = when (newMessageOrEditedMessage evt) $ do
     let notBotAndSameTimeZone u = not (uIsBot u) && uTz u /= uTz sender
         notSender userId = userId /= uId sender
     usersToNotify <- filter notBotAndSameTimeZone <$> (mapM getUser $ filter notSender usersInChannelIds)
---    usersToNotify <- mapM getUser usersInChannelIds -- dev
+    -- usersToNotify <- mapM getUser usersInChannelIds -- dev
 
     forConcurrently_ usersToNotify $ \userToNotify -> do
       let ephemeralMessage = renderEphemeralMessageForOthers userToNotify ephemeralTemplate

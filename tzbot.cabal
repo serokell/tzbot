@@ -103,6 +103,7 @@ library
     , formatting
     , http-client
     , http-client-tls
+    , http-types
     , lifted-async
     , megaparsec
     , monad-control
@@ -112,6 +113,7 @@ library
     , servant-auth
     , servant-auth-client
     , servant-client
+    , servant-client-core
     , servant-server
     , slacker
     , string-conversions
@@ -123,6 +125,9 @@ library
     , tz
     , tztime
     , universum
+    , uri-bytestring
+    , uri-bytestring-aeson
+    , utf8-string
     , validation
     , yaml
   default-language: Haskell2010
@@ -196,6 +201,7 @@ test-suite tzbot-test
   main-is: Main.hs
   other-modules:
       Test.TzBot.ConfigSpec
+      Test.TzBot.HandleTooManyRequests
       Test.TzBot.TimeReferenceToUtcSpec
       Tree
       Paths_tzbot
@@ -256,12 +262,16 @@ test-suite tzbot-test
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
     , containers
     , hspec
+    , http-types
+    , servant-client-core
     , tasty
     , tasty-hspec
     , tasty-hunit
+    , tasty-quickcheck
     , time
     , tzbot
     , tztime
