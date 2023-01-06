@@ -125,8 +125,6 @@ library
     , tz
     , tztime
     , universum
-    , uri-bytestring
-    , uri-bytestring-aeson
     , utf8-string
     , validation
     , yaml

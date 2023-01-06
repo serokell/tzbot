@@ -51,8 +51,6 @@ library:
   - tztime
   - validation
   - yaml
-  - uri-bytestring
-  - uri-bytestring-aeson
   - utf8-string
 
 executables:
