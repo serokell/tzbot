@@ -9,7 +9,7 @@ module TzBot.Slack
   , AppLevelToken(..)
   , BotToken(..)
   , BotState(..)
-  , BotConfig(..)
+  , BotConfig
   , BotException(..)
   , getUser
   , getChannelMembers
@@ -20,13 +20,13 @@ import Universum
 
 import Control.Monad.Except (throwError)
 import Data.Aeson (Value)
+import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Servant ((:<|>)(..))
 import Servant.Auth.Client qualified as Auth
 import Servant.Client
   (BaseUrl(BaseUrl), ClientM, Scheme(Https), client, hoistClient, mkClientEnv, runClientM)
 
-import Data.Text qualified as T
 import TzBot.Config
 import TzBot.RunMonad
 import TzBot.Slack.API
@@ -52,7 +52,7 @@ sendEphemeralMessage channelId threadId text userId = do
 
 getBotToken :: BotM Auth.Token
 getBotToken = do
-  BotToken bt <- asks $ bcBotToken . bsConfig
+  BotToken bt <- asks $ cBotToken . bsConfig
   pure $ Auth.Token $ T.encodeUtf8 bt
 
 endpointFailed :: Text -> SlackResponse key a -> BotM a

@@ -42,21 +42,16 @@ main = do
             & setAppToken (unAppLevelToken appLevelToken)
             & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
 
-  let wCfg = BotConfig
-        { bcAppLevelToken = appLevelToken
-        , bcBotToken = botToken
-        }
-
   manager <- newManager tlsManagerSettings
   refSetMapIORef <- newIORef M.empty
-  let wState = BotState wCfg manager refSetMapIORef
+  let bState = BotState config manager refSetMapIORef
 
-  runSocketMode sCfg (handler wState) -- auto-acknowledge received messages
+  runSocketMode sCfg (handler bState) -- auto-acknowledge received messages
 
 handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
-handler wstate _cfg = \e -> do
+handler bState _cfg = \e -> do
   case e of
     EventValue "message" evtRaw -> case parseEither parseJSON evtRaw of
       Left err -> log' $ T.pack err
-      Right evt -> void . runBotM wstate $ processEvent evt
+      Right evt -> void . runBotM bState $ processEvent evt
     _ -> pure ()

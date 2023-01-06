@@ -37,6 +37,8 @@ type family ConfigField (k :: ConfigStage) a where
   ConfigField 'CSInterm a = Maybe a
   ConfigField 'CSFinal a = a
 
+type BotConfig = Config 'CSFinal
+
 appTokenEnv, botTokenEnv, maxRetriesEnv, cacheUsersEnv, cacheConvMembersEnv :: EnvVarName
 appTokenEnv = "SLACK_TZ_APP_TOKEN"
 botTokenEnv = "SLACK_TZ_BOT_TOKEN"

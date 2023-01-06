@@ -20,11 +20,6 @@ import TzBot.Config
 import TzBot.Slack.API
 import TzBot.TimeReference
 
-data BotConfig = BotConfig
-  { bcAppLevelToken :: AppLevelToken
-  , bcBotToken :: BotToken
-  }
-
 data BotState = BotState
   { bsConfig :: BotConfig
   , bsManager :: Manager
