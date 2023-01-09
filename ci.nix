@@ -34,6 +34,10 @@ rec {
   pkgs-stylish = import sources.nixpkgs-stylish {};
 
   project = (import ./tzbot.nix { linux = true; });
+  shell = project.shellFor {
+    withHoogle = false;
+    additional = _: [ lib ];
+    };
 
   lib = project.tzbot.components.library;
   server = project.tzbot.components.exes.tzbot-exe;
