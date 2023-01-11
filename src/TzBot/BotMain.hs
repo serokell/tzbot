@@ -6,7 +6,7 @@ module TzBot.BotMain where
 
 import Universum
 
-import Data.Aeson.Types
+import Data.Aeson.Types (FromJSON(parseJSON), parseEither)
 import Data.Map qualified as M
 import Data.Text qualified as T
 import Network.HTTP.Client (newManager)
@@ -18,7 +18,7 @@ import System.Environment (getArgs)
 
 import TzBot.Config (AppLevelToken(..), BotToken(..), Config(cAppToken, cBotToken), readConfig)
 import TzBot.ProcessEvent (processEvent)
-import TzBot.RunMonad
+import TzBot.RunMonad (BotState(BotState), log', runBotM)
 
 {- |
 

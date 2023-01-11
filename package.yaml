@@ -28,6 +28,7 @@ library:
   - formatting
   - http-client
   - http-client-tls
+  - http-types
   - lifted-async
   - megaparsec
   - monad-control
@@ -37,6 +38,7 @@ library:
   - servant-auth
   - servant-auth-client
   - servant-client
+  - servant-client-core
   - servant-server
   - slacker
   - string-conversions
@@ -49,6 +51,7 @@ library:
   - tztime
   - validation
   - yaml
+  - utf8-string
 
 executables:
   tzbot-exe:
@@ -82,6 +85,11 @@ tests:
     - tasty-hunit
     - time
     - tztime
+    - QuickCheck
+    - http-types
+    - servant-client-core
+    - tasty-quickcheck
+    - time
     - universum
 
 ghc-options:

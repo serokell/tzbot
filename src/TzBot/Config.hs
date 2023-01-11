@@ -34,6 +34,7 @@ data LoadConfigError =
   LCEBothEnvAndConfigFieldMissing FieldName EnvVarName
   | LCEEnvVarParseError EnvVarName String
   | LCEYamlParseError Y.ParseException
+  | LCEInvalidValue FieldName String
   deriving stock (Show)
 
 instance Buildable LoadConfigError where
@@ -44,6 +45,9 @@ instance Buildable LoadConfigError where
           |]
     LCEEnvVarParseError envVar err -> [int||#{envVar}: #{show @Text err}|]
     LCEYamlParseError yExc -> fromString $ Y.prettyPrintParseException yExc
+    LCEInvalidValue fieldName desc -> [int||Invalid value of #{fieldName}.\
+                                            #{desc}.
+                                        |]
 
 -- This prevents Config.Default.defaultConfigText to be incorrect on compiling.
 defaultConfig :: Config 'CSInterm
@@ -102,8 +106,8 @@ readConfigWithEnv env mbPath =
     parseEnvFieldRequiredOverriding env "appToken" appTokenEnv (cAppToken cfg)
   cBotToken <- toValidation $
     parseEnvFieldRequiredOverriding env "botToken" botTokenEnv (cBotToken cfg)
-  cMaxRetries <- fromMaybe (cMaxRetries cfg) <$>
-    toValidation (parseEnvField env maxRetriesEnv)
+  cMaxRetries <- (fromMaybe (cMaxRetries cfg) <$>
+    toValidation (parseEnvField env maxRetriesEnv)) `bindValidation` validateMaxTries
   cCacheUsersInfo <- fromMaybe (cCacheUsersInfo cfg) <$>
     toValidation (parseEnvField env cacheUsersEnv)
   cCacheConversationMembers <- fromMaybe (cCacheConversationMembers cfg) <$>
@@ -112,6 +116,14 @@ readConfigWithEnv env mbPath =
   where
     handleFunc :: Y.ParseException -> IO (Either [LoadConfigError] $ Config 'CSFinal)
     handleFunc = pure . Left . singleton . LCEYamlParseError
+    validateMaxTries :: Int -> Validation [LoadConfigError] Int
+    validateMaxTries v = validate ([LCEInvalidValue "maxRetries" "Must be in range from 0 to 3"]) check v
+      where
+        check :: Int -> Maybe Int
+        check v =
+          if v < 0 || v > 3
+            then Nothing
+            else Just v
 
 -- | Read config from environment, given filepath, filling up missing fields
 -- with default values. Priorities:

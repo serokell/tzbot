@@ -10,6 +10,7 @@ import Universum
 
 import Data.Map qualified as M
 import Test.Hspec (it, shouldBe, shouldSatisfy)
+import Test.Hspec.QuickCheck (prop)
 import Test.Tasty hiding (after_)
 import Test.Tasty.Hspec
 
@@ -76,6 +77,17 @@ configLoadingSpec =
           , LCEEnvVarParseError "SLACK_TZ_CACHE_USERS_INFO" _
           ] -> True
         _ -> False
+    prop "maxRetries validation" $ \maxRetries -> do
+      let env = M.fromList $
+            [ (botTokenEnv, "bot-token")
+            , (appTokenEnv, "app-token")
+            , (maxRetriesEnv, show (maxRetries :: Int))
+            ]
+      eithConfig <- readConfigWithEnv env (Just "config/config.yaml")
+      eithConfig `shouldSatisfy` \case
+        Left
+          [LCEInvalidValue "maxRetries" "Must be in range from 0 to 3"] -> maxRetries < 0 || maxRetries > 3
+        _ -> maxRetries >= 0 && maxRetries <=3
     it "should succeed with the valid config file and the environment containing only secrets" $ do
       let env = M.fromList $
             [ (botTokenEnv, "bot-token")
