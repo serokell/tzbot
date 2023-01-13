@@ -8,19 +8,23 @@ import Universum
 
 import Control.Monad.Managed (managed, runManaged)
 import Data.Aeson.Types (FromJSON(parseJSON), parseEither)
+import Data.ByteString qualified as BS
 import Data.Map qualified as M
 import Data.Text qualified as T
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
+import Options.Applicative (execParser)
 import Slacker
   (SlackConfig, SocketModeEvent(..), defaultSlackConfig, handleThreadExceptionSensibly,
   pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
-import System.Environment (getArgs)
+import System.Directory (doesFileExist)
+import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Cache
 import TzBot.Config (AppLevelToken(..), BotToken(..), Config(..), readConfig)
+import TzBot.Config.Default (defaultConfigText)
+import TzBot.Options
 import TzBot.ProcessEvent
-  (processMemberJoinedChannel, processMemberLeftChannel, processMessageEvent)
 import TzBot.RunMonad (BotState(..), log', runBotM)
 
 {- |
@@ -34,9 +38,29 @@ To generate app-level / bot tokens, see: <docs/development.md>
 -}
 main :: IO ()
 main = do
-  -- TODO: add optparse
-  (configFilePath :: Maybe FilePath) <- safeHead <$> getArgs
-  bsConfig@Config{..} <- readConfig configFilePath
+  cliOptions <- execParser totalParser
+  case cliOptions of
+    DumpConfig dumpOpts -> dumpConfig dumpOpts
+    DefaultCommand op -> run op
+
+dumpConfig :: DumpOptions -> IO ()
+dumpConfig = \case
+  DOStdOut -> putStr defaultConfigText
+  DOFile path force -> do
+    let writeAction = BS.writeFile path defaultConfigText
+    if force
+    then writeAction
+    else do
+      ifM
+        (doesFileExist path)
+        (hPutStrLn @Text stderr [int||File #{path} already exists, \
+                                use --force to overwrite|] >> exitFailure)
+        writeAction
+
+run :: Options -> IO ()
+run opts = do
+  let mbConfigFilePath = oConfigFile opts
+  bsConfig@Config {..} <- readConfig mbConfigFilePath
 
   let sCfg = defaultSlackConfig
             & setApiToken (unBotToken cBotToken)
