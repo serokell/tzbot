@@ -24,13 +24,13 @@ import TzBot.Cache
 import TzBot.Config
 import TzBot.Config.Default (defaultConfigText)
 import TzBot.Config.Types (BotConfig)
+import TzBot.Logger (withLogger)
 import TzBot.Options
 import TzBot.ProcessEvents (handler)
 import TzBot.RunMonad
 import TzBot.Util (withMaybe)
 
 {- |
-
 Usage:
 
 See @Config.Default.defaultConfigText@ to get what options
@@ -83,6 +83,7 @@ run opts = do
     bsReportEntries <-
       managed $ withTzCacheDefault cCacheReportDialog
     -- auto-acknowledge received messages
+    (bsLogNamespace, bsLogContext, bsLogEnv) <- managed $ withLogger cLogLevel
     liftIO $ runSocketMode sCfg $ handler BotState {..}
 
 withFeedbackConfig :: BotConfig -> (FeedbackConfig -> IO a) -> IO a

@@ -6,24 +6,28 @@ module TzBot.ProcessEvents.Message
   ( processMessageEvent
   ) where
 
-import Universum
+import Universum hiding (try)
 
-import Control.Concurrent.Async.Lifted (forConcurrently_)
+import Control.Concurrent.Async.Lifted (forConcurrently)
 import Data.List.NonEmpty qualified as NE
 import Data.Map qualified as M
 import Data.Set qualified as S
+import Data.Text.Lazy.Builder (Builder)
 import System.Random (randomRIO)
+import Text.Interpolation.Nyan (int, rmode', rmode's)
 
 import TzBot.Config (Config(..))
+import TzBot.Logger
+  (KatipContext, MessageContext(MessageContext), debug, error_, info, katipAddContext,
+  katipAddNamespaceText, logTM)
 import TzBot.ProcessEvents.Common (getTimeReferencesFromMessage)
 import TzBot.Render
-import TzBot.RunMonad (log')
 import TzBot.Slack
 import TzBot.Slack.API
 import TzBot.Slack.Events
 import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.TimeReference (TimeReference(trText), TimeReferenceText)
-import TzBot.Util (isDevEnvironment)
+import TzBot.Util (catchAllErrors, isDevEnvironment, withMaybe)
 
 -- Helper function for `filterNewReferencesAndMemorize`
 filterNewReferencesAndMemorizePure
@@ -60,13 +64,34 @@ filterNewReferencesAndMemorize messageId timeRefs = NE.nonEmpty <$> do
 -- We don't need to handle MDMessageBroadcast anyhow,
 -- because we were supposed to reply to the original message
 -- in the thread earlier.
-newMessageOrEditedMessage :: MessageEvent -> Bool
-newMessageOrEditedMessage evt = case meMessageDetails evt of
-  MDMessage           -> True
-  MDMessageEdited {}  -> True
-  MDMessageBroadcast  -> False
-  MDUserJoinedChannel -> False
-  MDUserLeftChannel   -> False
+-- channel_join and channel_leave messages are also ignored because
+-- we handle these events in another way.
+filterMessageTypeWithLog :: (KatipContext m) => MessageEvent -> m Bool
+filterMessageTypeWithLog evt = case meMessageDetails evt of
+  MDMessage          -> do
+    $(logTM) `info` [int||Handling new message|]
+    pure True
+  MDMessageEdited {} -> do
+    $(logTM) `info` [int||Message was edited|]
+    pure True
+  MDMessageBroadcast -> do
+    $(logTM) `info` [int||Incoming message is thread broadcast, ignoring|]
+    pure False
+  MDUserJoinedChannel -> do
+    $(logTM) `info` [int||Incoming message subtype=channel_join, ignoring|]
+    pure False
+  MDUserLeftChannel -> do
+    $(logTM) `info` [int||Incoming message subtype=channel_leave, ignoring|]
+    pure False
+
+withSenderNotBot :: MessageEvent -> BotM (Maybe User)
+withSenderNotBot evt = do
+  sender <- getUserCached $ mUser $ meMessage evt
+  if uIsBot sender
+    then do
+      $(logTM) `info` [int||Sender is bot, ignoring|]
+      pure Nothing
+    else pure $ Just sender
 
 -- | Process incoming Slack message events. Only "message" and "message_edited" are processed.
 --
@@ -80,19 +105,24 @@ newMessageOrEditedMessage evt = case meMessageDetails evt of
 -- "message_edited" event is processed similarly, but only most recently added time
 -- references are processed and sent via ephemerals.
 processMessageEvent :: MessageEvent -> BotM ()
-processMessageEvent evt = when (newMessageOrEditedMessage evt) $ do
+processMessageEvent evt =
+  katipAddNamespaceText "message" $
+  katipAddContext (MessageContext (mMessageId $ meMessage evt)) $
+  whenM (filterMessageTypeWithLog evt) $
+    whenJustM (withSenderNotBot evt) $ \sender -> do
   let msg = meMessage evt
 
   -- TODO: use some "transactions here"? Or just lookup the map multiple times.
   timeRefs <- getTimeReferencesFromMessage msg
   mbReferencesToCheck <-
     filterNewReferencesAndMemorize (mMessageId msg) timeRefs
-  whenJust mbReferencesToCheck $ \timeRefs-> do
+  withMaybe mbReferencesToCheck
+    ($(logTM) `info` "No time references for processing found")
+      \timeRefs -> do
     inverseChance <- asks $ cInverseHelpUsageChance . bsConfig
-    sender <- getUserCached $ mUser msg
 
     whetherToShowHelpCmd <- liftIO $ fmap (== 1) $ randomRIO (1, inverseChance)
-    when whetherToShowHelpCmd $ log' "appending help command usage"
+    when whetherToShowHelpCmd $ $(logTM) `debug` "appending help command usage"
 
     let now = meTs evt
         channelId = meChannel evt
@@ -122,25 +152,53 @@ processMessageEvent evt = when (newMessageOrEditedMessage evt) $ do
       -- it if it were sent to the common channel.
       Just CTDirectChannel -> do
         let ephemeralMessage = renderAllForOthersTP sender ephemeralTemplate
+        $(logTM) `info` [int||Received message from the DM, sending translation \
+                              to the author|]
         sendAction False ephemeralMessage (uId sender)
       _ -> do
         usersInChannelIds <- getChannelMembersCached channelId
 
-        whenJust (renderErrorsForSenderTP ephemeralTemplate) $ \errorsMsg ->
+        whenJust (renderErrorsForSenderTP ephemeralTemplate) $ \errorsMsg -> do
+          $(logTM) `info`
+            [int||Found invalid time references, \
+                      sending an ephemeral with them to the message sender|]
           sendAction True errorsMsg (uId sender)
 
         let notBotAndSameTimeZone u = not (uIsBot u) && uTz u /= uTz sender
             notSender userId = userId /= uId sender
+            setSize = S.size usersInChannelIds
 
-        forConcurrently_ usersInChannelIds $ \userInChannelId ->
+        $(logTM) `info` [int||#{setSize} users in the channel #{channelId}, sending ephemerals|]
+        eithRes <- forConcurrently (toList usersInChannelIds) $ \userInChannelId -> catchAllErrors $
           if isDevEnvironment
           then do
             userInChannel <- getUserCached userInChannelId
             let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate
             sendAction False ephemeralMessage (uId userInChannel)
-          else
-            when (notSender userInChannelId) $ do
+            pure True
+          else do
+            let whenT :: (Monad m) => Bool -> m Bool -> m Bool
+                whenT cond_ action_ = if cond_ then action_ else pure False
+            whenT (notSender userInChannelId) $ do
               userInChannel <- getUserCached userInChannelId
-              when (notBotAndSameTimeZone userInChannel) $ do
+              whenT (notBotAndSameTimeZone userInChannel) $ do
                 let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate
                 sendAction False ephemeralMessage (uId userInChannel)
+                pure True
+
+        let failedMsg = "Ephemeral sending failed" :: Builder
+            logAll :: Either SomeException BotException -> BotM ()
+            logAll (Left se) = $(logTM) `error_` [int||#{failedMsg}, unknown error occured: #s{se}|]
+            logAll (Right ke) = $(logTM) `error_` [int||#{failedMsg}, #{displayException ke}|]
+
+            processResult
+              :: (Int, Int)
+              -> Either (Either SomeException BotException) Bool
+              -> BotM (Int, Int)
+            processResult (oks_, errs_) eithRes_ = case eithRes_ of
+              Left err_ -> logAll err_ >> pure (oks_, errs_ + 1)
+              Right ok_ -> let oks_' = if ok_ then oks_ + 1 else oks_ in pure (oks_', errs_)
+        (oks, errs) <- foldM processResult (0, 0) eithRes
+        $(logTM) `info` [int||#{oks} ephemeral sent successfully|]
+        $(logTM) `info` [int||#{errs} ephemerals failed|]
+        pure ()

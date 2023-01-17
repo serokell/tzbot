@@ -4,12 +4,16 @@
 
 module TzBot.Util where
 
-import Universum hiding (last)
+import Universum hiding (last, try)
 
+import Control.Exception.Lifted
+import Control.Lens (LensRules, lensField, lensRules, mappingNamer)
+import Control.Monad.Except (MonadError(catchError))
+import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Aeson
 import Data.Aeson qualified as AeKey
 import Data.Aeson qualified as Aeson
-import Data.Aeson.Casing (aesonPrefix, camelCase)
+import Data.Aeson.Casing
 import Data.Aeson.Key qualified as AeKey
 import Data.Aeson.Types (Parser, parseMaybe)
 import Data.Char (isLower)
@@ -156,3 +160,22 @@ instance (FromJSON a) => FromJSON (WithUnknown a) where
 
 instance (ToJSON a) => ToJSON (WithUnknown a) where
   toJSON (WithUnknown eith) = either (String . show) toJSON eith
+
+postfixFields :: LensRules
+postfixFields = lensRules & lensField .~ mappingNamer (\n -> [n ++ "L"])
+
+----
+-- not present in mtl-2.2.2
+tryError :: MonadError e m => m a -> m (Either e a)
+tryError action = (Right <$> action) `catchError` (pure . Left)
+
+catchAllErrors
+  :: (MonadError e m, MonadBaseControl IO m)
+  => m a
+  -> m (Either (Either SomeException e) a)
+catchAllErrors action = fmap reorder $ try $ tryError action
+  where
+  reorder :: Either e1 (Either e2 a) -> Either (Either e1 e2) a
+  reorder (Left e) = Left (Left e)
+  reorder (Right (Left e)) = Left (Right e)
+  reorder (Right (Right r)) = Right r

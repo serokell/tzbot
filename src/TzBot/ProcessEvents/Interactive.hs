@@ -10,14 +10,15 @@ module TzBot.ProcessEvents.Interactive
 
 import Universum
 
-import Text.Interpolation.Nyan (int, rmode')
+import Text.Interpolation.Nyan (int, rmode', rmode's)
 
 import TzBot.Feedback.Dialog (lookupDialogEntry)
 import TzBot.Feedback.Dialog.Types
 import TzBot.Feedback.Save
+import TzBot.Logger (info, katipAddNamespaceText, logTM, warn)
 import TzBot.ProcessEvents.Common (openModalCommon)
 import TzBot.Render (TranslationPairs)
-import TzBot.RunMonad (BotM, log')
+import TzBot.RunMonad (BotM)
 import TzBot.Slack (sendEphemeralMessage)
 import TzBot.Slack.API
 import TzBot.Slack.Events
@@ -27,7 +28,8 @@ import TzBot.Slack.Modal (mkReportModal, mkShowModal)
 -- | User triggered one of view or report entrypoints,
 --   start view or report modal, respectively.
 processInteractive :: InteractiveMessageEvent -> BotM ()
-processInteractive evt = do
+processInteractive evt =
+  katipAddNamespaceText [int||entrypoint_#s{cbId}|] $ do
   let msg = imeMessage evt
       whoTriggeredId = suId $ imeUser evt
       channelId = scId $ imeChannel evt
@@ -36,19 +38,26 @@ processInteractive evt = do
       mkModalFunc = case imeCallbackId evt of
         CTView   -> mkShowModal
         CTReport -> mkReportModal
+  $(logTM) `info` [int||User #{whoTriggeredId} triggered \
+                  entrypoint #s{cbId} from channel #{channelId}|]
   openModalCommon msg channelId whoTriggeredId triggerId mkModalFunc
+  where
+  cbId = imeCallbackId evt
 
 -- | User entered some report input and submited report view.
 --   Collect the input together with the message and timezone
 --   information and log it in configured ways (see `saveFeedback`).
 processViewSubmission :: SubmitViewEvent -> BotM ()
-processViewSubmission (ViewActionEvent view) = do
+processViewSubmission (ViewActionEvent view) =
+  katipAddNamespaceText "report_view_submitted" $ do
   let metadataEntryId = vPrivateMetadata view
       userInput = unViewPayload $ ufpUserInput $ vState view
   mbMetadata <- lookupDialogEntry metadataEntryId
   case mbMetadata of
-    Nothing -> log' [int||Dialog id not found: #{metadataEntryId}|]
+    Nothing -> $(logTM) `warn` [int||Dialog id not found: #{metadataEntryId}|]
     Just _metadata@ReportDialogEntry {..} -> do
+      $(logTM) `info` [int||Got feedback from user #{rpmUserId}, \
+                       dialogId #{metadataEntryId}|]
       let feedbackEntry = FeedbackEntry
             { feMessageText = rpmMessageText
             , feTimeTranslation = rpmTimeTranslation

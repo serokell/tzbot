@@ -28,9 +28,12 @@ import Data.Cache (Cache)
 import Data.Cache qualified as Cache
 import Data.Cache.Internal qualified as CacheI
 import Data.HashMap.Strict qualified as HM
+import Formatting (Buildable)
 import System.Clock (TimeSpec)
+import Text.Interpolation.Nyan
 import Time (Hour, KnownDivRat, Nanosecond, Time(..), hour, threadDelay, toUnit)
 
+import TzBot.Logger
 import TzBot.Util (multTimeSpec, randomTimeSpec, timeToTimespec, (+-))
 
 -- | This datatype uses `Cache` datatype inside, but also
@@ -122,16 +125,20 @@ insertRandomized key val TzCache {..} = do
 -- and insert the obtained value with configured expiration parameters
 -- into the cache.
 fetchWithCacheRandomized
-  :: (Eq k, Hashable k, MonadIO m)
+  :: (Eq k, Hashable k, MonadIO m, KatipContext m, Buildable k)
   => k
   -> (k -> m v)
   -> TzCache k v
   -> m v
-fetchWithCacheRandomized key fetchAction cache = do
+fetchWithCacheRandomized key fetchAction cache =
+  katipAddNamespace "cache" $ do
+  $(logTM) `debug` [int||Fetching key=#{key}|]
   mv <- liftIO $ Cache.lookup (rcCache cache) key
   case mv of
-    Just v -> pure v
+    Just v -> $(logTM) `debug` "Using cache" >> pure v
     Nothing -> do
+      $(logTM) `debug` [int||Key #{key} expired or absent: \
+                             using provided fetching action|]
       v <- fetchAction key
       insertRandomized key v cache
       pure v

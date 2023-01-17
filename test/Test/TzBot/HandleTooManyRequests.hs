@@ -6,8 +6,10 @@ module Test.TzBot.HandleTooManyRequests (test_HandleTooManyRequests) where
 
 import Universum
 
+import Data.Fixed (Fixed(MkFixed))
 import Data.Sequence qualified as Seq
 import Data.Time.Clock (diffUTCTime, getCurrentTime, nominalDiffTimeToSeconds)
+import Katip
 import Network.HTTP.Types.Header (Header)
 import Network.HTTP.Types.Method (methodGet)
 import Network.HTTP.Types.Status (status429)
@@ -17,10 +19,10 @@ import Servant.Client.Core
   Scheme(Https))
 import Test.Tasty (TestTree, localOption)
 
-import Data.Fixed (Fixed(MkFixed))
 import Test.QuickCheck.Monadic (assert, monadicIO, run)
 import Test.Tasty.QuickCheck
   (Arbitrary(arbitrary), Property, QuickCheckTests(QuickCheckTests), choose, generate, testProperty)
+import TzBot.Logger
 import TzBot.Slack (handleTooManyRequests)
 
 -- | Delay between attempts in seconds
@@ -59,7 +61,10 @@ handleTooManyRequestsProperty attempts = monadicIO $ do
   let attempts' = unAttempts attempts
   stateRef <- newIORef $ TestState attempts' 0
   start <- run getCurrentTime
-  run $ evalStateT (handleTooManyRequests $ mockSlackRequest stateRef) attempts'
+  run $ withLogger DebugS $ \(ns, ctx, le) ->
+    flip evalStateT attempts' $
+    runKatipContextT le ctx ns $ katipNoLogging $
+    handleTooManyRequests $ mockSlackRequest stateRef
   end <- run getCurrentTime
   delay' <- delay <$> readIORef stateRef
   let realDelay = nominalDiffTimeToSeconds $ diffUTCTime end start

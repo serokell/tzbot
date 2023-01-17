@@ -38,8 +38,11 @@ library:
   - http-client
   - http-client-tls
   - http-types
+  - katip
+  - lens
   - lens-aeson
   - lifted-async
+  - lifted-base
   - managed
   - megaparsec
   - monad-control
@@ -98,6 +101,7 @@ tests:
     - containers
     - hspec
     - http-types
+    - katip
     - nyan-interpolation
     - servant-client-core
     - string-conversions

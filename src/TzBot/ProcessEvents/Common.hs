@@ -20,9 +20,9 @@ import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Feedback.Dialog (insertDialogEntry)
 import TzBot.Feedback.Dialog.Types
+import TzBot.Logger (logTM, warn)
 import TzBot.Parser (parseTimeRefs)
 import TzBot.Render (TranslationPairs, renderAllForOthersTP, renderTemplate)
-import TzBot.RunMonad (log')
 import TzBot.Slack (BotM, getUserCached, startModal)
 import TzBot.Slack.API
 import TzBot.Slack.API.MessageBlock
@@ -86,18 +86,18 @@ getTextPiecesFromMessage message = do
   let throwAwayTooShort = filter (\x -> T.compareLength x 2 == GT)
   throwAwayTooShort <$> case unUnknown $ msgBlocks message of
     Left unknownBlocksValue -> do
-      log' [int||warning: Failed to parse message blocks, \
+      $(logTM) `warn` [int||Failed to parse message blocks, \
                  trying to ignore code blocks manually|]
-      log' [int||warning: Unrecognized message blocks: \
+      $(logTM) `warn` [int||Unrecognized message blocks: \
                  #{encodePrettyToTextBuilder unknownBlocksValue}|]
       pure $ ignoreCodeBlocksManually $ mText message
     Right blocks -> do
       let (pieces, exErrs) = extractPieces blocks
       let (l1Errs, l2Errs) = splitExtractErrors exErrs
       when (not $ null l1Errs) $
-        log' [int||warning: Unknown level1 block types: #{listF $ map (show @Text) l1Errs}|]
+        $(logTM) `warn` [int||Unknown level1 block types: #{listF $ map (show @Text) l1Errs}|]
       when (not $ null l2Errs) $
-        log' [int||warning: Unknown level2 block types: #{listF $ map ubeType l2Errs}|]
+        $(logTM) `warn` [int||Unknown level2 block types: #{listF $ map ubeType l2Errs}|]
       pure pieces
 
 {- | Simple function that works in a very naive way, but it's just reserve
