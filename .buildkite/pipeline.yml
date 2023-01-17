@@ -25,8 +25,8 @@ steps:
   - label: tests
     depends_on: build
     commands:
-      - nix-build ci.nix -A tests
-      - ./result/bin/tzbot-test
+      - nix run -f ci.nix tests -c tzbot-test
+      - nix-shell ci.nix -A shell --command "runghc test/doctests.hs"
 
   - label: haddock
     depends_on: build

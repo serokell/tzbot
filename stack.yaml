@@ -18,6 +18,8 @@ extra-deps:
   # nix-sha256: sha256-X/8l6jvudzi46dWyrvOAPxdT4f2nSAISGEzqVNyelKY=
 - git: https://github.com/serokell/tztime.git
   commit: 79034a1afc072e859df1ef8f58c2a1cdc04c78a3
+- git: https://github.com/martijnbastiaan/doctest-parallel
+  commit: 112b85b55c63dae1cc52b5216efe03873f1acc06
 
 # Slacker's deps
 - monad-logger-aeson-0.3.1.0@sha256:dbb1f816d00a820982094362551e20582de0a27c337d430fa7080dcacbe66f34,5193
