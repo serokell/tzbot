@@ -208,7 +208,7 @@ newtype TriggerId = TriggerId { unTriggerId :: Text }
 
 newtype ViewId = ViewId { unViewId :: Text }
   deriving stock (Eq, Show, Ord)
-  deriving newtype (IsString, ToJSON, FromJSON)
+  deriving newtype (IsString, ToJSON, FromJSON, Buildable)
 
 -- See https://api.slack.com/events/message
 data Message = Message

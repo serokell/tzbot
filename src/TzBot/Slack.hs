@@ -23,7 +23,6 @@ module TzBot.Slack
 
 import Universum hiding (toString)
 
-import Control.Concurrent (threadDelay)
 import Control.Monad.Except (throwError)
 import Data.Aeson (Value)
 import Data.ByteString.UTF8 (toString)
@@ -39,11 +38,14 @@ import Servant.Client
 import Servant.Client.Core
   (ClientError(FailureResponse), ResponseF(responseHeaders, responseStatusCode))
 import Text.Interpolation.Nyan (int, rmode', rmode's)
+import Time.Units (sec, threadDelay)
 
 import TzBot.Cache qualified as Cache
-import TzBot.Config (AppLevelToken(..), BotToken(..), Config(..))
+import TzBot.Config
+import TzBot.Logger
 import TzBot.RunMonad
-  (BotException(..), BotM(..), BotState(..), ErrorDescription, log', runBotM, runOrThrowBotM)
+  (BotException(..), BotM(..), BotState(..), ErrorDescription, runBotM, runKatipWithBotState,
+  runOrThrowBotM)
 import TzBot.Slack.API
   (ChannelId, Cursor, Limit(..), Message(..), MessageId(..), OpenViewReq(..), PostEphemeralReq(..),
   PostMessageReq(..), SlackContents(..), SlackResponse(..), ThreadId, UpdateViewReq(..), User,
@@ -58,8 +60,9 @@ getUser userId = do
 -- | Get a user's info using cache.
 getUserCached :: UserId -> BotM User
 getUserCached userId =
-  asks bsUserInfoCache
-    >>= Cache.fetchWithCacheRandomized userId getUser
+  katipAddNamespaceText "getUser" $ do
+  cache <- asks bsUserInfoCache
+  Cache.fetchWithCacheRandomized userId getUser cache
 
 -- | Get a list of a channel's members.
 getChannelMembers :: ChannelId -> BotM (S.Set UserId)
@@ -72,8 +75,9 @@ getChannelMembers channelId = do
 
 getChannelMembersCached :: ChannelId -> BotM (S.Set UserId)
 getChannelMembersCached channelId =
-  asks bsConversationMembersCache
-    >>= Cache.fetchWithCacheRandomized channelId getChannelMembers
+  katipAddNamespaceText "getChannelMembers" $ do
+  cache <- asks bsConversationMembersCache
+  Cache.fetchWithCacheRandomized channelId getChannelMembers cache
 
 -- | Post an "ephemeral message", a message only visible to the given user.
 sendEphemeralMessage :: PostEphemeralReq -> BotM ()
@@ -160,9 +164,9 @@ getBotToken = do
 handleSlackError :: Text -> SlackResponse a -> BotM a
 handleSlackError endpoint = \case
   SRSuccess a -> pure a
-  SRError err metadata -> do
-    log' [int||#{endpoint} error: #{err}; metadata: #s{metadata}|]
-    throwError $ EndpointFailed endpoint err
+  SRError err_ metadata -> do
+    logError [int||#{endpoint} error: #{err_}; metadata: #s{metadata}|]
+    throwError $ EndpointFailed endpoint err_
 
 handleSlackErrorSingle :: Text -> SlackResponse $ SlackContents key a -> BotM a
 handleSlackErrorSingle endpoint = fmap scContents . handleSlackError endpoint
@@ -232,48 +236,59 @@ usersInfo
     baseUrl = BaseUrl Https "slack.com" 443 "api"
 
     naturalTransformation :: ClientM a -> BotM a
-    naturalTransformation act = BotM do
+    naturalTransformation act = do
+      botState <- ask
       manager <- asks bsManager
       config <- asks bsConfig
       let clientEnv = mkClientEnv manager baseUrl
-      liftIO (evalStateT (handleTooManyRequests (runClientM act clientEnv)) (cMaxRetries config)) >>= \case
+      liftIO (evalStateT
+        (runKatipWithBotState botState $
+          handleTooManyRequests (runClientM act clientEnv)) (cMaxRetries config)) >>= \case
         Right a -> pure a
-        Left clientError -> throwError $ ServantError clientError
+        Left clientError -> do
+          logError [int||Client call failed: ${show @Text clientError}|]
+          throwError $ ServantError clientError
 
 -- | Handles slack API response with status code 429 @Too many requests@.
 -- If action result is success, then return result. If action result is error
 -- with response status code 429 and attempts are not exceeded then try the action again.
-handleTooManyRequests :: IO (Either ClientError a) -> StateT Int IO (Either ClientError a)
+handleTooManyRequests
+  :: forall a.
+     IO (Either ClientError a)
+  -> KatipContextT (StateT Int IO) (Either ClientError a)
 handleTooManyRequests botAction = do
   result <- liftIO botAction
   case result of
     Right _ -> return result
     Left err -> handle err
   where
+    handle :: ClientError -> KatipContextT (StateT Int IO) (Either ClientError a)
     handle err = case err of
         FailureResponse _ response ->
           if ((statusCode . responseStatusCode $ response) == 429)
-          -- TODO: Add logging when handling 429 response status code
             then do
+              logError "Client call returned 429 status code"
               attempts <- get
               if attempts > 0
                 then do
-                  let retryAfterHeader =
-                        Seq.filter ((== "Retry-After") . fst) (responseHeaders response)
-                  if Seq.null retryAfterHeader
-                    then return $ Left err -- if there is no Retri-After header don't handle 429 response
-                    else do
-                      let retryAfter =
-                            fmap (ceiling . (* 10^(6 :: Int)))
-                                (readMaybe $
-                                  toString . snd $
-                                  Seq.index retryAfterHeader 0 :: Maybe Double)
-                      maybe (pure $ Left err) (waitAndTryAgain botAction) retryAfter
-                else return $ Left err -- if number of attempts are exceeded don't try anymore
+                  let mbRetryAfterHeader =
+                        fmap snd $ Seq.lookup 0
+                          $ Seq.filter ((== "Retry-After") . fst) (responseHeaders response)
+                      parseRetryAfterSec :: ByteString -> Maybe Double
+                      parseRetryAfterSec bs = readMaybe @Double (toString bs)
+                  case mbRetryAfterHeader >>= parseRetryAfterSec of
+                    Nothing -> do
+                      logError "Header \"Retry-After\" not found or invalid, cannot retry"
+                      return $ Left err -- if there is no Retry-After header don't handle 429 response
+                    Just retryAfter -> do
+                      let delay = sec $ realToFrac retryAfter
+                      logError
+                        [int||Retrying again in #{retryAfter}, #{attempts-1} attempts remaining|]
+                      threadDelay delay
+                      modify (subtract 1)
+                      handleTooManyRequests botAction
+                else do
+                  logError "Attempts amount exceeded, stopping"
+                  return $ Left err -- if number of attempts are exceeded don't try anymore
             else return $ Left err -- if response code is other than 429 don't do anything
         _ -> return $ Left err -- if servant response is other than FailureResponse don't do anything
-    waitAndTryAgain :: IO (Either ClientError a) -> Int -> StateT Int IO (Either ClientError a)
-    waitAndTryAgain action delay = do
-      liftIO . threadDelay $ delay
-      modify (subtract 1)
-      handleTooManyRequests action

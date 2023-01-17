@@ -54,3 +54,9 @@ cacheReportDialog: 1h
 # Envvar: SLACK_TZ_INVERSE_HELP_USAGE_CHANCE
 #
 inverseHelpUsageChance: 15
+
+# Minimal permitted logging level.
+# Available: Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency
+# Envvar: SLACK_TZ_LOG_LEVEL
+#
+logLevel: Info
