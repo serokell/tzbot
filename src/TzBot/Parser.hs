@@ -2,7 +2,9 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module TzBot.Parser where
+module TzBot.Parser
+  ( parseTimeRefs
+  ) where
 
 import Universum hiding (toList, try)
 
@@ -15,8 +17,8 @@ import Data.Time.Zones.All (tzNameLabelMap)
 import Text.Megaparsec (Parsec, anySingle, choice, match, parseMaybe, takeRest, try)
 import Text.Megaparsec.Char (char, digitChar, space, space1, string')
 import Text.Megaparsec.Char.Lexer (decimal)
-import TzBot.TimeReference
 
+import TzBot.TimeReference
 
 type TzParser = Parsec Void Text
 

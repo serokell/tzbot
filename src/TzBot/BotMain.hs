@@ -6,6 +6,7 @@ module TzBot.BotMain where
 
 import Universum
 
+import Control.Monad.Managed (managed, runManaged)
 import Data.Aeson.Types (FromJSON(parseJSON), parseEither)
 import Data.Map qualified as M
 import Data.Text qualified as T
@@ -16,9 +17,11 @@ import Slacker
   pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
 import System.Environment (getArgs)
 
-import TzBot.Config (AppLevelToken(..), BotToken(..), Config(cAppToken, cBotToken), readConfig)
-import TzBot.ProcessEvent (processEvent)
-import TzBot.RunMonad (BotState(BotState), log', runBotM)
+import TzBot.Cache
+import TzBot.Config (AppLevelToken(..), BotToken(..), Config(..), readConfig)
+import TzBot.ProcessEvent
+  (processMemberJoinedChannel, processMemberLeftChannel, processMessageEvent)
+import TzBot.RunMonad (BotState(..), log', runBotM)
 
 {- |
 
@@ -33,25 +36,32 @@ main :: IO ()
 main = do
   -- TODO: add optparse
   (configFilePath :: Maybe FilePath) <- safeHead <$> getArgs
-  config <- readConfig configFilePath
+  bsConfig@Config{..} <- readConfig configFilePath
 
-  let appLevelToken = cAppToken config
-      botToken = cBotToken config
   let sCfg = defaultSlackConfig
-            & setApiToken (unBotToken botToken)
-            & setAppToken (unAppLevelToken appLevelToken)
+            & setApiToken (unBotToken cBotToken)
+            & setAppToken (unAppLevelToken cAppToken)
             & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
 
-  manager <- newManager tlsManagerSettings
-  refSetMapIORef <- newIORef M.empty
-  let bState = BotState config manager refSetMapIORef
-
-  runSocketMode sCfg (handler bState) -- auto-acknowledge received messages
+  bsManager <- newManager tlsManagerSettings
+  bsMessagesReferences <- newIORef M.empty
+  runManaged $ do
+    bsUserInfoCache <-
+      managed $ withRandomizedCacheDefault cCacheUsersInfo
+    bsConversationMembersCache <-
+      managed $ withRandomizedCacheDefault cCacheConversationMembers
+    liftIO $ runSocketMode sCfg $ handler BotState {..}
 
 handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
 handler bState _cfg = \e -> do
   case e of
     EventValue "message" evtRaw -> case parseEither parseJSON evtRaw of
       Left err -> log' $ T.pack err
-      Right evt -> void . runBotM bState $ processEvent evt
+      Right evt -> void . runBotM bState $ processMessageEvent evt
+    EventValue "member_joined_channel" evtRaw -> case parseEither parseJSON evtRaw of
+      Left err -> log' $ T.pack err
+      Right evt -> void . runBotM bState $ processMemberJoinedChannel evt
+    EventValue "member_left_channel" evtRaw -> case parseEither parseJSON evtRaw of
+      Left err -> log' $ T.pack err
+      Right evt -> void . runBotM bState $ processMemberLeftChannel evt
     _ -> pure ()

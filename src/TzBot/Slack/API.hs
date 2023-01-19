@@ -18,16 +18,18 @@ module TzBot.Slack.API
 
 import Universum
 
-import Data.Aeson
+import Data.Aeson (FromJSON(parseJSON), ToJSON, Value, withObject, (.:), (.:?))
 import Data.Aeson.Casing (aesonPrefix, snakeCase)
 import Data.Aeson.Key qualified as Key
-import Data.Aeson.TH
+import Data.Aeson.TH (deriveFromJSON)
 import Data.Time.Zones.All (TZLabel)
+import Formatting (Buildable)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import Servant
   (Get, JSON, Post, QueryParam, QueryParam', Required, Strict, ToHttpApiData, type (:<|>),
   type (:>))
 import Servant.Auth (Auth, JWT)
+
 import TzBot.Instances ()
 
 ----------------------------------------------------------------------------
@@ -109,12 +111,12 @@ instance (KnownSymbol key, FromJSON a) => FromJSON (SlackContents key a) where
 ----------------------------------------------------------------------------
 
 newtype UserId = UserId { unUserId :: Text }
-  deriving stock (Eq, Show)
-  deriving newtype (ToHttpApiData, FromJSON)
+  deriving stock (Eq, Ord, Show)
+  deriving newtype (ToHttpApiData, FromJSON, ToJSON, Hashable, Buildable)
 
 newtype ChannelId = ChannelId { unChannelId :: Text }
   deriving stock (Eq, Show)
-  deriving newtype (ToHttpApiData, FromJSON)
+  deriving newtype (ToHttpApiData, FromJSON, ToJSON, Hashable, Buildable)
 
 newtype ThreadId = ThreadId { unThreadId :: Text }
   deriving stock (Eq, Show)

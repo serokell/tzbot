@@ -8,22 +8,25 @@ import Universum
 
 import Control.Monad.Base (MonadBase)
 import Control.Monad.Except (MonadError)
-import Control.Monad.Trans.Control
+import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text.IO qualified as T
 import Network.HTTP.Client (Manager)
 import Servant.Client (ClientError)
-import Text.Interpolation.Nyan
+import Text.Interpolation.Nyan (int, rmode')
 
-import TzBot.Config
-import TzBot.Slack.API
-import TzBot.TimeReference
+import TzBot.Cache (RandomizedCache)
+import TzBot.Config.Types (BotConfig)
+import TzBot.Slack.API (ChannelId, MessageId, User, UserId)
+import TzBot.TimeReference (TimeReferenceText)
 
 data BotState = BotState
   { bsConfig :: BotConfig
   , bsManager :: Manager
   , bsMessagesReferences :: IORef (M.Map MessageId (S.Set TimeReferenceText))
+  , bsUserInfoCache :: RandomizedCache UserId User
+  , bsConversationMembersCache :: RandomizedCache ChannelId (S.Set UserId)
   }
 
 newtype BotM a = BotM

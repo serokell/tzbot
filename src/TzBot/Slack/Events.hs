@@ -7,12 +7,15 @@ module TzBot.Slack.Events where
 import Universum
 
 import Data.Aeson
+  (FromJSON(parseJSON), Object, ToJSON(..), genericParseJSON, genericToJSON, withObject, (.:),
+  (.:?))
 import Data.Aeson.Key qualified as AeKey
-import Data.Aeson.Types
-import Data.Time
-import Text.Interpolation.Nyan
+import Data.Aeson.Types (Parser)
+import Data.Time (UTCTime, defaultTimeLocale, parseTimeM)
+import Text.Interpolation.Nyan (int, rmode')
 
-import TzBot.Slack.API
+import TzBot.Slack.API (ChannelId, MessageId, ThreadId, UserId)
+import TzBot.Util (aesonStripLowercasePrefixOptions)
 
 data Message = Message
   { mUser :: UserId
@@ -83,6 +86,34 @@ instance FromJSON MessageEvent where
       Just unknownSubtype -> fail $ "unknown subtype " <> toString unknownSubtype
     pure MessageEvent {..}
 
+-- | See https://api.slack.com/events/member_left_channel
+data MemberLeftChannelEvent = MemberLeftChannelEvent
+  { mlceChannel :: ChannelId
+  , mlceChannelType :: Text
+  , mlceUser :: UserId
+  } deriving stock (Eq, Show, Generic)
+
+instance ToJSON MemberLeftChannelEvent where
+  toJSON = genericToJSON aesonStripLowercasePrefixOptions
+
+instance FromJSON MemberLeftChannelEvent where
+  parseJSON = genericParseJSON aesonStripLowercasePrefixOptions
+
+-- | See https://api.slack.com/events/member_joined_channel
+data MemberJoinedChannelEvent = MemberJoinedChannelEvent
+  { mjceChannel :: ChannelId
+  , mjceChannelType :: Text
+  , mjceUser :: UserId
+  , mjceInviter :: Maybe UserId
+  } deriving stock (Eq, Show, Generic)
+
+instance ToJSON MemberJoinedChannelEvent where
+  toJSON = genericToJSON aesonStripLowercasePrefixOptions
+
+instance FromJSON MemberJoinedChannelEvent where
+  parseJSON = genericParseJSON aesonStripLowercasePrefixOptions
+
+-- time related utils
 tsToUTC :: String -> Maybe UTCTime
 tsToUTC = parseTimeM False defaultTimeLocale "%s%Q"
 

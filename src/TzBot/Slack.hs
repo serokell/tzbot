@@ -9,12 +9,11 @@ module TzBot.Slack
   , AppLevelToken(..)
   , BotToken(..)
   , BotState(..)
-  , BotConfig
   , BotException(..)
-  , getUser
-  , getChannelMembers
-  , handleTooManyRequests
+  , getUserCached
+  , getChannelMembersCached
   , sendEphemeralMessage
+  , handleTooManyRequests
   ) where
 
 import Universum hiding (toString)
@@ -25,6 +24,7 @@ import Data.Aeson (Value)
 import Data.ByteString.UTF8 (toString)
 import Data.DList qualified as DList
 import Data.Sequence qualified as Seq
+import Data.Set qualified as S
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Network.HTTP.Types.Status (Status(statusCode))
@@ -35,9 +35,11 @@ import Servant.Client
 import Servant.Client.Core
   (ClientError(FailureResponse), ResponseF(responseHeaders, responseStatusCode))
 
-import TzBot.Config
-import TzBot.RunMonad
+import TzBot.Cache qualified as Cache
+import TzBot.Config (AppLevelToken(..), BotToken(..), Config(..))
+import TzBot.RunMonad (BotException(..), BotM(..), BotState(..), log', runBotM, runOrThrowBotM)
 import TzBot.Slack.API
+  (ChannelId, Cursor, Limit(..), SlackContents(..), SlackResponse(..), ThreadId, User, UserId, api)
 
 -- | Get a user's info.
 getUser :: UserId -> BotM User
@@ -45,12 +47,25 @@ getUser userId = do
   token <- getBotToken
   usersInfo token userId >>= handleSlackErrorSingle "users.info"
 
+-- | Get a user's info using cache.
+getUserCached :: UserId -> BotM User
+getUserCached userId =
+  asks bsUserInfoCache
+    >>= Cache.fetchWithCacheRandomized userId getUser
+
 -- | Get a list of a channel's members.
-getChannelMembers :: ChannelId -> BotM [UserId]
+getChannelMembers :: ChannelId -> BotM (S.Set UserId)
 getChannelMembers channelId = do
   token <- getBotToken
   let limit = Limit {limitQ = 200}
-  getPaginatedObjects "conversation.members" $ conversationMembers token channelId limit
+  fmap S.fromList
+    $ getPaginatedObjects "conversation.members"
+    $ conversationMembers token channelId limit
+
+getChannelMembersCached :: ChannelId -> BotM (S.Set UserId)
+getChannelMembersCached channelId =
+  asks bsConversationMembersCache
+    >>= Cache.fetchWithCacheRandomized channelId getChannelMembers
 
 -- | Post an "ephemeral message", a message only visible to the given user.
 sendEphemeralMessage :: ChannelId -> Maybe ThreadId -> Text -> UserId -> BotM ()

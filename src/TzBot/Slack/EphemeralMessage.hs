@@ -13,7 +13,7 @@ import Data.Time.Compat
 import Data.Time.TZInfo qualified as TZI
 import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
-import Text.Interpolation.Nyan
+import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Instances ()
 import TzBot.Slack.API (User(uTz))

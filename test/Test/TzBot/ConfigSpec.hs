@@ -12,13 +12,16 @@ import Data.Map qualified as M
 import Test.Hspec (it, shouldBe, shouldSatisfy)
 import Test.Hspec.QuickCheck (prop)
 import Test.Tasty hiding (after_)
-import Test.Tasty.Hspec
+import Test.Tasty.Hspec (testSpec)
 
 import TzBot.Config
-import TzBot.Config.Default
+  (LoadConfigError(..), appTokenEnv, botTokenEnv, cacheConvMembersEnv, cacheUsersEnv, maxRetriesEnv,
+  readConfigWithEnv)
+import TzBot.Config.Default (defaultConfigText)
 
 test_configSpec :: IO TestTree
-test_configSpec = testGroup "Config" <$> sequence [defaultConfigSpec, configLoadingSpec]
+test_configSpec =
+  testGroup "Config" <$> sequence [defaultConfigSpec, configLoadingSpec]
 
 defaultConfigSpec :: IO TestTree
 defaultConfigSpec =
@@ -62,7 +65,8 @@ configLoadingSpec =
       eithConfig `shouldSatisfy` \case
         Left [LCEYamlParseError _] -> True
         _ -> False
-    it "should report all the missing required fields/envvars and the envvars with incorrect contents" $ do
+    it "should report all the missing required fields/envvars\
+                    \ and the envvars with incorrect contents" $ do
       let env = M.fromList $
             [ (botTokenEnv, "bot-token")
             , (maxRetriesEnv, "mazda")
@@ -88,7 +92,8 @@ configLoadingSpec =
         Left
           [LCEInvalidValue "maxRetries" "Must be in range from 0 to 3"] -> maxRetries < 0 || maxRetries > 3
         _ -> maxRetries >= 0 && maxRetries <=3
-    it "should succeed with the valid config file and the environment containing only secrets" $ do
+    it "should succeed with the valid config file and\
+                      \ the environment containing only secrets" $ do
       let env = M.fromList $
             [ (botTokenEnv, "bot-token")
             , (appTokenEnv, "app-token")
