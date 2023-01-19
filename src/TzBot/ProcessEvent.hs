@@ -16,7 +16,7 @@ import Data.Map qualified as M
 import Data.Set qualified as S
 import Text.Interpolation.Nyan (int, rmode')
 
-import TzBot.Cache qualified as Cache
+import TzBot.Cache1 qualified as Cache
 import TzBot.Parser (parseTimeRefs)
 import TzBot.RunMonad
 import TzBot.Slack (getChannelMembersCached, getUserCached, sendEphemeralMessage)

@@ -16,7 +16,7 @@ import Network.HTTP.Client (Manager)
 import Servant.Client (ClientError)
 import Text.Interpolation.Nyan (int, rmode')
 
-import TzBot.Cache (RandomizedCache)
+import TzBot.Cache1 (RandomizedCache)
 import TzBot.Config.Types (BotConfig)
 import TzBot.Slack.API (ChannelId, MessageId, User, UserId)
 import TzBot.TimeReference (TimeReferenceText)

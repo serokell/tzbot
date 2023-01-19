@@ -10,6 +10,8 @@ module TzBot.Slack
   , BotToken(..)
   , BotState(..)
   , BotException(..)
+  , getUser
+  , getChannelMembers
   , getUserCached
   , getChannelMembersCached
   , sendEphemeralMessage
@@ -35,7 +37,7 @@ import Servant.Client
 import Servant.Client.Core
   (ClientError(FailureResponse), ResponseF(responseHeaders, responseStatusCode))
 
-import TzBot.Cache qualified as Cache
+import TzBot.Cache1 qualified as Cache
 import TzBot.Config (AppLevelToken(..), BotToken(..), Config(..))
 import TzBot.RunMonad (BotException(..), BotM(..), BotState(..), log', runBotM, runOrThrowBotM)
 import TzBot.Slack.API

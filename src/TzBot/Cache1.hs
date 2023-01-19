@@ -2,7 +2,7 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module TzBot.Cache
+module TzBot.Cache1
   ( -- * Types
     RandomizedCache
 
@@ -27,6 +27,8 @@ import System.Clock (TimeSpec)
 import Time (Hour, KnownDivRat, Nanosecond, Time(..), hour, threadDelay, toUnit)
 
 import TzBot.Util (randomTimeSpec, timeToTimespec, (+-))
+import Control.Concurrent (newChan, Chan, readChan, writeChan)
+import Text.Interpolation.Nyan (int, rmode's)
 
 -- | This datatype uses `Cache` datatype inside, but also
 --   provides a possibility to slightly vary expiration
@@ -39,6 +41,7 @@ data RandomizedCache k v = RandomizedCache
   { rcCache  :: Cache k v
   , rcExpiry :: TimeSpec
   , rcExpiryRandomAmplitude :: TimeSpec
+  , rcInsertionChan :: Chan (k, v)
   }
 
 getCache :: (Show k, Show v) => RandomizedCache k v -> IO [(k, v, Maybe TimeSpec)]
@@ -49,7 +52,7 @@ getCache RandomizedCache {..} = Data.Cache.toList rcCache
 -- default cleaning period of 24 hours is used.
 withRandomizedCacheDefault
   :: ( KnownDivRat u Nanosecond
-     , Eq k, Hashable k
+     , Eq k, Hashable k, Show k, Show v
      )
   => Time u -- ^ Expiration time
   -> (RandomizedCache k v -> IO a) -- ^ Action that uses the cache
@@ -64,7 +67,7 @@ withRandomizedCacheDefault expiry =
 -- Raises `error` on incorrect use.
 withRandomizedCache
   :: ( KnownDivRat u Nanosecond
-     , Eq k, Hashable k
+     , Eq k, Hashable k, Show k, Show v
      , HasCallStack
      )
   => Time u -- ^ Expiration time
@@ -80,13 +83,23 @@ withRandomizedCache
   = do
   when (rcExpiry - rcExpiryRandomAmplitude <= 0) $
     error "Expiry random amplitude should be lower than the expiry"
+  rcInsertionChan <- newChan
   rcCache <- Cache.newCache $ Just rcExpiry
-  withAsync
-    (cleaningThread (toUnit <$> cleaningPeriod) rcCache)
-    (\_ -> action RandomizedCache {..})
+  withAsync (cleaningThread (toUnit <$> cleaningPeriod) rcCache) $ \_ -> do
+    let cache = RandomizedCache {..}
+    withAsync (insertionThread cache) (\_ -> action cache)
 
 defaultCleaningPeriod :: Time Hour
 defaultCleaningPeriod = hour 24
+
+insertionThread
+  :: (Eq k, Hashable k, Show k, Show v)
+  => RandomizedCache k v
+  -> IO ()
+insertionThread rc@RandomizedCache {..} = forever $ do
+  (k, v) <- readChan rcInsertionChan
+--  putStrLn @Text [int||insertion thread: read key=#s{k} val=#s{v} from chan and inserted into cache|]
+  insertRandomized' k v rc
 
 cleaningThread :: (Eq k, Hashable k) => Maybe (Time Hour) -> Cache k v -> IO ()
 cleaningThread mbCleaningPeriod cache = forever $ do
@@ -97,23 +110,33 @@ cleaningThread mbCleaningPeriod cache = forever $ do
 
 -- | Generate a random expiry time and insert a key/value pair into
 -- the cache with that expiry time.
-insertRandomized
+insertRandomized'
   :: (Eq k, Hashable k, MonadIO m)
   => k
   -> v
   -> RandomizedCache k v
   -> m ()
-insertRandomized key val RandomizedCache {..} = do
+insertRandomized' key val RandomizedCache {..} = do
   let (minTimeSpec, maxTimeSpec) = rcExpiry +- rcExpiryRandomAmplitude
   rndVal <- liftIO $ randomTimeSpec (minTimeSpec, maxTimeSpec)
   liftIO $ Cache.insert' rcCache (Just rndVal) key val
+
+insertRandomized
+  :: (MonadIO m, Show k, Show v)
+  => k
+  -> v
+  -> RandomizedCache k v
+  -> m ()
+insertRandomized key val RandomizedCache {..} = do
+--  putStrLn @Text [int||inserted key=#s{key} val=#s{val} into chan|]
+  liftIO $ writeChan rcInsertionChan (key, val)
 
 -- | Try to get a value by the key from the cache, delete if it is expired.
 -- If the value is either absent or expired, perform given fetch action
 -- and insert the obtained value with configured expiration parameters
 -- into the cache.
 fetchWithCacheRandomized
-  :: (Eq k, Hashable k, MonadIO m)
+  :: (Eq k, Hashable k, MonadIO m, Show k, Show v)
   => k
   -> (k -> m v)
   -> RandomizedCache k v

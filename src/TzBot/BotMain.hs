@@ -17,11 +17,12 @@ import Slacker
   pattern EventValue, runSocketMode, setApiToken, setAppToken, setOnException)
 import System.Environment (getArgs)
 
-import TzBot.Cache
+import TzBot.Cache1
 import TzBot.Config (AppLevelToken(..), BotToken(..), Config(..), readConfig)
 import TzBot.ProcessEvent
   (processMemberJoinedChannel, processMemberLeftChannel, processMessageEvent)
 import TzBot.RunMonad (BotState(..), log', runBotM)
+import TzBot.Config.Types (BotConfig)
 
 {- |
 
@@ -51,6 +52,17 @@ main = do
     bsConversationMembersCache <-
       managed $ withRandomizedCacheDefault cCacheConversationMembers
     liftIO $ runSocketMode sCfg $ handler BotState {..}
+
+withBotState :: BotConfig -> (BotState -> IO ()) -> IO ()
+withBotState bsConfig@Config{..} action = do
+  bsManager <- newManager tlsManagerSettings
+  bsMessagesReferences <- newIORef M.empty
+  runManaged $ do
+    bsUserInfoCache <-
+      managed $ withRandomizedCacheDefault cCacheUsersInfo
+    bsConversationMembersCache <-
+      managed $ withRandomizedCacheDefault cCacheConversationMembers
+    liftIO $ action BotState {..}
 
 handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
 handler bState _cfg = \e -> do
