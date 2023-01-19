@@ -110,26 +110,38 @@ processMessageEvent evt = when (newMessageOrEditedMessage evt) $ do
                   ]
                 }
           sendEphemeralMessage req
-
-    usersInChannelIds <- getChannelMembersCached channelId
     let ephemeralTemplate = renderTemplate now sender timeRefs
+    case meChannelType evt of
+      -- According to
+      -- https://forums.slackcommunity.com/s/question/0D53a00008vsItQCAU/how-to-use-an-app-in-the-private-chat-for-public-and-private-channels-its-easy-to-add-an-app-there-in-the-integrations-menu-of-the-channel-but-i-didnt-find-such-possibility-for-private-chats-am-i-missing-some-permissions?language=en_US
+      -- it's not possible to add the bot to any existing DMs, so if
+      -- the channel type of the message event is DM, it can only be
+      -- the user-bot conversation. This means that the user wants
+      -- to translate some time references and we send the translation
+      -- only to him, showing it in the way how other users would see
+      -- it if it were sent to the common channel.
+      Just CTDirectChannel -> do
+        let ephemeralMessage = renderAllForOthersTP sender ephemeralTemplate
+        sendAction False ephemeralMessage (uId sender)
+      _ -> do
+        usersInChannelIds <- getChannelMembersCached channelId
 
-    whenJust (renderErrorsForSenderTP ephemeralTemplate) $ \errorsMsg ->
-      sendAction True errorsMsg (uId sender)
+        whenJust (renderErrorsForSenderTP ephemeralTemplate) $ \errorsMsg ->
+          sendAction True errorsMsg (uId sender)
 
-    let notBotAndSameTimeZone u = not (uIsBot u) && uTz u /= uTz sender
-        notSender userId = userId /= uId sender
+        let notBotAndSameTimeZone u = not (uIsBot u) && uTz u /= uTz sender
+            notSender userId = userId /= uId sender
 
-    let devEnv = False
-    forConcurrently_ usersInChannelIds $ \userInChannelId ->
-      if devEnv
-      then do
-        userInChannel <- getUserCached userInChannelId
-        let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate
-        sendAction False ephemeralMessage (uId userInChannel)
-      else
-        when (notSender userInChannelId) $ do
-          userInChannel <- getUserCached userInChannelId
-          when (notBotAndSameTimeZone userInChannel) $ do
+        let devEnv = False
+        forConcurrently_ usersInChannelIds $ \userInChannelId ->
+          if devEnv
+          then do
+            userInChannel <- getUserCached userInChannelId
             let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate
             sendAction False ephemeralMessage (uId userInChannel)
+          else
+            when (notSender userInChannelId) $ do
+              userInChannel <- getUserCached userInChannelId
+              when (notBotAndSameTimeZone userInChannel) $ do
+                let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate
+                sendAction False ephemeralMessage (uId userInChannel)

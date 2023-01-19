@@ -12,6 +12,7 @@ module TzBot.Slack.API
   , User(..)
   , UserId(..)
   , ChannelId(..)
+  , ChannelType(..)
   , Cursor(..)
   , ThreadId(..)
   , MessageId(..)
@@ -29,9 +30,8 @@ module TzBot.Slack.API
 
 import Universum
 
-import Data.Aeson (FromJSON(parseJSON), ToJSON, Value, withObject, (.:), (.:?))
 import Data.Aeson.Key qualified as Key
-import Data.Aeson.Types (Object, Parser)
+import Data.Aeson.Types
 import Data.List.NonEmpty qualified as NE
 import Data.Time (UTCTime)
 import Data.Time.Zones.All (TZLabel)
@@ -41,6 +41,7 @@ import Servant
   (Get, JSON, Post, QueryParam, QueryParam', ReqBody, Required, Strict, ToHttpApiData, type (:<|>),
   type (:>))
 import Servant.Auth (Auth, JWT)
+import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Instances ()
 import TzBot.Slack.API.Block
@@ -170,16 +171,19 @@ newtype UserId = UserId { unUserId :: Text }
 newtype ChannelId = ChannelId { unChannelId :: Text }
   deriving stock (Eq, Show)
   deriving newtype (ToHttpApiData, FromJSON, ToJSON, Hashable, Buildable)
-{-
-=======
-  deriving stock (Eq, Show)
-  deriving newtype (ToHttpApiData, FromJSON, ToJSON)
 
-newtype ChannelId = ChannelId { unChannelId :: Text }
+data ChannelType
+  = CTChannel       -- ^ Public channel
+  | CTGroup         -- ^ Private channel
+  | CTDirectChannel -- ^ Direct messages
   deriving stock (Eq, Show)
-  deriving newtype (ToHttpApiData, FromJSON, ToJSON)
->>>>>>> [#19] Collect user feedback
--}
+
+instance FromJSON ChannelType where
+  parseJSON = withText "ChannelType" $ \case
+    "channel" -> pure CTChannel
+    "group"   -> pure CTGroup
+    "im"      -> pure CTDirectChannel
+    unknown   -> fail [int||unknown channel type #{unknown}|]
 
 newtype ThreadId = ThreadId { unThreadId :: Text }
   deriving stock (Eq, Show)
