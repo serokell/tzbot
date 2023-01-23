@@ -13,6 +13,7 @@ import Data.Aeson.Casing (aesonPrefix, camelCase)
 import Data.Aeson.Key qualified as AeKey
 import Data.Aeson.Types (Parser, parseMaybe)
 import Data.Char (isLower)
+import Data.List (stripPrefix)
 import Data.String.Conversions (cs)
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeM)
 import Data.Yaml qualified as Y
@@ -105,6 +106,8 @@ newtype TypedWrapper a = TypedWrapper a
 instance (Generic a, GToJSON' Value Zero (Rep a)) => ToJSON (TypedWrapper a) where
   toJSON (TypedWrapper x) = genericToJSON defaultTypedOptions x
 
+instance (Generic a, GFromJSON Zero (Rep a)) => FromJSON (TypedWrapper a) where
+  parseJSON x = TypedWrapper <$> genericParseJSON defaultTypedOptions x
 ----
 defaultSumOptions :: Options
 defaultSumOptions = defaultOptions
@@ -116,6 +119,8 @@ newtype SumWrapper a = SumWrapper a
 instance (Generic a, GToJSON' Value Zero (Rep a)) => ToJSON (SumWrapper a) where
   toJSON (SumWrapper x) = genericToJSON defaultSumOptions x
 
+instance (Generic a, GFromJSON Zero (Rep a)) => FromJSON (SumWrapper a) where
+  parseJSON x = SumWrapper <$> genericParseJSON defaultSumOptions x
 ----
 encodeText :: ToJSON a => a -> Text
 encodeText = cs . encode
@@ -132,8 +137,22 @@ neConcatMap func ns = foldr1 (<>) $ fmap func ns
 1 :| [2,2,3,3,4]
  -}
 
+----
 {-# NOINLINE isDevEnvironment #-}
 isDevEnvironment :: Bool
 isDevEnvironment = unsafePerformIO $ do
   env <- lookupEnv "SLACK_TZ_DEVENV"
   pure $ env == Just "true"
+
+----
+stripPrefixIfPresent :: Eq a => [a] -> [a] -> [a]
+stripPrefixIfPresent pref x = fromMaybe x $ stripPrefix pref x
+
+newtype WithUnknown a = WithUnknown { unUnknown :: Either Value a }
+  deriving stock (Show, Eq)
+
+instance (FromJSON a) => FromJSON (WithUnknown a) where
+  parseJSON val = WithUnknown <$> asum [Right <$> parseJSON val, pure $ Left val]
+
+instance (ToJSON a) => ToJSON (WithUnknown a) where
+  toJSON (WithUnknown eith) = either (String . show) toJSON eith
