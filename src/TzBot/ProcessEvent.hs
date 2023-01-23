@@ -94,14 +94,15 @@ processMessageEvent evt = when (newMessageOrEditedMessage evt) $ do
     let notBotAndSameTimeZone u = not (uIsBot u) && uTz u /= uTz sender
         notSender userId = userId /= uId sender
 
-    usersToNotify <- filter notBotAndSameTimeZone
-      <$> (mapM getUserCached $ filter notSender $ S.toList usersInChannelIds)
---    usersToNotify <- mapM getUserCached $ S.toList usersInChannelIds -- dev
-
-    forConcurrently_ usersToNotify $ \userToNotify -> do
-      let ephemeralMessage =
-            renderEphemeralMessageForOthers userToNotify ephemeralTemplate
-      sendAction ephemeralMessage (uId userToNotify)
+    forConcurrently_ usersInChannelIds $ \userInChannelId ->
+      when (notSender userInChannelId) $ do
+--      when True $ do -- dev
+        userInChannel <- getUserCached userInChannelId
+--        when True $ do -- dev
+        when (notBotAndSameTimeZone userInChannel) $ do
+          let ephemeralMessage =
+                renderEphemeralMessageForOthers userInChannel ephemeralTemplate
+          sendAction ephemeralMessage (uId userInChannel)
 
 processMemberJoinedChannel :: MemberJoinedChannelEvent -> BotM ()
 processMemberJoinedChannel MemberJoinedChannelEvent {..} = do
