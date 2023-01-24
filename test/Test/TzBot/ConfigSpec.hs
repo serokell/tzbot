@@ -9,7 +9,7 @@ module Test.TzBot.ConfigSpec (
 import Universum
 
 import Data.Map qualified as M
-import Test.Hspec (it, shouldBe, shouldSatisfy)
+import Test.Hspec (expectationFailure, it, shouldSatisfy)
 import Test.Hspec.QuickCheck (prop)
 import Test.Tasty hiding (after_)
 import Test.Tasty.Hspec (testSpec)
@@ -28,7 +28,11 @@ defaultConfigSpec =
   testSpec "Default config" $ do
     it "config/config.yaml should be the same as the default config" $ do
       contents <- (readFile "config/config.yaml" :: IO Text)
-      contents `shouldBe` decodeUtf8 defaultConfigText
+      when (contents /= decodeUtf8 defaultConfigText) $
+        expectationFailure
+          "config/config.yaml should be the same as the default config,\
+            \ please run `stack exec tzbot-exe -- dump-config --file\
+            \ config/config.yaml --force"
 
 configLoadingSpec :: IO TestTree
 configLoadingSpec =

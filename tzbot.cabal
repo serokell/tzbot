@@ -30,6 +30,7 @@ library
       TzBot.Config.Default
       TzBot.Config.Types
       TzBot.Instances
+      TzBot.Options
       TzBot.Parser
       TzBot.ProcessEvent
       TzBot.RunMonad
@@ -99,9 +100,11 @@ library
       aeson
     , aeson-casing
     , base >=4.7 && <5
+    , bytestring
     , cache
     , clock
     , containers
+    , directory
     , dlist
     , fmt
     , formatting
@@ -115,6 +118,7 @@ library
     , mtl
     , nyan-interpolation
     , o-clock
+    , optparse-applicative
     , random
     , servant-auth
     , servant-auth-client
