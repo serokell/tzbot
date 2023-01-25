@@ -112,19 +112,20 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
             >>> addLocalTime (negate offsetNominal)
             )
       TRTUSuccess (utcLocalTimeToUTC refTimeUTC) (Right offset)
-    Right (Left tzLabel) -> do
+    Right (Left (tzLabel, implicitSenderTimezone)) -> do
       let eventLocalTime = TZT.fromUTC (TZI.fromLabel tzLabel) eventTimestamp
       let eithRefTime = eventLocalTime & TZT.modifyLocalStrict (
             dayTransition >>> TZT.atTimeOfDay trTimeOfDay
             )
       case eithRefTime of
-        Left err -> tzErrorToResult err
+        Left err -> tzErrorToResult implicitSenderTimezone tzLabel err
         Right refTime -> TRTUSuccess (TZT.toUTC refTime) (Left tzLabel)
 
   where
-  tzErrorToResult :: TZT.TZError -> TimeReferenceToUTCResult
-  tzErrorToResult TZT.TZOverlap {} = TRTUAmbiguous
-  tzErrorToResult TZT.TZGap {}     = TRTUInvalid
+  tzErrorToResult :: Bool -> TZLabel -> TZT.TZError -> TimeReferenceToUTCResult
+  tzErrorToResult implicitSenderTimezone tzLabel = \case
+    TZT.TZOverlap {} -> TRTUAmbiguous implicitSenderTimezone tzLabel
+    TZT.TZGap {}     -> TRTUInvalid implicitSenderTimezone tzLabel
 
   -- This doesn't include setting time, only date changes
   dayTransition :: LocalTime -> LocalTime
@@ -145,10 +146,10 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
   -- The outer `Either` acts like an error carrier, so for it we use `pure` and `<$>`,
   -- and the inner `Either` carries one of the possible equitable results, so
   -- for it we use `Right` or `Left`.
-  mbEitherTzOrOffset :: Either TimeZoneAbbreviation (Either TZLabel Offset)
+  mbEitherTzOrOffset :: Either TimeZoneAbbreviation (Either (TZLabel, Bool) Offset)
   mbEitherTzOrOffset = case trLocationRef of
-    Nothing -> pure $ Left sendersTZLabel
-    Just (TimeZoneRef tzLabel) -> pure $ Left tzLabel
+    Nothing -> pure $ Left (sendersTZLabel, True)
+    Just (TimeZoneRef tzLabel) -> pure $ Left (tzLabel, False)
     Just (OffsetRef offset) -> pure $ Right offset
     Just (TimeZoneAbbreviationRef abbrev) ->
       Right . tzaiOffsetMinutes <$>
@@ -205,6 +206,8 @@ chooseBestYear dayOfMonth monthOfYear now = do
       sortedCandidates = NE.sortBy (compare `on` calcWeight) candidates
   NE.head sortedCandidates
 
+type IsImplicitSenderTimezone = Bool
+
 data TimeReferenceToUTCResult
   = TRTUSuccess
     -- ^ Conversion succeeded.
@@ -214,10 +217,10 @@ data TimeReferenceToUTCResult
       -- ^ The timezone or offset that this TimeReference is related to.
       -- When the `TimeReference` does not explicitly mention a timezone/offset,
       -- we assume it's related to the sender's timezone.
-  | TRTUAmbiguous
+  | TRTUAmbiguous IsImplicitSenderTimezone TZLabel
   -- ^ The time reference was ambiguous (e.g. due to a time ocurring twice in the same timezone during DST changes).
   -- See [Edge cases & pitfalls](https://github.com/serokell/tzbot/blob/main/docs/pitfalls.md#ambiguous-times).
-  | TRTUInvalid
+  | TRTUInvalid IsImplicitSenderTimezone TZLabel
   -- ^ The time reference was invalid (e.g. due to a time being skipped in a timezone during DST changes).
   -- See [Edge cases & pitfalls](https://github.com/serokell/tzbot/blob/main/docs/pitfalls.md#invalid-times).
   | TRTUInvalidTimeZoneAbbrev TimeZoneAbbreviation

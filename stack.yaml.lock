@@ -64,6 +64,13 @@ packages:
     git: https://github.com/martijnbastiaan/doctest-parallel
     commit: 112b85b55c63dae1cc52b5216efe03873f1acc06
 - completed:
+    hackage: guid-0.1.0@sha256:a7c975be473f6f142d5cc1b39bc807a99043d20b1bb0873fdfe7a3ce84d2faf1,1078
+    pantry-tree:
+      size: 364
+      sha256: a33838b7b1c54f6ac3e1b436b25674948713a4189658e4d82e639b9a689bc90d
+  original:
+    hackage: guid-0.1.0@sha256:a7c975be473f6f142d5cc1b39bc807a99043d20b1bb0873fdfe7a3ce84d2faf1,1078
+- completed:
     hackage: monad-logger-aeson-0.3.1.0@sha256:dbb1f816d00a820982094362551e20582de0a27c337d430fa7080dcacbe66f34,5193
     pantry-tree:
       size: 5103

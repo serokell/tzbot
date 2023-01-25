@@ -15,8 +15,6 @@ import Test.Tasty hiding (after_)
 import Test.Tasty.Hspec (testSpec)
 
 import TzBot.Config
-  (LoadConfigError(..), appTokenEnv, botTokenEnv, cacheConvMembersEnv, cacheUsersEnv, maxRetriesEnv,
-  readConfigWithEnv)
 import TzBot.Config.Default (defaultConfigText)
 
 test_configSpec :: IO TestTree
@@ -38,12 +36,16 @@ configLoadingSpec :: IO TestTree
 configLoadingSpec =
   testSpec "Config loading" $ do
     it "should not touch the config file if all envvars are set" $ do
-      let env = M.fromList $
+      let env :: Map String String
+          env = M.fromList $
             [ (appTokenEnv, "app-token")
             , (botTokenEnv, "bot-token")
             , (maxRetriesEnv, "3")
             , (cacheUsersEnv, "3m")
             , (cacheConvMembersEnv, "3m")
+            , (feedbackChannelEnv, "C13FQHWLQS2")
+            , (feedbackFileEnv, "feedback.log")
+            , (cacheReportDialogEnv, "3m")
             ]
       eithConfig <- readConfigWithEnv env (Just "config/nonexistent.yaml")
       eithConfig `shouldSatisfy` isRight

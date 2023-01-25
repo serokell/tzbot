@@ -8,15 +8,28 @@ features:
   bot_user:
     display_name: TzBot
     always_online: true
+  shortcuts:
+    - name: Translate time refs
+      type: message
+      callback_id: tz_view
+      description: Translate to the user's timezone
+    - name: Report an issue
+      type: message
+      callback_id: tz_report
+      description: Report timezone bot working incorrectly
 oauth_config:
   scopes:
     bot:
       - channels:history
-      - chat:write
-      - users:read
       - channels:read
+      - chat:write
       - groups:read
+      - users:read
+      - commands
       - groups:history
+      - im:history
+      - mpim:history
+      - mpim:read
 settings:
   event_subscriptions:
     bot_events:

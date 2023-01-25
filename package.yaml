@@ -31,9 +31,11 @@ library:
   - fmt
   - dlist
   - formatting
+  - guid
   - http-client
   - http-client-tls
   - http-types
+  - lens-aeson
   - lifted-async
   - managed
   - megaparsec

@@ -6,40 +6,15 @@ module TzBot.Slack.Events where
 
 import Universum
 
-import Data.Aeson
-  (FromJSON(parseJSON), Object, ToJSON(..), genericParseJSON, genericToJSON, withObject, (.:),
-  (.:?))
-import Data.Aeson.Key qualified as AeKey
-import Data.Aeson.Types (Parser)
+import Data.Aeson (FromJSON(parseJSON), ToJSON, withObject, withText, (.:), (.:?))
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeM)
 import Text.Interpolation.Nyan (int, rmode')
 
-import TzBot.Slack.API (ChannelId, MessageId, ThreadId, UserId)
-import TzBot.Util (aesonStripLowercasePrefixOptions)
-
-data Message = Message
-  { mUser :: UserId
-  , mText :: Text
-  , mMessageId :: MessageId
-  , mThreadId :: Maybe ThreadId
-  , mEdited :: Bool
-  , mSubType :: Maybe Text
-  } deriving stock (Eq, Show, Generic)
-
-instance FromJSON Message where
-  parseJSON = withObject "Message" parseMessage
-
-parseMessage :: Object -> Parser Message
-parseMessage o = do
-    mUser <- o .: "user"
-    mText <- o .: "text"
-    mMessageId <- o .: "ts"
-    mThreadId <- o .:? "thread_ts"
-    mSubType <- o .:? "subtype"
-    -- FIXME: use lenses
-    mEdited <- fmap (isJust @Text) . runMaybeT $
-      MaybeT (o .:? "edited") >>= MaybeT . (.:? "ts")
-    pure Message {..}
+import TzBot.Feedback.Dialog.Types (ReportDialogId)
+import TzBot.Slack.API
+import TzBot.Slack.Events.ViewPayload
+import TzBot.Slack.Fixtures qualified as Fixtures
+import TzBot.Util (RecordWrapper(..), fetchSlackTimestamp)
 
 data MessageEvent = MessageEvent
   { meChannel :: ChannelId
@@ -54,10 +29,12 @@ meUser = mUser . meMessage
 meThreadId :: MessageEvent -> Maybe ThreadId
 meThreadId = mThreadId . meMessage
 
-data MessageDetails =
-  MDMessage
+data MessageDetails
+  = MDMessage
   | MDMessageEdited Message
   | MDMessageBroadcast -- message copied to channel from thread
+  | MDUserJoinedChannel
+  | MDUserLeftChannel
   deriving stock (Eq, Show, Generic)
 
 instance FromJSON MessageEvent where
@@ -70,7 +47,9 @@ instance FromJSON MessageEvent where
     (meMessage, meMessageDetails) <- case subtype of
       Nothing -> parseMessageFromTopObject
       Just "thread_broadcast" -> parseMessageFromTopObject
-      Just "message_changed" -> do
+      Just "channel_join"     -> (,MDUserJoinedChannel) <$> parseMessage o
+      Just "channel_leave"    -> (,MDUserLeftChannel) <$> parseMessage o
+      Just "message_changed"  -> do
         -- Explanation: when someone posts a message to a thread with channel broadcast,
         -- two events come: message and then message_changed, the latter seemingly
         -- corresponds to sending this message directly to the channel.
@@ -92,12 +71,7 @@ data MemberLeftChannelEvent = MemberLeftChannelEvent
   , mlceChannelType :: Text
   , mlceUser :: UserId
   } deriving stock (Eq, Show, Generic)
-
-instance ToJSON MemberLeftChannelEvent where
-  toJSON = genericToJSON aesonStripLowercasePrefixOptions
-
-instance FromJSON MemberLeftChannelEvent where
-  parseJSON = genericParseJSON aesonStripLowercasePrefixOptions
+    deriving (FromJSON, ToJSON) via RecordWrapper MemberLeftChannelEvent
 
 -- | See https://api.slack.com/events/member_joined_channel
 data MemberJoinedChannelEvent = MemberJoinedChannelEvent
@@ -106,21 +80,73 @@ data MemberJoinedChannelEvent = MemberJoinedChannelEvent
   , mjceUser :: UserId
   , mjceInviter :: Maybe UserId
   } deriving stock (Eq, Show, Generic)
-
-instance ToJSON MemberJoinedChannelEvent where
-  toJSON = genericToJSON aesonStripLowercasePrefixOptions
-
-instance FromJSON MemberJoinedChannelEvent where
-  parseJSON = genericParseJSON aesonStripLowercasePrefixOptions
+    deriving (FromJSON, ToJSON) via RecordWrapper MemberJoinedChannelEvent
 
 -- time related utils
 tsToUTC :: String -> Maybe UTCTime
 tsToUTC = parseTimeM False defaultTimeLocale "%s%Q"
+--
+data CallbackType = CTView | CTReport
+  deriving stock (Eq, Show, Read, Generic)
 
-parseSlackTimestamp :: AeKey.Key -> String -> Parser UTCTime
-parseSlackTimestamp fieldName tsStr = do
-  let failMessage = [int||Failed to parse timestamp "#{AeKey.toString fieldName}"|]
-  maybe (fail failMessage) pure $ tsToUTC tsStr
+instance FromJSON CallbackType where
+  parseJSON = withText "CallbackType" $ \case
+    Fixtures.ViewEntrypointCallbackId   -> pure CTView
+    Fixtures.ReportEntrypointCallbackId -> pure CTReport
+    e -> fail [int||Unknown callback type #{e}|]
 
-fetchSlackTimestamp :: AeKey.Key -> Object -> Parser UTCTime
-fetchSlackTimestamp key o = o .: key >>= parseSlackTimestamp key
+-- | See https://api.slack.com/reference/interaction-payloads/shortcuts
+data InteractiveMessageEvent = InteractiveMessageEvent
+  { imeCallbackId :: CallbackType
+  , imeMessage :: Message
+  , imeUser :: ShortUser
+  , imeChannel :: ShortChannel
+  , imeTriggerId :: TriggerId
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper InteractiveMessageEvent
+
+data ShortUser = ShortUser
+  { suId :: UserId
+  , suName :: Text
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper ShortUser
+
+data ShortChannel = ShortChannel
+  { scId :: ChannelId
+  , scName :: Text
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper ShortChannel
+
+data ReportEphemeralEvent = ReportEphemeralEvent
+  { reeTriggerId :: TriggerId
+  , reeUser :: ShortUser
+  , reeChannel :: ShortChannel
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper ReportEphemeralEvent
+
+-- | See https://api.slack.com/reference/interaction-payloads/views
+data ViewActionEvent a = ViewActionEvent
+  { vaeView :: View a
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper (ViewActionEvent a)
+
+data UserFeedbackPayload = UserFeedbackPayload
+  { ufpUserInput ::
+      ViewPayload
+        Fixtures.ReportInputBlockId
+        Fixtures.ReportInputElementActionId
+        Text
+  } deriving stock (Show, Generic)
+    deriving FromJSON via PayloadCollection UserFeedbackPayload
+
+type SubmitViewEvent = ViewActionEvent UserFeedbackPayload
+
+-- | See https://api.slack.com/reference/interaction-payloads/views
+data View a = View
+  { vId :: ViewId
+  , vRootViewId :: ViewId
+  , vCallbackId :: Text
+  , vPrivateMetadata :: ReportDialogId
+  , vState :: a
+  } deriving stock (Eq, Show, Generic)
+    deriving FromJSON via RecordWrapper (View a)

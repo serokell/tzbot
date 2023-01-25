@@ -16,17 +16,27 @@ import Network.HTTP.Client (Manager)
 import Servant.Client (ClientError)
 import Text.Interpolation.Nyan (int, rmode')
 
-import TzBot.Cache (RandomizedCache)
+import TzBot.Cache (TzCache)
 import TzBot.Config.Types (BotConfig)
+import TzBot.Feedback.Dialog.Types (ReportDialogEntry, ReportDialogId)
 import TzBot.Slack.API (ChannelId, MessageId, User, UserId)
 import TzBot.TimeReference (TimeReferenceText)
+
+data FeedbackConfig = FeedbackConfig
+  { fcFeedbackChannel :: Maybe ChannelId
+  , fcFeedbackFile    :: Maybe Handle
+  }
 
 data BotState = BotState
   { bsConfig :: BotConfig
   , bsManager :: Manager
+  , bsFeedbackConfig :: FeedbackConfig
+  -- TODO: after #22 bsMessagesReferences should either disappear or become
+  -- cached (not IORef).
   , bsMessagesReferences :: IORef (M.Map MessageId (S.Set TimeReferenceText))
-  , bsUserInfoCache :: RandomizedCache UserId User
-  , bsConversationMembersCache :: RandomizedCache ChannelId (S.Set UserId)
+  , bsUserInfoCache :: TzCache UserId User
+  , bsConversationMembersCache :: TzCache ChannelId (S.Set UserId)
+  , bsReportEntries :: TzCache ReportDialogId ReportDialogEntry
   }
 
 newtype BotM a = BotM
@@ -52,21 +62,31 @@ runOrThrowBotM state action =
 -- This ugly logging is only temporary
 log' :: MonadIO m => Text -> m ()
 log' msg = liftIO $ T.putStrLn $ "Bot> " <> msg
+
 ----------------------------------------------------------------------------
 -- Exceptions
 ----------------------------------------------------------------------------
 
+type FunctionName = Text
+type EndpointName = Text
+type ErrorDescription = Text
+
 data BotException
-  = EndpointFailed Text Text
+  = EndpointFailed EndpointName ErrorDescription
+  | UnexpectedResult EndpointName FunctionName ErrorDescription
   | ServantError ClientError
-  deriving stock Show
+  deriving stock (Show, Generic)
 
 instance Exception BotException where
   displayException = \case
     EndpointFailed endpoint err ->
       [int|s|
-        '#{endpoint}' failed:
+        '#{endpoint}' failed: \
           #{err}
+      |]
+    UnexpectedResult endpoint funcName err ->
+      [int|s|
+        '#{funcName}', unexpected result from endpoint '#{endpoint}': #{err}
       |]
     ServantError clientError ->
       displayException clientError

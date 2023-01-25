@@ -13,6 +13,7 @@ import Data.Data (Data)
 import Time (Minute, Time)
 
 import TzBot.Instances ()
+import TzBot.Slack.API (ChannelId)
 import TzBot.Util (aesonConfigOptions)
 
 type FieldName = String
@@ -39,12 +40,18 @@ type family ConfigField (k :: ConfigStage) a where
 
 type BotConfig = Config 'CSFinal
 
-appTokenEnv, botTokenEnv, maxRetriesEnv, cacheUsersEnv, cacheConvMembersEnv :: EnvVarName
+appTokenEnv, botTokenEnv, maxRetriesEnv,
+  cacheUsersEnv, cacheConvMembersEnv,
+  feedbackChannelEnv, feedbackFileEnv,
+  cacheReportDialogEnv :: EnvVarName
 appTokenEnv = "SLACK_TZ_APP_TOKEN"
 botTokenEnv = "SLACK_TZ_BOT_TOKEN"
 maxRetriesEnv = "SLACK_TZ_MAX_RETRIES"
 cacheUsersEnv = "SLACK_TZ_CACHE_USERS_INFO"
 cacheConvMembersEnv = "SLACK_TZ_CACHE_CONVERSATION_MEMBERS"
+feedbackChannelEnv = "SLACK_TZ_FEEDBACK_CHANNEL"
+feedbackFileEnv = "SLACK_TZ_FEEDBACK_FILE"
+cacheReportDialogEnv = "SLACK_TZ_CACHE_REPORT_DIALOG"
 
 -- | Overall config.
 data Config f = Config
@@ -58,6 +65,12 @@ data Config f = Config
     -- ^ Caching expiration time for user profile info.
   , cCacheConversationMembers :: Time Minute
     -- ^ Caching expiration time for channel members info.
+  , cFeedbackChannel          :: Maybe ChannelId
+    -- ^ Slack channel to send collected user feedback.
+  , cFeedbackFile             :: Maybe FilePath
+    -- ^ File path to record collected user feedback.
+  , cCacheReportDialog        :: Time Minute
+    -- ^ How long a report dialog is valid after its opening.
   } deriving stock (Generic)
 
 deriving stock instance Eq (Config 'CSInterm)
