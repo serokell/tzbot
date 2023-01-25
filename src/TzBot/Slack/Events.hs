@@ -18,6 +18,7 @@ import TzBot.Util (RecordWrapper(..), fetchSlackTimestamp)
 
 data MessageEvent = MessageEvent
   { meChannel :: ChannelId
+  , meChannelType :: Maybe ChannelType
   , meMessage :: Message
   , meTs :: UTCTime
   , meMessageDetails :: MessageDetails
@@ -40,6 +41,7 @@ data MessageDetails
 instance FromJSON MessageEvent where
   parseJSON = withObject "" $ \o -> do
     meChannel <- o .: "channel"
+    meChannelType <- o .:? "channel_type"
     meTs <- fetchSlackTimestamp "ts" o
     (subtype :: Maybe Text) <- o .:? "subtype"
 
