@@ -15,6 +15,7 @@ import Data.Text.Encoding qualified as T
 import Data.Time.Zones.All (TZLabel, toTZName)
 import Data.Time.Zones.All qualified as TZ
 import Formatting.Buildable (Buildable(..))
+import Glider.NLP.Tokenizer (Token(..))
 import Time (KnownRatName, Time, unitsF, unitsP)
 
 instance Buildable TZLabel where
@@ -37,3 +38,5 @@ instance KnownRatName unit => FromJSON (Time unit) where
 
 instance KnownRatName unit => ToJSON (Time unit) where
   toJSON = String . fromString . unitsF
+
+deriving stock instance Ord Token

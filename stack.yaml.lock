@@ -84,6 +84,13 @@ packages:
       sha256: ebb043dd007864588c6b1676a0d30e521deab4353a3f19716f6f6f7d52b62817
   original:
     hackage: context-0.2.0.1@sha256:b5a1390a5ad11b7edd0449c9ef96823f082bff4988bd09583e37a4e93e9aad10,1891
+- completed:
+    hackage: glider-nlp-0.4@sha256:3bf4edc4dc72b633debc0ffc2dc8edffae7871ed59c400512ac5aa4cf4a2bc90,2339
+    pantry-tree:
+      size: 1040
+      sha256: fc6bbae05b6e309686a6eef93366028cdbe68814f882be655b23c0bca76d8bde
+  original:
+    hackage: glider-nlp-0.4@sha256:3bf4edc4dc72b633debc0ffc2dc8edffae7871ed59c400512ac5aa4cf4a2bc90,2339
 snapshots:
 - completed:
     size: 619399

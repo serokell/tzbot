@@ -17,6 +17,8 @@ import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
 import Formatting (Buildable)
 
+import TzBot.Util qualified as CI
+
 {- | An offset from UTC (e.g. @UTC+01:00@) with an optional timezone abbreviation (e.g. @BST@).
 
 Note: The `TimeZone` data type from the @time@ package is a misnomer, it doesn't actually represent a timezone.
@@ -153,7 +155,8 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
     Just (OffsetRef offset) -> pure $ Right offset
     Just (TimeZoneAbbreviationRef abbrev) ->
       Right . tzaiOffsetMinutes <$>
-        maybe (Left abbrev) pure (find (\e -> tzaiAbbreviation e == abbrev) knownTimeZoneAbbreviations)
+          maybe (Left abbrev) pure
+            (CI.lookup (unTimeZoneAbbreviation abbrev) knownTimeZoneAbbreviations)
 
 -- | Given a day of month and current time, try to figure out what day was really meant.
 -- Algorithm:
@@ -236,9 +239,15 @@ data TimeZoneAbbreviationInfo = TimeZoneAbbreviationInfo
   , tzaiFullName :: Text
   }
 
--- | A subset of https://en.wikipedia.org/wiki/List_of_time_zone_abbreviations
-knownTimeZoneAbbreviations :: [TimeZoneAbbreviationInfo]
+knownTimeZoneAbbreviations :: CI.CIStorage TimeZoneAbbreviationInfo
 knownTimeZoneAbbreviations =
+  CI.fromList . map (\tzAbbr ->
+    (unTimeZoneAbbreviation $ tzaiAbbreviation tzAbbr, tzAbbr)) $
+      knownTimeZoneAbbreviations'
+
+-- | A subset of https://en.wikipedia.org/wiki/List_of_time_zone_abbreviations
+knownTimeZoneAbbreviations' :: [TimeZoneAbbreviationInfo]
+knownTimeZoneAbbreviations' =
   -- TODO: add more tz abbreviations.
   --
   -- NOTE: Remember to update `docs/timezone_abbreviations.md` when making changes to this list.

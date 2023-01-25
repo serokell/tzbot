@@ -118,6 +118,7 @@ library
     , base >=4.7 && <5
     , bytestring
     , cache
+    , case-insensitive
     , clock
     , containers
     , deriving-aeson
@@ -125,6 +126,7 @@ library
     , dlist
     , fmt
     , formatting
+    , glider-nlp
     , guid
     , http-client
     , http-client-tls
