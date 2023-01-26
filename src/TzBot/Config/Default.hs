@@ -11,6 +11,7 @@ import Universum
 
 import Text.Interpolation.Nyan (int, rmode')
 
+import TzBot.Config.Types (inverseHelpUsageChanceEnv)
 import TzBot.Config.Types qualified as CT
 import TzBot.Instances ()
 import TzBot.Util (Trick, thTrickYaml)
@@ -67,6 +68,12 @@ feedbackFile: feedback.log
 # Envvar: #{CT.cacheReportDialogEnv}
 #
 cacheReportDialog: 1h
+
+# Inverse chance of appending help command usage hint to the ephemeral
+# message containing time translations.
+# Envvar: #{CT.inverseHelpUsageChanceEnv}
+#
+inverseHelpUsageChance: 15
   |]
 
 -- This prevents Config.Default.defaultConfigText to be incorrect on compiling.

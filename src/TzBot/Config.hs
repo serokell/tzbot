@@ -30,7 +30,7 @@ import TzBot.Config.Default (defaultConfigTrick)
 import TzBot.Config.Types as Types
   (AppLevelToken(..), BotToken(..), Config(..), ConfigField, ConfigStage(..), Env, EnvVarName,
   FieldName, appTokenEnv, botTokenEnv, cacheConvMembersEnv, cacheReportDialogEnv, cacheUsersEnv,
-  feedbackChannelEnv, feedbackFileEnv, maxRetriesEnv)
+  feedbackChannelEnv, feedbackFileEnv, inverseHelpUsageChanceEnv, maxRetriesEnv)
 import TzBot.Instances ()
 
 data LoadConfigError
@@ -110,6 +110,7 @@ readConfigWithEnv env mbPath =
   cFeedbackChannel          <- fetchOptional feedbackChannelEnv   cFeedbackChannel
   cFeedbackFile             <- fetchOptional feedbackFileEnv      cFeedbackFile
   cCacheReportDialog        <- fetchOptional cacheReportDialogEnv cCacheReportDialog
+  cInverseHelpUsageChance   <- fetchOptional inverseHelpUsageChanceEnv cInverseHelpUsageChance
   pure Config {..}
   where
     handleFunc :: Y.ParseException -> IO (Either [LoadConfigError] $ Config 'CSFinal)

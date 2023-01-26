@@ -9,13 +9,15 @@ module TzBot.ProcessEvents.Message
 import Universum
 
 import Control.Concurrent.Async.Lifted (forConcurrently_)
-import Data.List qualified as L
 import Data.List.NonEmpty qualified as NE
 import Data.Map qualified as M
 import Data.Set qualified as S
+import System.Random (randomRIO)
 
+import TzBot.Config (Config(..))
 import TzBot.Parser (parseTimeRefs)
 import TzBot.Render
+import TzBot.RunMonad (log')
 import TzBot.Slack
 import TzBot.Slack.API
 import TzBot.Slack.Events
@@ -83,8 +85,13 @@ processMessageEvent evt = when (newMessageOrEditedMessage evt) $ do
   -- TODO: use some "transactions here"? Or just lookup the map multiple times.
   mbReferencesToCheck <-
     filterNewReferencesAndMemorize (mMessageId msg) (parseTimeRefs $ mText msg)
-  whenJust mbReferencesToCheck $ \timeRefs-> do
+  whenJust mbReferencesToCheck $ \timeRefs -> do
+    inverseChance <- asks $ cInverseHelpUsageChance . bsConfig
     sender <- getUserCached $ mUser msg
+
+    whetherToShowHelpCmd <- liftIO $ fmap (== 1) $ randomRIO (1, inverseChance)
+    when whetherToShowHelpCmd $ log' "appending help command usage"
+
     let now = meTs evt
         channelId = meChannel evt
     let sendAction :: Bool -> TranslationPairs -> UserId -> BotM ()
@@ -96,24 +103,15 @@ processMessageEvent evt = when (newMessageOrEditedMessage evt) $ do
                 , perText = joinTranslationPairs toSender transl
                 , perBlocks = NE.nonEmpty $
                   renderSlackBlocks toSender (Just transl) <>
-                  [ BSection $ textSection (PlainText "Something wrong?") Nothing
-                  , BActions Actions
-                    { aBlockId = Fixtures.reportFromEphemeralBlockId
-                    , aElements = L.singleton $ Button
-                      { bText = "Report an issue here"
-                      , bActionId =
-                          Fixtures.reportFromEphemeralActionId
-                            (mMessageId msg)
-                            (mThreadId msg)
-                      }
-                    }
+                  [ BSection $ markdownSection (Mrkdwn Fixtures.helpUsage) Nothing
+                    | whetherToShowHelpCmd
                   ]
                 }
           sendEphemeralMessage req
     let ephemeralTemplate = renderTemplate now sender timeRefs
     case meChannelType evt of
       -- According to
-      -- https://forums.slackcommunity.com/s/question/0D53a00008vsItQCAU/how-to-use-an-app-in-the-private-chat-for-public-and-private-channels-its-easy-to-add-an-app-there-in-the-integrations-menu-of-the-channel-but-i-didnt-find-such-possibility-for-private-chats-am-i-missing-some-permissions?language=en_US
+      -- https://forums.slackcommunity.com/s/question/0D53a00008vsItQCAU
       -- it's not possible to add the bot to any existing DMs, so if
       -- the channel type of the message event is DM, it can only be
       -- the user-bot conversation. This means that the user wants
