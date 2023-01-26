@@ -23,6 +23,7 @@ import TzBot.Slack.API
 import TzBot.Slack.Events
 import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.TimeReference (TimeReference(trText), TimeReferenceText)
+import TzBot.Util (isDevEnvironment)
 
 -- Helper function for `filterNewReferencesAndMemorize`
 filterNewReferencesAndMemorizePure
@@ -130,9 +131,8 @@ processMessageEvent evt = when (newMessageOrEditedMessage evt) $ do
         let notBotAndSameTimeZone u = not (uIsBot u) && uTz u /= uTz sender
             notSender userId = userId /= uId sender
 
-        let devEnv = False
         forConcurrently_ usersInChannelIds $ \userInChannelId ->
-          if devEnv
+          if isDevEnvironment
           then do
             userInChannel <- getUserCached userInChannelId
             let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate

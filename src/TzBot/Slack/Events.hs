@@ -64,7 +64,7 @@ instance FromJSON MessageEvent where
           (False, Just "thread_broadcast") ->
             pure (newMsg, MDMessageBroadcast)
           _ -> fail "expected edited message"
-      Just unknownSubtype -> fail $ "unknown subtype " <> toString unknownSubtype
+      Just _unknownSubtype -> parseMessageFromTopObject
     pure MessageEvent {..}
 
 -- | See https://api.slack.com/events/member_left_channel

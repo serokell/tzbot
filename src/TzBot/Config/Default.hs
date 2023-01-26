@@ -11,7 +11,6 @@ import Universum
 
 import Text.Interpolation.Nyan (int, rmode')
 
-import TzBot.Config.Types (inverseHelpUsageChanceEnv)
 import TzBot.Config.Types qualified as CT
 import TzBot.Instances ()
 import TzBot.Util (Trick, thTrickYaml)
