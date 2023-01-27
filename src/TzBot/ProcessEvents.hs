@@ -8,6 +8,7 @@ module TzBot.ProcessEvents
 
 import Universum
 
+import Control.Exception (AsyncException(UserInterrupt))
 import Data.Aeson (FromJSON(..), Value)
 import Data.Aeson.Types (parseEither)
 import Slacker
@@ -24,10 +25,10 @@ import TzBot.ProcessEvents.ChannelEvent (processMemberJoinedChannel, processMemb
 import TzBot.ProcessEvents.Command (processHelpCommand)
 import TzBot.ProcessEvents.Interactive qualified as I
 import TzBot.ProcessEvents.Message (processMessageEvent)
-import TzBot.RunMonad (BotM, BotState(..), runBotM, runKatipWithBotState)
+import TzBot.RunMonad (BotM, BotState(..), runBotM)
 import TzBot.Slack.API.Block (ActionId(..))
 import TzBot.Slack.Fixtures qualified as Fixtures
-import TzBot.Util (encodeText)
+import TzBot.Util (catchAllErrors, encodeText)
 
 {- |
 After the message event came, the bot sends some ephemerals
@@ -49,8 +50,8 @@ event comes, and the bot collects user feedback in the configured way.
 
 The bot also has a command `\tzhelp`, should return help message in response.
  -}
-handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
-handler bState _cfg e = run $ do
+handler :: IORef (IO ()) -> BotState -> SlackConfig -> SocketModeEvent -> IO ()
+handler shutdownRef bState _cfg e = run $ do
   logDebug [int||Received Slack event: #{show @Text e}|]
   case e of
     Command cmdType slashCmd -> case cmdType of
@@ -83,11 +84,17 @@ handler bState _cfg e = run $ do
     _ -> logWarn [int||Unknown SocketModeEvent #s{e}|]
   where
     run :: BotM a -> IO ()
-    run action = do
-      eithRes <- runBotM bState action
-      runKatipWithBotState bState $ case eithRes of
-        Left err -> logError [int||Error occured: #s{err}|]
-        Right _ -> pure ()
+    run action = void $ runBotM bState $ do
+      eithRes <- catchAllErrors action
+      whenLeft eithRes $ \eithErr -> do
+        let logException :: (Exception e) => e -> BotM ()
+            logException err = logError [int||Error occured: #s{err}|]
+        case eithErr of
+          Left someExc
+            | Just UserInterrupt <- fromException someExc ->
+                liftIO $ join $ readIORef shutdownRef
+            | otherwise -> logException someExc
+          Right botExc -> logException botExc
 
     envelopeIdentifier :: Text
     envelopeIdentifier = case e of
