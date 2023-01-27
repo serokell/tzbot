@@ -15,7 +15,7 @@ import Data.Set qualified as S
 import System.Random (randomRIO)
 
 import TzBot.Config (Config(..))
-import TzBot.Parser (parseTimeRefs)
+import TzBot.ProcessEvents.Common (getTimeReferencesFromMessage)
 import TzBot.Render
 import TzBot.RunMonad (log')
 import TzBot.Slack
@@ -84,9 +84,10 @@ processMessageEvent evt = when (newMessageOrEditedMessage evt) $ do
   let msg = meMessage evt
 
   -- TODO: use some "transactions here"? Or just lookup the map multiple times.
+  timeRefs <- getTimeReferencesFromMessage msg
   mbReferencesToCheck <-
-    filterNewReferencesAndMemorize (mMessageId msg) (parseTimeRefs $ mText msg)
-  whenJust mbReferencesToCheck $ \timeRefs -> do
+    filterNewReferencesAndMemorize (mMessageId msg) timeRefs
+  whenJust mbReferencesToCheck $ \timeRefs-> do
     inverseChance <- asks $ cInverseHelpUsageChance . bsConfig
     sender <- getUserCached $ mUser msg
 

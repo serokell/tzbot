@@ -46,6 +46,7 @@ import Text.Interpolation.Nyan (int, rmode')
 import TzBot.Instances ()
 import TzBot.Slack.API.Block
 import TzBot.Slack.API.Common
+import TzBot.Slack.API.MessageBlock (MessageBlock)
 import TzBot.Util
 
 ----------------------------------------------------------------------------
@@ -218,6 +219,7 @@ data Message = Message
   , mThreadId :: Maybe ThreadId
   , mEdited :: Bool
   , mSubType :: Maybe Text
+  , msgBlocks :: WithUnknown [MessageBlock]
   } deriving stock (Eq, Show, Generic)
 
 instance FromJSON Message where
@@ -233,6 +235,7 @@ parseMessage o = do
   mSubType <- o .:? "subtype"
   mEdited <- fmap (isJust @Text) . runMaybeT $
     MaybeT (o .:? "edited") >>= MaybeT . (.:? "ts")
+  msgBlocks <- o .: "blocks"
   pure Message {..}
 
 -- | See: https://api.slack.com/types/user

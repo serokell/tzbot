@@ -48,6 +48,7 @@ library
       TzBot.Slack.API
       TzBot.Slack.API.Block
       TzBot.Slack.API.Common
+      TzBot.Slack.API.MessageBlock
       TzBot.Slack.Events
       TzBot.Slack.Events.ViewPayload
       TzBot.Slack.Fixtures
@@ -113,11 +114,13 @@ library
   build-depends:
       aeson
     , aeson-casing
+    , aeson-pretty
     , base >=4.7 && <5
     , bytestring
     , cache
     , clock
     , containers
+    , deriving-aeson
     , directory
     , dlist
     , fmt
@@ -147,6 +150,7 @@ library
     , text
     , time
     , time-compat
+    , transformers
     , transformers-base
     , tz
     , tztime
@@ -290,6 +294,7 @@ test-suite tzbot-test
   other-modules:
       Test.TzBot.ConfigSpec
       Test.TzBot.HandleTooManyRequests
+      Test.TzBot.MessageBlocksSpec
       Test.TzBot.TimeReferenceToUtcSpec
       Tree
       Paths_tzbot
@@ -351,11 +356,14 @@ test-suite tzbot-test
       tasty-discover:tasty-discover
   build-depends:
       QuickCheck
+    , aeson
     , base >=4.7 && <5
     , containers
     , hspec
     , http-types
+    , nyan-interpolation
     , servant-client-core
+    , string-conversions
     , tasty
     , tasty-hspec
     , tasty-hunit

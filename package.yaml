@@ -22,6 +22,7 @@ library:
   - universum
   - aeson
   - aeson-casing
+  - aeson-pretty
   - base >= 4.7 && < 5
   - bytestring
   - cache
@@ -29,7 +30,9 @@ library:
   - containers
   - directory
   - fmt
+  - deriving-aeson
   - dlist
+  - fmt
   - formatting
   - guid
   - http-client
@@ -56,6 +59,7 @@ library:
   - text
   - time
   - time-compat
+  - transformers
   - transformers-base
   - tz
   - tztime
@@ -88,20 +92,22 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - base >= 4.7 && < 5
+    - universum
     - tzbot
+    - aeson
     - containers
     - hspec
+    - http-types
+    - nyan-interpolation
+    - servant-client-core
+    - string-conversions
     - tasty
     - tasty-hspec
     - tasty-hunit
+    - tasty-quickcheck
     - time
     - tztime
     - QuickCheck
-    - http-types
-    - servant-client-core
-    - tasty-quickcheck
-    - time
-    - universum
   doctests:
     main:                doctests.hs
     source-dirs:         test
