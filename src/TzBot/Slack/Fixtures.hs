@@ -15,26 +15,22 @@ module TzBot.Slack.Fixtures
   , reportInputElementActionId
   , reportInputBlockId
 
-  -- * Report button inside ephemerals
-  , MessageIdentifier (..)
-  , reportFromEphemeralActionIdPrefix
-  , reportFromEphemeralActionId
-  , getMessageIdFromReportEphemeral
-  , reportFromEphemeralBlockId
-
   -- * Modal identifiers
   , viewModal
   , reportModal
+
+  -- * Help message
+  , pattern HelpCommand
+  , helpMessage
+  , helpUsage
   ) where
 
 import Universum
 
-import Data.Aeson (FromJSON, ToJSON)
-import Data.Text qualified as T
 import GHC.TypeLits (symbolVal)
 
-import TzBot.Slack.API (ActionId(ActionId), BlockId, MessageId, ThreadId)
-import TzBot.Util (RecordWrapper(..), decodeText, encodeText)
+import Text.Interpolation.Nyan (int, rmode')
+import TzBot.Slack.API (ActionId(..), BlockId)
 
 pattern ViewEntrypointCallbackId :: Text
 pattern ViewEntrypointCallbackId = "tz_view"
@@ -63,30 +59,6 @@ reportInputElementActionId = fromString $ symbolVal $ Proxy @ReportInputElementA
 reportInputBlockId :: BlockId
 reportInputBlockId = fromString $ symbolVal $ Proxy @ReportInputBlockId
 
--- report button from the ephemeral message
-data MessageIdentifier = MessageIdentifier
-  { miMessageId :: MessageId
-  , miThreadId :: Maybe ThreadId
-  } deriving stock (Generic)
-    deriving (FromJSON, ToJSON) via RecordWrapper MessageIdentifier
-
-reportFromEphemeralActionIdPrefix :: Text
-reportFromEphemeralActionIdPrefix = "report-from-ephemeral-action-id"
-
-reportFromEphemeralActionId :: MessageId -> Maybe ThreadId -> ActionId
-reportFromEphemeralActionId msgId mbThreadId = do
-  ActionId $
-    reportFromEphemeralActionIdPrefix
-      <> encodeText (MessageIdentifier msgId mbThreadId)
-
-reportFromEphemeralBlockId :: BlockId
-reportFromEphemeralBlockId = "report-from-ephemeral-block-id"
-
-getMessageIdFromReportEphemeral :: ActionId -> Maybe MessageIdentifier
-getMessageIdFromReportEphemeral (ActionId aId) = do
-  suf <- T.stripPrefix reportFromEphemeralActionIdPrefix aId
-  decodeText suf
-
 ---------------------------
 -- modal types
 ---------------------------
@@ -95,3 +67,33 @@ viewModal = "view_modal"
 
 reportModal :: Text
 reportModal = "report_modal"
+
+---------------------------
+-- getting help
+---------------------------
+
+pattern HelpCommand :: Text
+pattern HelpCommand = "/tzhelp"
+
+helpUsage :: Text
+helpUsage = [int||_Type #{HelpCommand} to find out how the tzbot works._|]
+
+helpMessage :: Text
+helpMessage = [int|n|
+Hello!
+
+I am *tzbot* - the time zone bot.
+
+I can capture time references inside messages and translate them to your
+time zone.
+Whenever the message is posted in the channel I'm in, if this
+message contains any time references, I will translate them and send it
+to you via an ephemeral message. If a time reference is invalid for some
+reason, I will say what's wrong with it.
+
+Also you can trigger the message translation yourself,
+by using entrypoints in the Slack message context menu; this works
+in every channel of the workspace (including direct messages).
+There you also can report the bot working wrongly,
+we will be very grateful for your feedback!
+|]

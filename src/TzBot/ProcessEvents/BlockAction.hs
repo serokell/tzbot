@@ -5,7 +5,6 @@
 module TzBot.ProcessEvents.BlockAction
   ( -- * Handlers
     processReportButtonToggled
-  , processReportButtonFromEphemeral
   ) where
 
 import Universum
@@ -16,12 +15,10 @@ import Text.Interpolation.Nyan (int, rmode')
 import TzBot.Feedback.Dialog (lookupDialogEntry)
 import TzBot.Feedback.Dialog.Types
   (ReportDialogEntry(ReportDialogEntry, rpmMessageText, rpmMessageTimestamp, rpmSenderTimeZone, rpmTimeTranslation))
-import TzBot.ProcessEvents.Common (openModalCommon)
 import TzBot.RunMonad (log')
-import TzBot.Slack (BotM, retrieveOneMessage, retrieveOneMessageFromThread, updateModal)
+import TzBot.Slack (BotM, updateModal)
 import TzBot.Slack.API (UpdateViewReq(UpdateViewReq))
 import TzBot.Slack.Events
-import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.Slack.Modal (mkReportModal)
 
 -- | User was in the view modal and now wants to report error.
@@ -37,16 +34,3 @@ processReportButtonToggled val = do
       UpdateViewReq
         (mkReportModal rpmMessageText rpmTimeTranslation metadataEntryId)
         (vId $ vaeView val)
-
--- | User wants to report error, the report modal is started.
-processReportButtonFromEphemeral
-  :: (ReportEphemeralEvent, Fixtures.MessageIdentifier)
-  -> BotM ()
-processReportButtonFromEphemeral (evt, Fixtures.MessageIdentifier {..}) = do
-  let channelId = scId $ reeChannel evt
-  msg <- case miThreadId of
-    Nothing -> retrieveOneMessage channelId miMessageId
-    Just threadId -> retrieveOneMessageFromThread channelId threadId miMessageId
-  let whoTriggeredId = suId $ reeUser evt
-      triggerId = reeTriggerId evt
-  openModalCommon msg channelId whoTriggeredId triggerId mkReportModal

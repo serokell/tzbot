@@ -11,11 +11,13 @@ import Universum
 import Data.Aeson (FromJSON(..), Value)
 import Data.Aeson.Types (parseEither)
 import Slacker
-  (SlackConfig, SocketModeEvent(..), pattern BlockAction, pattern EventValue, pattern Interactive)
+  (SlackConfig, SocketModeEvent(..), pattern BlockAction, pattern Command, pattern EventValue,
+  pattern Interactive)
 import Text.Interpolation.Nyan (int, rmode', rmode's)
 
 import TzBot.ProcessEvents.BlockAction qualified as B
 import TzBot.ProcessEvents.ChannelEvent (processMemberJoinedChannel, processMemberLeftChannel)
+import TzBot.ProcessEvents.Command (processHelpCommand)
 import TzBot.ProcessEvents.Interactive qualified as I
 import TzBot.ProcessEvents.Message (processMessageEvent)
 import TzBot.RunMonad (BotM, BotState, log', runBotM)
@@ -49,6 +51,10 @@ event comes, and the bot collects user feedback in the configured way.
 handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
 handler wstate _cfg = \e -> do
   run $ case e of
+    Command cmdType slashCmd -> case cmdType of
+      Fixtures.HelpCommand -> processHelpCommand slashCmd
+      unknownCmd           -> log' [int||Unknown command #{unknownCmd}|]
+
     EventValue eventType evtRaw
       | eventType == "message" ->
         decodeAndProcess eventType processMessageEvent evtRaw
@@ -58,16 +64,10 @@ handler wstate _cfg = \e -> do
         decodeAndProcess eventType processMemberLeftChannel evtRaw
       | otherwise -> log' [int||Unrecognized EventValue #{encodeText evtRaw}|]
 
-  -- BlockAction events form a subset of Interactive, so check them first
+    -- BlockAction events form a subset of Interactive, so check them first
     BlockAction actionId blockActionRaw
       | actionId == unActionId Fixtures.reportButtonActionId ->
         decodeAndProcess actionId B.processReportButtonToggled blockActionRaw
-      | Just messageId <-
-          Fixtures.getMessageIdFromReportEphemeral $ ActionId actionId ->
-        decodeAndProcess
-          actionId
-          (\x -> B.processReportButtonFromEphemeral (x, messageId))
-          blockActionRaw
       | otherwise ->
         log' [int||Unrecognized BlockAction #s{e}|]
 

@@ -67,6 +67,12 @@ feedbackFile: feedback.log
 # Envvar: #{CT.cacheReportDialogEnv}
 #
 cacheReportDialog: 1h
+
+# Inverse chance of appending help command usage hint to the ephemeral
+# message containing time translations.
+# Envvar: #{CT.inverseHelpUsageChanceEnv}
+#
+inverseHelpUsageChance: 15
   |]
 
 -- This prevents Config.Default.defaultConfigText to be incorrect on compiling.

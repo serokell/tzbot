@@ -17,8 +17,10 @@ import Data.String.Conversions (cs)
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeM)
 import Data.Yaml qualified as Y
 import GHC.Generics
+import GHC.IO (unsafePerformIO)
 import Language.Haskell.TH
 import System.Clock (TimeSpec, fromNanoSecs, toNanoSecs)
+import System.Environment (lookupEnv)
 import System.Random (randomRIO)
 import Text.Interpolation.Nyan (int, rmode')
 import Time (KnownDivRat, Nanosecond, Time, floorRat, ns, toUnit)
@@ -129,3 +131,9 @@ neConcatMap func ns = foldr1 (<>) $ fmap func ns
 >>> neConcatMap (\x -> x :| [x + 1]) $ 1 :| [2,3]
 1 :| [2,2,3,3,4]
  -}
+
+{-# NOINLINE isDevEnvironment #-}
+isDevEnvironment :: Bool
+isDevEnvironment = unsafePerformIO $ do
+  env <- lookupEnv "SLACK_TZ_DEVENV"
+  pure $ env == Just "true"

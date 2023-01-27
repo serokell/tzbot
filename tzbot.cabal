@@ -38,6 +38,7 @@ library
       TzBot.ProcessEvents
       TzBot.ProcessEvents.BlockAction
       TzBot.ProcessEvents.ChannelEvent
+      TzBot.ProcessEvents.Command
       TzBot.ProcessEvents.Common
       TzBot.ProcessEvents.Interactive
       TzBot.ProcessEvents.Message

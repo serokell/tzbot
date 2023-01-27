@@ -48,3 +48,9 @@ feedbackFile: feedback.log
 # Envvar: SLACK_TZ_CACHE_REPORT_DIALOG
 #
 cacheReportDialog: 1h
+
+# Inverse chance of appending help command usage hint to the ephemeral
+# message containing time translations.
+# Envvar: SLACK_TZ_INVERSE_HELP_USAGE_CHANCE
+#
+inverseHelpUsageChance: 15

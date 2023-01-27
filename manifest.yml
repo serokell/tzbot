@@ -17,6 +17,10 @@ features:
       type: message
       callback_id: tz_report
       description: Report timezone bot working incorrectly
+  slash_commands:
+    - command: /tzhelp
+      description: Get info how the tzbot works
+      should_escape: false
 oauth_config:
   scopes:
     bot:
