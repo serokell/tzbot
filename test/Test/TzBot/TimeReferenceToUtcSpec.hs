@@ -4,23 +4,44 @@
  - SPDX-License-Identifier: MPL-2.0
  -}
 
-module Test.TzBot.TimeReferenceToUtcSpec (test_TimeReferenceToUtc) where
+module Test.TzBot.TimeReferenceToUtcSpec (test_TimeReferenceToUtc, test_theSameDayInDifferentZones) where
 
 import Universum
 
 import Data.Time (DayOfWeek(Friday, Monday, Wednesday), TimeOfDay(TimeOfDay), UTCTime)
-import Data.Time.TZInfo (TZLabel(America__Havana, Asia__Tashkent, Europe__Helsinki))
+import Data.Time.TZInfo
 import Data.Time.TZTime (toUTC)
 import Data.Time.TZTime.QQ (tz)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
 
 import TzBot.TimeReference
-  (DateReference(DayOfMonthRef, DayOfWeekRef, DaysFromToday),
-  LocationReference(OffsetRef, TimeZoneAbbreviationRef, TimeZoneRef), Offset(Offset),
-  TimeReference(TimeReference), TimeReferenceToUTCResult(..),
-  TimeZoneAbbreviation(TimeZoneAbbreviation), timeReferenceToUTC)
 
+test_theSameDayInDifferentZones :: TestTree
+test_theSameDayInDifferentZones = testGroup "TheSameDay"
+  [ testCase "Moscow and UTC" $ do
+      let t1 = toUTC [tz|2022-03-11 01:00:00 [Europe/Moscow]|]
+      let res = theSameDayInTwoTimezones t1 Europe__Moscow (Right 0)
+      res @?= False
+  , testCase "Moscow and Lisbon" $ do
+      let t1 = toUTC [tz|2022-03-11 02:59:59 [Europe/Moscow]|]
+      let res = theSameDayInTwoTimezones t1 Europe__Moscow (Left Europe__Lisbon)
+      res @?= False
+  , testCase "Moscow and Lisbon, same day" $ do
+      let t1 = toUTC [tz|2022-03-11 03:00:00 [Europe/Moscow]|]
+      let res = theSameDayInTwoTimezones t1 Europe__Moscow (Left Europe__Lisbon)
+      res @?= True
+  , testCase "Havana -5 vs Offset -5" $ do
+      let t2 = toUTC [tz|2022-11-06 00:30:00 -05:00 [America/Havana]|]
+      let res = theSameDayInTwoTimezones t2 America__Havana (Right $ (-5) * 60)
+      res @?= True
+  , testCase "Havana -4 vs Offset -5" $ do
+      let t2 = toUTC [tz|2022-11-06 00:30:00 -04:00 [America/Havana]|]
+      let res = theSameDayInTwoTimezones t2 America__Havana (Right $ (-5) * 60)
+      res @?= False
+  ]
+
+--
 time1 :: UTCTime
 time1 = toUTC [tz|2022-12-14 10:30:00 [Europe/Helsinki]|] -- Wednesday
 
@@ -61,7 +82,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-14 18:30:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess True (toUTC [tz|2022-12-14 18:30:00 [UTC]|]) (Left label1)
           }
     , testCase "Tomorrow" $
         mkTestCase $ TestEntry
@@ -69,7 +90,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-15 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess True (toUTC [tz|2022-12-15 06:00:00 [UTC]|]) (Left label1)
           }
     ]
   , testGroup "Time reference without location reference" $
@@ -80,7 +101,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-15 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-12-15 06:00:00 [UTC]|]) (Left label1)
           }
     , testCase "Day of week, Wednesday -> Monday" $
         mkTestCase $ TestEntry
@@ -89,7 +110,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-19 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess True (toUTC [tz|2022-12-19 06:00:00 [UTC]|]) (Left label1)
           }
     , testCase "Day of week, Wednesday -> Friday" $
         mkTestCase $ TestEntry
@@ -98,7 +119,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-16 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-12-16 06:00:00 [UTC]|]) (Left label1)
           }
     , testCase "Day of week, Wednesday -> Wednesday" $
         mkTestCase $ TestEntry
@@ -107,7 +128,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-14 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-12-14 06:00:00 [UTC]|]) (Left label1)
           }
 
     , testCase "Day of month, new year" $
@@ -117,7 +138,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2023-01-02 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess True (toUTC [tz|2023-01-02 06:00:00 [UTC]|]) (Left label1)
           }
     , testCase "Day of month, search for exactly matching candidate (not the closest)" $
         mkTestCase $ TestEntry
@@ -126,7 +147,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = toUTC [tz|2022-11-29 10:00:00 [Europe/Helsinki]|]
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-31 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess True (toUTC [tz|2022-12-31 06:00:00 [UTC]|]) (Left label1)
           }
     , testCase "Day of month, prefer past days if they are much closer" $
         mkTestCase $ TestEntry
@@ -135,7 +156,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = toUTC [tz|2022-12-03 10:00:00 [Europe/Helsinki]|]
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-11-25 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess True (toUTC [tz|2022-11-25 06:00:00 [UTC]|]) (Left label1)
           }
     , testCase "Day of month, prefer future days if they are slightly further" $
         mkTestCase $ TestEntry
@@ -144,7 +165,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = toUTC [tz|2022-12-03 10:00:00 [Europe/Helsinki]|]
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-22 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess True (toUTC [tz|2022-12-22 06:00:00 [UTC]|]) (Left label1)
           }
 
     , testCase "Day of month and month of year, 1" $
@@ -154,7 +175,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2023-01-14 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2023-01-14 06:00:00 [UTC]|]) (Left label1)
           }
     , testCase "Day of month and month of year, prefer future day if it's further" $
         mkTestCase $ TestEntry
@@ -163,7 +184,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = toUTC [tz|2022-06-15 10:00:00 [Europe/Helsinki]|]
           , teResult =
-              TRTUSuccess (toUTC [tz|2023-02-10 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2023-02-10 06:00:00 [UTC]|]) (Left label1)
           }
     , testCase "Day of month and month of year, prefer past day if it's much closer" $
         mkTestCase $ TestEntry
@@ -172,7 +193,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = toUTC [tz|2022-06-15 10:00:00 [Europe/Helsinki]|]
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-04-10 05:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-04-10 05:00:00 [UTC]|]) (Left label1)
           }
 
     , testCase "Time reference without location reference,\
@@ -183,7 +204,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-14 06:00:00 [UTC]|]) (Left label1)
+              TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-12-14 06:00:00 [UTC]|]) (Left label1)
           }
     ]
   , testCase "Custom time ref" $
@@ -194,7 +215,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-16 03:00:00 [UTC]|]) (Left Asia__Tashkent)
+              TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-12-16 03:00:00 [UTC]|]) (Left Asia__Tashkent)
           }
   , testCase "Explicit offset" $ do
       let offset = Offset $ 3 * hour
@@ -205,7 +226,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
-              TRTUSuccess (toUTC [tz|2022-12-16 05:00:00 [UTC]|]) (Right offset)
+              TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-12-16 05:00:00 [UTC]|]) (Right offset)
           }
   , testCase "Valid timezone abbreviation" $
       mkTestCase $ TestEntry
@@ -214,7 +235,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
         , teUserLabel = label1
         , teCurrentTime = time1
         , teResult =
-          TRTUSuccess (toUTC [tz|2022-12-16 05:00:00 [UTC]|]) (Right $ Offset $ 3 * hour)
+          TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-12-16 05:00:00 [UTC]|]) (Right $ Offset $ 3 * hour)
         }
   , testCase "Invalid timezone abbreviation" $
       mkTestCase $ TestEntry
@@ -233,7 +254,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ DaysFromToday 2) (Just $ TimeZoneRef labelHavana)
           , teUserLabel = labelHavana
           , teCurrentTime = time2
-          , teResult = TRTUInvalid False labelHavana
+          , teResult = TRTUInvalid $ TimeShiftErrorInfo False labelHavana
           }
     , testCase "Turn on DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
@@ -243,7 +264,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ DaysFromToday 2) (Just $ OffsetRef offset)
           , teUserLabel = labelHavana
           , teCurrentTime = time2
-          , teResult = TRTUSuccess (toUTC [tz|2022-03-13 05:30:00 [UTC]|]) (Right offset)
+          , teResult = TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-03-13 05:30:00 [UTC]|]) (Right offset)
           }
     , testCase "Turn on DST, explicit offset abbreviation, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
@@ -253,7 +274,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ TimeZoneAbbreviationRef $ TimeZoneAbbreviation "CDT")
           , teUserLabel = labelHavana
           , teCurrentTime = time2
-          , teResult = TRTUSuccess (toUTC [tz|2022-03-13 05:30:00 [UTC]|]) (Right offset)
+          , teResult = TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-03-13 05:30:00 [UTC]|]) (Right offset)
           }
     , testCase "Turn off DST, explicit time zone, Havana, Cuba" $
         mkTestCase $ TestEntry
@@ -262,7 +283,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ DaysFromToday 2) (Just $ TimeZoneRef labelHavana)
           , teUserLabel = labelHavana
           , teCurrentTime = time3
-          , teResult = TRTUAmbiguous False labelHavana
+          , teResult = TRTUAmbiguous $ TimeShiftErrorInfo False labelHavana
           }
     , testCase "Turn off DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
@@ -272,7 +293,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ DaysFromToday 2) (Just $ OffsetRef offset)
           , teUserLabel = labelHavana
           , teCurrentTime = time3
-          , teResult = TRTUSuccess (toUTC [tz|2022-11-06 05:30:00 [UTC]|]) (Right offset)
+          , teResult = TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-11-06 05:30:00 [UTC]|]) (Right offset)
           }
     , testCase "Turn off DST, explicit offset abbreviation, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
@@ -282,7 +303,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ TimeZoneAbbreviationRef $ TimeZoneAbbreviation "CDT")
           , teUserLabel = labelHavana
           , teCurrentTime = time3
-          , teResult = TRTUSuccess (toUTC [tz|2022-11-06 05:30:00 [UTC]|]) (Right offset)
+          , teResult = TRTUSuccess $ TimeRefSuccess False (toUTC [tz|2022-11-06 05:30:00 [UTC]|]) (Right offset)
           }
     ]
   ]

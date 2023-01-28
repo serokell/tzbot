@@ -27,7 +27,7 @@ import TzBot.Slack.API
 import TzBot.Slack.Events
 import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.TimeReference (TimeReference(trText), TimeReferenceText)
-import TzBot.Util (catchAllErrors, isDevEnvironment, withMaybe)
+import TzBot.Util (catchAllErrors, withMaybe)
 
 -- Helper function for `filterNewReferencesAndMemorize`
 filterNewReferencesAndMemorizePure
@@ -126,8 +126,8 @@ processMessageEvent evt =
 
     let now = meTs evt
         channelId = meChannel evt
-    let sendAction :: Bool -> TranslationPairs -> UserId -> BotM ()
-        sendAction toSender transl userId = do
+    let sendAction :: SenderFlag -> UserId -> TranslationPairs -> BotM ()
+        sendAction toSender userId transl = do
           let req = PostEphemeralReq
                 { perUser = userId
                 , perChannel = channelId
@@ -140,7 +140,6 @@ processMessageEvent evt =
                   ]
                 }
           sendEphemeralMessage req
-    let ephemeralTemplate = renderTemplate now sender timeRefs
     case meChannelType evt of
       -- According to
       -- https://forums.slackcommunity.com/s/question/0D53a00008vsItQCAU
@@ -148,43 +147,34 @@ processMessageEvent evt =
       -- the channel type of the message event is DM, it can only be
       -- the user-bot conversation. This means that the user wants
       -- to translate some time references and we send the translation
-      -- only to him, showing it in the way how other users would see
-      -- it if it were sent to the common channel.
+      -- only to him, showing it in the way how other users would see it.
       Just CTDirectChannel -> do
-        let ephemeralMessage = renderAllForOthersTP sender ephemeralTemplate
+        let mbEphemeralMessage = renderAllTP sender $
+              renderTemplate asForModalM now sender timeRefs
         $(logTM) `info` [int||Received message from the DM, sending translation \
                               to the author|]
-        sendAction False ephemeralMessage (uId sender)
+        whenJust mbEphemeralMessage $ sendAction asForOthersS (uId sender)
       _ -> do
+        let ephemeralTemplate = renderTemplate asForMessageM now sender timeRefs
         usersInChannelIds <- getChannelMembersCached channelId
 
-        whenJust (renderErrorsForSenderTP ephemeralTemplate) $ \errorsMsg -> do
-          $(logTM) `info`
-            [int||Found invalid time references, \
-                      sending an ephemeral with them to the message sender|]
-          sendAction True errorsMsg (uId sender)
-
-        let notBotAndSameTimeZone u = not (uIsBot u) && uTz u /= uTz sender
-            notSender userId = userId /= uId sender
+        let isSender userId = userId == uId sender
+            notBot u = not (uIsBot u)
             setSize = S.size usersInChannelIds
 
         $(logTM) `info` [int||#{setSize} users in the channel #{channelId}, sending ephemerals|]
-        eithRes <- forConcurrently (toList usersInChannelIds) $ \userInChannelId -> catchAllErrors $
-          if isDevEnvironment
-          then do
-            userInChannel <- getUserCached userInChannelId
-            let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate
-            sendAction False ephemeralMessage (uId userInChannel)
+        eithRes <- forConcurrently (toList usersInChannelIds) $ \userInChannelId -> catchAllErrors $ do
+          userInChannel <- getUserCached userInChannelId
+          let whenT :: (Monad m) => Bool -> m Bool -> m Bool
+              whenT cond_ action_ = if cond_ then action_ else pure False
+          whenT (notBot userInChannel) $ do
+            let mbEphemeralMessage = renderAllTP userInChannel ephemeralTemplate
+            let senderFlag =
+                  if isSender $ uId userInChannel
+                  then asForSenderS
+                  else asForOthersS
+            whenJust mbEphemeralMessage $ sendAction senderFlag (uId userInChannel)
             pure True
-          else do
-            let whenT :: (Monad m) => Bool -> m Bool -> m Bool
-                whenT cond_ action_ = if cond_ then action_ else pure False
-            whenT (notSender userInChannelId) $ do
-              userInChannel <- getUserCached userInChannelId
-              whenT (notBotAndSameTimeZone userInChannel) $ do
-                let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate
-                sendAction False ephemeralMessage (uId userInChannel)
-                pure True
 
         let failedMsg = "Ephemeral sending failed" :: Builder
             logAll :: Either SomeException BotException -> BotM ()
@@ -201,4 +191,3 @@ processMessageEvent evt =
         (oks, errs) <- foldM processResult (0, 0) eithRes
         $(logTM) `info` [int||#{oks} ephemeral sent successfully|]
         $(logTM) `info` [int||#{errs} ephemerals failed|]
-        pure ()

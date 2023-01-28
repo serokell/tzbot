@@ -299,6 +299,7 @@ test-suite tzbot-test
       Test.TzBot.ConfigSpec
       Test.TzBot.HandleTooManyRequests
       Test.TzBot.MessageBlocksSpec
+      Test.TzBot.RenderSpec
       Test.TzBot.TimeReferenceToUtcSpec
       Tree
       Paths_tzbot

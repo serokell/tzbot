@@ -20,9 +20,9 @@ import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Feedback.Dialog (insertDialogEntry)
 import TzBot.Feedback.Dialog.Types
-import TzBot.Logger (logTM, warn)
+import TzBot.Logger (KatipContext, logTM, warn)
 import TzBot.Parser (parseTimeRefs)
-import TzBot.Render (TranslationPairs, renderAllForOthersTP, renderTemplate)
+import TzBot.Render (TranslationPairs, asForModalM, renderAllTP, renderTemplate)
 import TzBot.Slack (BotM, getUserCached, startModal)
 import TzBot.Slack.API
 import TzBot.Slack.API.MessageBlock
@@ -47,11 +47,11 @@ openModalCommon message channelId whoTriggeredId triggerId mkModalFunc = do
       msgTimestamp = mTs message
   mbTimeRefs <- nonEmpty <$> getTimeReferencesFromMessage message
   sender <- getUserCached $ mUser message
-  translationPairs <- forM mbTimeRefs $ \neTimeRefs -> do
-      whoTriggered <- getUserCached whoTriggeredId
-      pure $
-        renderAllForOthersTP whoTriggered $
-          renderTemplate msgTimestamp sender neTimeRefs
+  translationPairs <- fmap join $ forM mbTimeRefs $ \neTimeRefs -> do
+    whoTriggered <- getUserCached whoTriggeredId
+    pure $
+      renderAllTP whoTriggered $
+        renderTemplate asForModalM msgTimestamp sender neTimeRefs
 
   guid <- ReportDialogId <$> liftIO genText
   let metadata = ReportDialogEntry
@@ -80,8 +80,9 @@ getTimeReferencesFromMessage message =
 -- structure, but since it's not documented it can not work sometimes,
 -- `ignoreCodeBlocksManually` is used a reserve function.
 getTextPiecesFromMessage
-  :: Message
-  -> BotM [Text]
+  :: (Monad m, KatipContext m)
+  => Message
+  -> m [Text]
 getTextPiecesFromMessage message = do
   let throwAwayTooShort = filter (\x -> T.compareLength x 2 == GT)
   throwAwayTooShort <$> case unUnknown $ msgBlocks message of

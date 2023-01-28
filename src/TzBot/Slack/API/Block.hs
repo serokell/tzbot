@@ -53,7 +53,7 @@ data Block
 data Section = Section
   { sText :: Maybe TextObject
   , sAccessory :: Maybe Button
-  , sFields :: Maybe (NE.NonEmpty PlainText)
+  , sFields :: Maybe (NE.NonEmpty Mrkdwn)
   } deriving stock (Eq, Show, Generic)
     deriving ToJSON via TypedWrapper Section
 
@@ -63,7 +63,7 @@ textSection text mbButton = Section (Just $ TOPlainText text) mbButton Nothing
 markdownSection :: Mrkdwn -> Maybe Button -> Section
 markdownSection markdown mbButton = Section (Just $ TOMarkdownText markdown) mbButton Nothing
 
-fieldsSection :: Maybe TextObject -> Maybe Button -> NE.NonEmpty (PlainText, PlainText) -> Section
+fieldsSection :: Maybe TextObject -> Maybe Button -> NE.NonEmpty (Mrkdwn, Mrkdwn) -> Section
 fieldsSection mbText mbButton fields =
   Section mbText mbButton $ Just $ neConcatMap (\(x, y) -> x :| [y]) fields
 
