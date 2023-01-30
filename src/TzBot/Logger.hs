@@ -14,6 +14,7 @@ import Universum
 
 import Data.Aeson (KeyValue((.=)), ToJSON(..), object)
 import Katip
+import Text.Interpolation.Nyan (int, rmode's)
 
 import TzBot.Slack.API (MessageId(..))
 
@@ -25,6 +26,9 @@ logInfo t = withFrozenCallStack $ logSugar_ InfoS t
 logWarn t = withFrozenCallStack $ logSugar_ WarningS t
 logDebug t = withFrozenCallStack $ logSugar_ DebugS t
 logError t = withFrozenCallStack $ logSugar_ ErrorS t
+
+logException :: (Exception e, KatipContext m) => e -> m ()
+logException err = logError [int||Error occured: #s{err}|]
 
 withLogger
   :: Severity

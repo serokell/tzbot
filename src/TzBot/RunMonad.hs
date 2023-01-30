@@ -10,7 +10,6 @@ import Control.Lens (makeLensesWith)
 import Control.Monad.Base (MonadBase)
 import Control.Monad.Except (MonadError)
 import Control.Monad.Trans.Control (MonadBaseControl)
-import Data.Map qualified as M
 import Data.Set qualified as S
 import Katip qualified as K
 import Network.HTTP.Client (Manager)
@@ -33,12 +32,11 @@ data BotState = BotState
   { bsConfig         :: BotConfig
   , bsManager        :: Manager
   , bsFeedbackConfig :: FeedbackConfig
-  -- TODO: after #22 bsMessagesReferences should either disappear or become
-  -- cached (not IORef).
-  , bsMessagesReferences :: IORef (M.Map MessageId (S.Set TimeReferenceText))
   , bsUserInfoCache  :: TzCache UserId User
   , bsConversationMembersCache :: TzCache ChannelId (S.Set UserId)
   , bsReportEntries  :: TzCache ReportDialogId ReportDialogEntry
+  , bsMessageCache   :: TzCache MessageId [TimeReference]
+  , bsMessageLinkCache :: TzCache MessageId Text
   , bsLogNamespace   :: K.Namespace
   , bsLogContext     :: K.LogContexts
   , bsLogEnv         :: K.LogEnv

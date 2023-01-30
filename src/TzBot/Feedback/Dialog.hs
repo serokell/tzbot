@@ -20,7 +20,7 @@ import TzBot.RunMonad (BotM, BotState(bsReportEntries))
 insertDialogEntry :: ReportDialogId -> ReportDialogEntry -> BotM ()
 insertDialogEntry id_ entry = do
   dialogEntriesCache <- asks bsReportEntries
-  Cache.insertRandomized id_ entry dialogEntriesCache
+  Cache.insert id_ entry dialogEntriesCache
 
 lookupDialogEntry :: ReportDialogId -> BotM (Maybe ReportDialogEntry)
 lookupDialogEntry id_ = do

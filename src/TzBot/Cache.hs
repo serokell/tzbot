@@ -16,8 +16,8 @@ module TzBot.Cache
   , lookup
 
     -- * Altering cache
-  , insertRandomized
-  , fetchWithCacheRandomized
+  , insert
+  , fetchWithCache
   , update
   ) where
 
@@ -106,13 +106,13 @@ cleaningThread cleaningPeriod cache = forever $ do
 
 -- | Generate a random expiry time and insert a key/value pair into
 -- the cache with that expiry time.
-insertRandomized
+insert
   :: (Eq k, Hashable k, MonadIO m)
   => k
   -> v
   -> TzCache k v
   -> m ()
-insertRandomized key val TzCache {..} = do
+insert key val TzCache {..} = do
   expiry <- case rcExpiryRandomAmplitude of
     Nothing -> pure rcExpiry
     Just randAmp -> do
@@ -124,13 +124,13 @@ insertRandomized key val TzCache {..} = do
 -- If the value is either absent or expired, perform given fetch action
 -- and insert the obtained value with configured expiration parameters
 -- into the cache.
-fetchWithCacheRandomized
+fetchWithCache
   :: (Eq k, Hashable k, MonadIO m, KatipContext m, Buildable k)
   => k
   -> (k -> m v)
   -> TzCache k v
   -> m v
-fetchWithCacheRandomized key fetchAction cache =
+fetchWithCache key fetchAction cache =
   katipAddNamespace "cache" $ do
   logDebug [int||Fetching key=#{key}|]
   mv <- liftIO $ Cache.lookup (rcCache cache) key
@@ -142,7 +142,7 @@ fetchWithCacheRandomized key fetchAction cache =
         using provided fetching action
         |]
       v <- fetchAction key
-      insertRandomized key v cache
+      insert key v cache
       pure v
 
 lookup

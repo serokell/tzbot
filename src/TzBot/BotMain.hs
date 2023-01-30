@@ -8,7 +8,6 @@ import Universum
 
 import Control.Monad.Managed (managed, runManaged)
 import Data.ByteString qualified as BS
-import Data.Map qualified as M
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Options.Applicative (execParser)
@@ -17,6 +16,7 @@ import Slacker
   setGracefulShutdownHandler, setOnException)
 import System.Directory (doesFileExist)
 import Text.Interpolation.Nyan (int, rmode')
+import Time (hour)
 
 import TzBot.Cache
   (TzCacheSettings(tcsExpiryRandomAmplitudeFraction), defaultTzCacheSettings, withTzCache,
@@ -78,13 +78,17 @@ run opts = do
               & setGracefulShutdownHandler extractShutdownFunction
 
     bsManager <- liftIO $ newManager tlsManagerSettings
-    bsMessagesReferences <- newIORef M.empty
     bsFeedbackConfig <-
       managed $ withFeedbackConfig bsConfig
     bsUserInfoCache <-
       managed $ withTzCache fifteenPercentAmplitudeSettings cCacheUsersInfo
     bsConversationMembersCache <-
       managed $ withTzCache fifteenPercentAmplitudeSettings cCacheConversationMembers
+    let defaultMessageInfoCachingTime = hour 1
+    bsMessageCache <-
+      managed $ withTzCacheDefault defaultMessageInfoCachingTime
+    bsMessageLinkCache <-
+      managed $ withTzCacheDefault defaultMessageInfoCachingTime
     bsReportEntries <-
       managed $ withTzCacheDefault cCacheReportDialog
     -- auto-acknowledge received messages

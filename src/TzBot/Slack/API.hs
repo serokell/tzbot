@@ -117,6 +117,12 @@ type API =
     :> "views.update"
     :> ReqBody '[JSON] UpdateViewReq
     :> Post '[JSON] (SlackResponse $ SlackContents "view" Value)
+  :<|>
+  Auth '[JWT] Text
+    :> "chat.getPermalink"
+    :> RequiredParam "channel" ChannelId
+    :> RequiredParam "message_ts" MessageId
+    :> Get '[JSON] (SlackResponse $ SlackContents "permalink" Text)
 
 api :: Proxy API
 api = Proxy
@@ -192,7 +198,7 @@ newtype ThreadId = ThreadId { unThreadId :: Text }
 
 newtype MessageId = MessageId { unMessageId :: Text }
   deriving stock (Eq, Show, Ord)
-  deriving newtype (ToHttpApiData, FromJSON, ToJSON, Buildable)
+  deriving newtype (ToHttpApiData, FromJSON, ToJSON, Buildable, Hashable)
 
 newtype Limit = Limit { limitQ :: Int}
   deriving stock (Eq, Show)
