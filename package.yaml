@@ -26,6 +26,7 @@ library:
   - base >= 4.7 && < 5
   - bytestring
   - cache
+  - case-insensitive
   - clock
   - containers
   - directory
@@ -35,6 +36,7 @@ library:
   - fmt
   - formatting
   - guid
+  - glider-nlp
   - http-client
   - http-client-tls
   - http-types

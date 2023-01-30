@@ -26,7 +26,7 @@ extra-deps:
 # Slacker's deps
 - monad-logger-aeson-0.3.1.0@sha256:dbb1f816d00a820982094362551e20582de0a27c337d430fa7080dcacbe66f34,5193
 - context-0.2.0.1@sha256:b5a1390a5ad11b7edd0449c9ef96823f082bff4988bd09583e37a4e93e9aad10,1891
-
+- glider-nlp-0.4@sha256:3bf4edc4dc72b633debc0ffc2dc8edffae7871ed59c400512ac5aa4cf4a2bc90,2339
 
 nix:
   enable: false

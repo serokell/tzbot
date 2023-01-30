@@ -12,7 +12,9 @@ import Data.Aeson qualified as Aeson
 import Data.Aeson.Casing (aesonPrefix, camelCase)
 import Data.Aeson.Key qualified as AeKey
 import Data.Aeson.Types (Parser, parseMaybe)
+import Data.CaseInsensitive qualified as CI
 import Data.Char (isLower)
+import Data.HashMap.Strict qualified as H
 import Data.List (stripPrefix)
 import Data.String.Conversions (cs)
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeM)
@@ -156,3 +158,12 @@ instance (FromJSON a) => FromJSON (WithUnknown a) where
 
 instance (ToJSON a) => ToJSON (WithUnknown a) where
   toJSON (WithUnknown eith) = either (String . show) toJSON eith
+
+----
+newtype CIStorage a = CIStorage { unCIStorage :: H.HashMap (CI.CI Text) a }
+
+fromList :: [(Text, a)] -> CIStorage a
+fromList = CIStorage . H.fromList . map (first CI.mk)
+
+lookup :: Text -> CIStorage a -> Maybe a
+lookup key ciStorage = H.lookup (CI.mk key) $ unCIStorage ciStorage
