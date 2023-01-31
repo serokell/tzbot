@@ -14,7 +14,7 @@ import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Options.Applicative (execParser)
 import Slacker
   (defaultSlackConfig, handleThreadExceptionSensibly, runSocketMode, setApiToken, setAppToken,
-  setOnException)
+  setGracefulShutdownHandler, setOnException)
 import System.Directory (doesFileExist)
 import Text.Interpolation.Nyan (int, rmode')
 
@@ -67,10 +67,15 @@ run opts = do
     let fifteenPercentAmplitudeSettings = defaultTzCacheSettings
           { tcsExpiryRandomAmplitudeFraction = Just 0.15
           }
+
+    gracefulShutdownContainer <- liftIO $ newIORef $ (pure () :: IO ())
+    let extractShutdownFunction :: IO () -> IO ()
+        extractShutdownFunction = writeIORef gracefulShutdownContainer
     let sCfg = defaultSlackConfig
               & setApiToken (unBotToken cBotToken)
               & setAppToken (unAppLevelToken cAppToken)
               & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
+              & setGracefulShutdownHandler extractShutdownFunction
 
     bsManager <- liftIO $ newManager tlsManagerSettings
     bsMessagesReferences <- newIORef M.empty
@@ -84,7 +89,7 @@ run opts = do
       managed $ withTzCacheDefault cCacheReportDialog
     -- auto-acknowledge received messages
     (bsLogNamespace, bsLogContext, bsLogEnv) <- managed $ withLogger cLogLevel
-    liftIO $ runSocketMode sCfg $ handler BotState {..}
+    liftIO $ runSocketMode sCfg $ handler gracefulShutdownContainer BotState {..}
 
 withFeedbackConfig :: BotConfig -> (FeedbackConfig -> IO a) -> IO a
 withFeedbackConfig Config {..} action = do
