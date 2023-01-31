@@ -6,12 +6,13 @@ module TzBot.RunMonad where
 
 import Universum
 
+import Control.Lens (makeLensesWith)
 import Control.Monad.Base (MonadBase)
 import Control.Monad.Except (MonadError)
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Map qualified as M
 import Data.Set qualified as S
-import Data.Text.IO qualified as T
+import Katip qualified as K
 import Network.HTTP.Client (Manager)
 import Servant.Client (ClientError)
 import Text.Interpolation.Nyan (int, rmode')
@@ -19,8 +20,9 @@ import Text.Interpolation.Nyan (int, rmode')
 import TzBot.Cache (TzCache)
 import TzBot.Config.Types (BotConfig)
 import TzBot.Feedback.Dialog.Types (ReportDialogEntry, ReportDialogId)
-import TzBot.Slack.API (ChannelId, MessageId, User, UserId)
-import TzBot.TimeReference (TimeReferenceText)
+import TzBot.Slack.API
+import TzBot.TimeReference
+import TzBot.Util (postfixFields)
 
 data FeedbackConfig = FeedbackConfig
   { fcFeedbackChannel :: Maybe ChannelId
@@ -28,16 +30,20 @@ data FeedbackConfig = FeedbackConfig
   }
 
 data BotState = BotState
-  { bsConfig :: BotConfig
-  , bsManager :: Manager
+  { bsConfig         :: BotConfig
+  , bsManager        :: Manager
   , bsFeedbackConfig :: FeedbackConfig
   -- TODO: after #22 bsMessagesReferences should either disappear or become
   -- cached (not IORef).
   , bsMessagesReferences :: IORef (M.Map MessageId (S.Set TimeReferenceText))
-  , bsUserInfoCache :: TzCache UserId User
+  , bsUserInfoCache  :: TzCache UserId User
   , bsConversationMembersCache :: TzCache ChannelId (S.Set UserId)
-  , bsReportEntries :: TzCache ReportDialogId ReportDialogEntry
+  , bsReportEntries  :: TzCache ReportDialogId ReportDialogEntry
+  , bsLogNamespace   :: K.Namespace
+  , bsLogContext     :: K.LogContexts
+  , bsLogEnv         :: K.LogEnv
   }
+makeLensesWith postfixFields ''BotState
 
 newtype BotM a = BotM
   { unBotM :: ReaderT BotState (ExceptT BotException IO) a
@@ -59,10 +65,18 @@ runOrThrowBotM :: BotState -> BotM a -> IO a
 runOrThrowBotM state action =
   runBotM state action >>= either throwM pure
 
--- This ugly logging is only temporary
-log' :: MonadIO m => Text -> m ()
-log' msg = liftIO $ T.putStrLn $ "Bot> " <> msg
+instance K.Katip BotM where
+  localLogEnv f = local (over bsLogEnvL f)
+  getLogEnv = view bsLogEnvL
 
+instance K.KatipContext BotM where
+  localKatipContext f = local (over bsLogContextL f)
+  localKatipNamespace f = local (over bsLogNamespaceL f)
+  getKatipContext = view bsLogContextL
+  getKatipNamespace = view bsLogNamespaceL
+
+runKatipWithBotState :: BotState -> K.KatipContextT m a -> m a
+runKatipWithBotState BotState {..} action = K.runKatipContextT bsLogEnv bsLogContext bsLogNamespace action
 ----------------------------------------------------------------------------
 -- Exceptions
 ----------------------------------------------------------------------------

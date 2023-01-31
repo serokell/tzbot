@@ -10,19 +10,18 @@ import Data.Set qualified as S
 import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Cache qualified as Cache
+import TzBot.Logger
 import TzBot.RunMonad
 import TzBot.Slack.Events (MemberJoinedChannelEvent(..), MemberLeftChannelEvent(..))
 
 processMemberJoinedChannel :: MemberJoinedChannelEvent -> BotM ()
 processMemberJoinedChannel MemberJoinedChannelEvent {..} = do
-  log' [int||member_joined_channel: \
-               the user #{mjceUser} joined the channel #{mjceChannel}|]
+  logInfo [int||user #{mjceUser} joined channel #{mjceChannel}|]
   channelMembersCache <- asks bsConversationMembersCache
   Cache.update mjceChannel (S.insert mjceUser) channelMembersCache
 
 processMemberLeftChannel :: MemberLeftChannelEvent -> BotM ()
 processMemberLeftChannel MemberLeftChannelEvent {..} = do
-  log' [int||member_left_channel: \
-               the user #{mlceUser} left the channel #{mlceChannel}|]
+  logInfo [int||user #{mlceUser} left channel #{mlceChannel}|]
   channelMembersCache <- asks bsConversationMembersCache
   Cache.update mlceChannel (S.delete mlceUser) channelMembersCache

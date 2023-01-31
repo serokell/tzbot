@@ -18,6 +18,7 @@ import Data.Time.TZInfo (TZLabel)
 import Data.Time.Zones.All (toTZName)
 import Text.Interpolation.Nyan (int, rmode')
 
+import TzBot.Logger
 import TzBot.Render (TranslationPairs, renderSlackBlocks)
 import TzBot.RunMonad
 import TzBot.Slack (sendMessage)
@@ -33,9 +34,9 @@ data FeedbackEntry = FeedbackEntry
   } deriving stock (Show, Generic)
     deriving ToJSON via RecordWrapper FeedbackEntry
 
-logFeedbackError :: BotException -> BotM ()
+logFeedbackError :: (KatipContext m) => BotException -> m ()
 logFeedbackError (displayException -> err) = do
-  log' [int||Error occured while saving user feedback: #{err}|]
+  logError [int||Error occured while saving user feedback: #{err}|]
 
 -- | Save user feedback to the Slack channel if configured
 --   and record to the file if configured.

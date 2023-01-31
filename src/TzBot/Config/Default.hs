@@ -73,6 +73,12 @@ cacheReportDialog: 1h
 # Envvar: #{CT.inverseHelpUsageChanceEnv}
 #
 inverseHelpUsageChance: 15
+
+# Minimal permitted logging level.
+# Available: Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency
+# Envvar: #{CT.logLevelEnv}
+#
+logLevel: Info
   |]
 
 -- This prevents Config.Default.defaultConfigText to be incorrect on compiling.

@@ -11,16 +11,20 @@ import Universum
 import Data.Aeson (FromJSON(..), Value)
 import Data.Aeson.Types (parseEither)
 import Slacker
-  (SlackConfig, SocketModeEvent(..), pattern BlockAction, pattern Command, pattern EventValue,
+  (DisconnectBody(DisconnectBody), EventsApiEnvelope(EventsApiEnvelope, eaeEnvelopeId),
+  HelloBody(..), SlackConfig, SlashCommandsEnvelope(SlashCommandsEnvelope, sceEnvelopeId),
+  SocketModeEvent(..), pattern BlockAction, pattern Command, pattern EventValue,
   pattern Interactive)
+import Slacker.SocketMode (InteractiveEnvelope(..))
 import Text.Interpolation.Nyan (int, rmode', rmode's)
 
+import TzBot.Logger
 import TzBot.ProcessEvents.BlockAction qualified as B
 import TzBot.ProcessEvents.ChannelEvent (processMemberJoinedChannel, processMemberLeftChannel)
 import TzBot.ProcessEvents.Command (processHelpCommand)
 import TzBot.ProcessEvents.Interactive qualified as I
 import TzBot.ProcessEvents.Message (processMessageEvent)
-import TzBot.RunMonad (BotM, BotState, log', runBotM)
+import TzBot.RunMonad (BotM, BotState(..), runBotM, runKatipWithBotState)
 import TzBot.Slack.API.Block (ActionId(..))
 import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.Util (encodeText)
@@ -28,11 +32,6 @@ import TzBot.Util (encodeText)
 {- |
 After the message event came, the bot sends some ephemerals
 containing translations of time references in that message.
-Also the ephemeral contains the \"Report\" button that
-user can click if something is processed wrong, then
-the \"report\" dialog will start (see below). On this clicking,
-the `BlockAction`/`BAReportButtonFromEphemeral` event comes
-(see "ProcessEvents.BlockAction").
 
 The bot has two entrypoints, \"view\" and \"report\", that
 can be triggered from the message context menu
@@ -47,51 +46,64 @@ the \"report\" dialog. And instead \"report\" dialog contains
 an input block for user to share their thoughts.
 When the \"report\" modal is submitted, the `Interactive`/`IEReportViewSubmitted`
 event comes, and the bot collects user feedback in the configured way.
+
+The bot also has a command `\tzhelp`, should return help message in response.
  -}
 handler :: BotState -> SlackConfig -> SocketModeEvent -> IO ()
-handler wstate _cfg = \e -> do
-  run $ case e of
+handler bState _cfg e = run $ do
+  logDebug [int||Received Slack event: #{show @Text e}|]
+  case e of
     Command cmdType slashCmd -> case cmdType of
-      Fixtures.HelpCommand -> processHelpCommand slashCmd
-      unknownCmd           -> log' [int||Unknown command #{unknownCmd}|]
+      Fixtures.HelpCommand -> katipAddNamespaceText cmdType $ processHelpCommand slashCmd
+      unknownCmd           -> logWarn [int||Unknown command #{unknownCmd}|]
 
     EventValue eventType evtRaw
       | eventType == "message" ->
-        decodeAndProcess eventType processMessageEvent evtRaw
+        decodeAndProcess eventType envelopeIdentifier processMessageEvent evtRaw
       | eventType == "member_joined_channel" ->
-        decodeAndProcess eventType processMemberJoinedChannel evtRaw
+        decodeAndProcess eventType envelopeIdentifier processMemberJoinedChannel evtRaw
       | eventType == "member_left_channel" ->
-        decodeAndProcess eventType processMemberLeftChannel evtRaw
-      | otherwise -> log' [int||Unrecognized EventValue #{encodeText evtRaw}|]
+        decodeAndProcess eventType envelopeIdentifier processMemberLeftChannel evtRaw
+      | otherwise -> logWarn [int||Unrecognized EventValue #{encodeText evtRaw}|]
 
     -- BlockAction events form a subset of Interactive, so check them first
     BlockAction actionId blockActionRaw
       | actionId == unActionId Fixtures.reportButtonActionId ->
-        decodeAndProcess actionId B.processReportButtonToggled blockActionRaw
+        decodeAndProcess actionId envelopeIdentifier B.processReportButtonToggled blockActionRaw
       | otherwise ->
-        log' [int||Unrecognized BlockAction #s{e}|]
+        logWarn [int||Unrecognized BlockAction #s{e}|]
 
     Interactive interactiveType interactiveRaw
       | interactiveType == "message_action" ->
-        decodeAndProcess interactiveType I.processInteractive interactiveRaw
+        decodeAndProcess interactiveType envelopeIdentifier I.processInteractive interactiveRaw
       | interactiveType == "view_submission" ->
-        decodeAndProcess interactiveType I.processViewSubmission interactiveRaw
+        decodeAndProcess interactiveType envelopeIdentifier I.processViewSubmission interactiveRaw
       | otherwise ->
-        log' [int||Unrecognized Interactive event #s{e}|]
-    _ -> log' [int||Unknown SocketModeEvent #s{e}|]
+        logWarn [int||Unrecognized Interactive event #s{e}|]
+    _ -> logWarn [int||Unknown SocketModeEvent #s{e}|]
   where
     run :: BotM a -> IO ()
     run action = do
-      eithRes <- runBotM wstate action
-      case eithRes of
-        Left err -> log' [int||Error occured: #s{err}|]
+      eithRes <- runBotM bState action
+      runKatipWithBotState bState $ case eithRes of
+        Left err -> logError [int||Error occured: #s{err}|]
         Right _ -> pure ()
 
-decodeAndProcess :: FromJSON a => Text -> (a -> BotM b) -> Value -> BotM ()
-decodeAndProcess interactiveType processFunc raw = do
+    envelopeIdentifier :: Text
+    envelopeIdentifier = case e of
+      EventsApi EventsApiEnvelope {..} -> eaeEnvelopeId
+      SlashCommands SlashCommandsEnvelope {..} -> sceEnvelopeId
+      InteractiveEvent InteractiveEnvelope {..} -> ieEnvelopeId
+      Hello HelloBody {} -> "hello_body"
+      Disconnect DisconnectBody {} -> "disconnect_body"
+
+decodeAndProcess :: FromJSON a => Text -> Text -> (a -> BotM b) -> Value -> BotM ()
+decodeAndProcess interactiveType envelopeIdentifier processFunc raw = do
   let eithEvt = parseEither parseJSON raw
   case eithEvt of
     Left err -> do
-      log' [int||Invalid #{interactiveType} event/action, error #s{err}|]
-      log' [int||Full event object: #{encodeText raw}|]
-    Right evt -> void $ processFunc evt
+      logError [int||Invalid #{interactiveType} event/action, error #s{err}|]
+      logError [int||Full event object: #{encodeText raw}|]
+    Right evt -> void $
+      katipAddContext (EventContext interactiveType envelopeIdentifier) $
+        processFunc evt
