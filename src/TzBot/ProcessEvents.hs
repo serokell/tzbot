@@ -18,6 +18,7 @@ import Slacker
   pattern Interactive)
 import Slacker.SocketMode (InteractiveEnvelope(..))
 import Text.Interpolation.Nyan (int, rmode', rmode's)
+import UnliftIO.Exception qualified as UnliftIO
 
 import TzBot.Logger
 import TzBot.ProcessEvents.BlockAction qualified as B
@@ -28,7 +29,7 @@ import TzBot.ProcessEvents.Message (processMessageEvent)
 import TzBot.RunMonad (BotM, BotState(..), runBotM)
 import TzBot.Slack.API.Block (ActionId(..))
 import TzBot.Slack.Fixtures qualified as Fixtures
-import TzBot.Util (catchAllErrors, encodeText)
+import TzBot.Util (encodeText)
 
 {- |
 After the message event came, the bot sends some ephemerals
@@ -85,14 +86,11 @@ handler shutdownRef bState _cfg e = run $ do
   where
     run :: BotM a -> IO ()
     run action = void $ runBotM bState $ do
-      eithRes <- catchAllErrors action
-      whenLeft eithRes $ \eithErr -> do
-        case eithErr of
-          Left someExc
-            | Just UserInterrupt <- fromException someExc ->
-                liftIO $ join $ readIORef shutdownRef
-            | otherwise -> logException someExc
-          Right botExc -> logException botExc
+      eithRes <- UnliftIO.trySyncOrAsync action
+      whenLeft eithRes $ \e -> do
+        case fromException e of
+          Just UserInterrupt -> liftIO $ join $ readIORef shutdownRef
+          _ -> logError [int||Error occured: #{displayException e}|]
 
     envelopeIdentifier :: Text
     envelopeIdentifier = case e of

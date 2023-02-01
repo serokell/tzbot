@@ -8,13 +8,13 @@ module TzBot.ProcessEvents.Message
 
 import Universum hiding (try)
 
-import Control.Concurrent.Async.Lifted (forConcurrently)
 import Data.List (singleton)
 import Data.List.NonEmpty qualified as NE
 import Data.Set qualified as S
 import Data.Text.Lazy.Builder (Builder)
 import System.Random (randomRIO)
-import Text.Interpolation.Nyan (int, rmode', rmode's)
+import Text.Interpolation.Nyan (int, rmode')
+import UnliftIO qualified
 
 import TzBot.Cache qualified as Cache
 import TzBot.Config (Config(..))
@@ -26,7 +26,7 @@ import TzBot.Slack.API
 import TzBot.Slack.Events
 import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.TimeReference (TimeReference(..))
-import TzBot.Util (catchAllErrors, isDevEnvironment, whenT, withMaybe)
+import TzBot.Util (isDevEnvironment, whenT, withMaybe)
 
 data MessageEventType = METMessage | METMessageEdited
   deriving stock (Eq)
@@ -223,15 +223,14 @@ ephemeralsMailing channelId sendAction = do
   usersInChannelIds <- getChannelMembersCached channelId
   let setSize = S.size usersInChannelIds
   logInfo [int||#{setSize} users in the channel #{channelId}, sending ephemerals|]
-  eithRes <- forConcurrently (toList usersInChannelIds) $ catchAllErrors . sendAction
+  eithRes <- UnliftIO.forConcurrently (toList usersInChannelIds) $ UnliftIO.trySyncOrAsync . sendAction
   let failedMsg = "Ephemeral sending failed" :: Builder
-      logAll :: Either SomeException BotException -> BotM ()
-      logAll (Left se) = logError [int||#{failedMsg}, unknown error occured: #s{se}|]
-      logAll (Right ke) = logError [int||#{failedMsg}, #{displayException ke}|]
+      logAll :: SomeException -> BotM ()
+      logAll se = logError [int||#{failedMsg}, #{displayException se}|]
 
       processResult
         :: (Int, Int)
-        -> Either (Either SomeException BotException) Bool
+        -> Either SomeException Bool
         -> BotM (Int, Int)
       processResult (oks_, errs_) eithRes_ = case eithRes_ of
         Left err_ -> logAll err_ >> pure (oks_, errs_ + 1)

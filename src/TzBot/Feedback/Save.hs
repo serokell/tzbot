@@ -9,7 +9,6 @@ module TzBot.Feedback.Save
 
 import Universum
 
-import Control.Monad.Error.Class (MonadError(catchError))
 import Data.Aeson (ToJSON, encode)
 import Data.List.NonEmpty qualified as NE
 import Data.String.Conversions (cs)
@@ -17,6 +16,7 @@ import Data.Time (UTCTime)
 import Data.Time.TZInfo (TZLabel)
 import Data.Time.Zones.All (toTZName)
 import Text.Interpolation.Nyan (int, rmode')
+import UnliftIO.Exception qualified as UnliftIO
 
 import TzBot.Logger
 import TzBot.Render (TranslationPairs, asForOthersS, renderSlackBlocks)
@@ -34,14 +34,14 @@ data FeedbackEntry = FeedbackEntry
   } deriving stock (Show, Generic)
     deriving ToJSON via RecordWrapper FeedbackEntry
 
-logFeedbackError :: (KatipContext m) => BotException -> m ()
+logFeedbackError :: (KatipContext m) => SomeException -> m ()
 logFeedbackError (displayException -> err) = do
   logError [int||Error occured while saving user feedback: #{err}|]
 
 -- | Save user feedback to the Slack channel if configured
 --   and record to the file if configured.
 saveFeedback :: FeedbackEntry -> BotM ()
-saveFeedback entry = flip catchError logFeedbackError $ do
+saveFeedback entry = UnliftIO.handleAny logFeedbackError $ do
   FeedbackConfig {..} <- asks bsFeedbackConfig
   whenJust fcFeedbackChannel $ saveFeedbackSlack entry
   whenJust fcFeedbackFile $ saveFeedbackFile entry

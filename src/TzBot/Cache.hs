@@ -23,7 +23,6 @@ module TzBot.Cache
 
 import Universum
 
-import Control.Concurrent.Async.Lifted (withAsync)
 import Data.Cache (Cache)
 import Data.Cache qualified as Cache
 import Data.Cache.Internal qualified as CacheI
@@ -32,6 +31,7 @@ import Formatting (Buildable)
 import System.Clock (TimeSpec)
 import Text.Interpolation.Nyan (int, rmode')
 import Time (Hour, KnownDivRat, Nanosecond, Time(..), hour, threadDelay, toUnit)
+import UnliftIO.Async (withAsync)
 
 import TzBot.Logger (KatipContext, katipAddNamespace, logDebug)
 import TzBot.Util (multTimeSpec, randomTimeSpec, timeToTimespec, (+-))

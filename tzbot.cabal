@@ -135,12 +135,8 @@ library
     , katip
     , lens
     , lens-aeson
-    , lifted-async
-    , lifted-base
     , managed
     , megaparsec
-    , monad-control
-    , mtl
     , nyan-interpolation
     , o-clock
     , optparse-applicative
@@ -157,10 +153,10 @@ library
     , time
     , time-compat
     , transformers
-    , transformers-base
     , tz
     , tztime
     , universum
+    , unliftio
     , unordered-containers
     , utf8-string
     , validation
