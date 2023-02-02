@@ -9,7 +9,7 @@ import Universum
 import Control.Arrow ((>>>))
 import Data.List.NonEmpty qualified as NE
 import Data.Time
-  (DayOfWeek, LocalTime(localDay), NominalDiffTime, TimeOfDay, TimeZone, UTCTime, addLocalTime,
+  (Day, DayOfWeek, LocalTime(localDay), NominalDiffTime, TimeOfDay, TimeZone, UTCTime, addLocalTime,
   diffLocalTime, localTimeToUTC, nominalDay, toGregorian, utc, utcToLocalTime)
 import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
 import Data.Time.TZInfo qualified as TZI
@@ -113,13 +113,15 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
       -- In the case of rigid offset we don't need the `modifyLocal` from
       -- from the `tztime` package because there are no timeshifts that
       -- we should take into account. So we just use plain LocalTime.
-      let refTimeUTC = eventTimestamp & (
+      let refTime = eventTimestamp & (
             convertUtcToOffsetTime offset
             >>> dayTransition
             >>> TZT.atTimeOfDay trTimeOfDay
-            >>> convertOffsetTimeToUtc offset
             )
-      TRTUSuccess $ TimeRefSuccess refTimeUTC (Right offset)
+      TRTUSuccess $ TimeRefSuccess
+        (convertOffsetTimeToUtc offset refTime)
+        (Right offset)
+        (localDay refTime)
     Right (Left (tzLabel, implicitSenderTimezone)) -> do
       let eventLocalTime = TZT.fromUTC (TZI.fromLabel tzLabel) eventTimestamp
       let eithRefTime = eventLocalTime & TZT.modifyLocalStrict (
@@ -127,15 +129,18 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
             )
       case eithRefTime of
         Left err -> tzErrorToResult implicitSenderTimezone tzLabel err
-        Right refTime -> TRTUSuccess $ TimeRefSuccess (TZT.toUTC refTime) (Left tzLabel)
+        Right refTime -> TRTUSuccess $ TimeRefSuccess
+          (TZT.toUTC refTime)
+          (Left tzLabel)
+          (localDay $ TZT.tzTimeLocalTime refTime)
 
   where
   tzErrorToResult :: Bool -> TZLabel -> TZT.TZError -> TimeReferenceToUTCResult
   tzErrorToResult implicitSenderTimezone tzLabel = \case
-    TZT.TZOverlap {} -> TRTUAmbiguous $
-      TimeShiftErrorInfo implicitSenderTimezone tzLabel
-    TZT.TZGap {}     -> TRTUInvalid $
-      TimeShiftErrorInfo implicitSenderTimezone tzLabel
+    TZT.TZOverlap invalidTime _ _ -> TRTUAmbiguous $
+      TimeShiftErrorInfo implicitSenderTimezone tzLabel (localDay invalidTime)
+    TZT.TZGap invalidTime _ _ -> TRTUInvalid $
+      TimeShiftErrorInfo implicitSenderTimezone tzLabel (localDay invalidTime)
 
   -- This doesn't include setting time, only date changes
   dayTransition :: LocalTime -> LocalTime
@@ -224,11 +229,19 @@ data TimeRefSuccess = TimeRefSuccess
     -- ^ The timezone or offset that this TimeReference is related to.
     -- When the `TimeReference` does not explicitly mention a timezone/offset,
     -- we assume it's related to the sender's timezone.
+  , trsOriginalDate :: Day
+    -- ^ The day that was originally mentioned by the sender
+    -- in specified or implicit sender's timezone.
   } deriving stock (Eq, Show)
 
 data TimeShiftErrorInfo = TimeShiftErrorInfo
   { tseiIsImplicitSenderTimezone :: Bool
+    -- ^ Whether the sender's timezone was taken implicitly.
   , tseiRefTimeZone :: TZLabel
+    -- ^ Timezone label associated with original time reference.
+  , tseiOriginalDate :: Day
+    -- ^ The day that was originally mentioned by the sender
+    -- in specified or implicit sender's timezone.
   } deriving stock (Eq, Show)
 
 data TimeReferenceToUTCResult
