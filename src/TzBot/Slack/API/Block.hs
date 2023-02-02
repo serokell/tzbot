@@ -12,7 +12,6 @@ module TzBot.Slack.API.Block
   , ActionId(..)
   , BlockId(..)
   , Section
-  , textSection
   , markdownSection
   , fieldsSection
   , Divider(..)
@@ -27,7 +26,7 @@ import Data.List.NonEmpty qualified as NE
 import Formatting (Buildable)
 
 import TzBot.Instances ()
-import TzBot.Slack.API.Common (Mrkdwn, PlainText, TextObject(TOMarkdownText, TOPlainText))
+import TzBot.Slack.API.Common (Mrkdwn(..), PlainText)
 import TzBot.Util (SumWrapper(..), TypedWrapper(..), neConcatMap)
 
 newtype ActionId = ActionId { unActionId :: Text }
@@ -51,21 +50,18 @@ data Block
 
 -- | See https://api.slack.com/reference/block-kit/blocks#section
 data Section = Section
-  { sText :: Maybe TextObject
+  { sText :: Maybe Mrkdwn
   , sAccessory :: Maybe Button
-  , sFields :: Maybe (NE.NonEmpty PlainText)
+  , sFields :: Maybe (NE.NonEmpty Mrkdwn)
   } deriving stock (Eq, Show, Generic)
     deriving ToJSON via TypedWrapper Section
 
-textSection :: PlainText -> Maybe Button -> Section
-textSection text mbButton = Section (Just $ TOPlainText text) mbButton Nothing
+markdownSection :: Mrkdwn -> Section
+markdownSection markdown = Section (Just markdown) Nothing Nothing
 
-markdownSection :: Mrkdwn -> Maybe Button -> Section
-markdownSection markdown mbButton = Section (Just $ TOMarkdownText markdown) mbButton Nothing
-
-fieldsSection :: Maybe TextObject -> Maybe Button -> NE.NonEmpty (PlainText, PlainText) -> Section
-fieldsSection mbText mbButton fields =
-  Section mbText mbButton $ Just $ neConcatMap (\(x, y) -> x :| [y]) fields
+fieldsSection :: Maybe Mrkdwn -> NE.NonEmpty (Mrkdwn, Mrkdwn) -> Section
+fieldsSection mbText fields =
+  Section mbText Nothing $ Just $ neConcatMap (\(x, y) -> x :| [y]) fields
 
 -- | See https://api.slack.com/reference/block-kit/blocks#divider
 data Divider = Divider

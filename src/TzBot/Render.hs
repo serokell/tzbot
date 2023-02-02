@@ -22,6 +22,11 @@ module TzBot.Render
 
     -- * General template
   , renderTemplate
+
+    -- * Flags
+  , SenderFlag
+  , asForSenderS
+  , asForOthersS
   ) where
 
 import Universum
@@ -38,7 +43,7 @@ import Data.Time.Zones.All (TZLabel)
 import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Instances ()
-import TzBot.Slack.API (Mrkdwn(Mrkdwn), PlainText(..), User(uTz))
+import TzBot.Slack.API (Mrkdwn(Mrkdwn), User(uTz))
 import TzBot.Slack.API.Block
 import TzBot.TimeReference
 import TzBot.Util
@@ -66,10 +71,20 @@ type TranslationPairs = NE.NonEmpty TranslationPair
 
 newtype Template = Template { unTemplate :: NE.NonEmpty EitherTemplateUnit }
 
-chooseNote :: Bool -> TranslationPair -> Maybe Text
-chooseNote sender = if sender then tuNoteForSender else tuNoteForOthers
+--------
+-- Notes
+-- | Used for choosing between two notes
+newtype SenderFlag = SenderFlag Bool
 
-concatTranslationPair :: Bool -> TranslationPair -> Builder
+asForSenderS, asForOthersS :: SenderFlag
+asForSenderS = SenderFlag True
+asForOthersS = SenderFlag False
+
+chooseNote :: SenderFlag -> TranslationPair -> Maybe Text
+chooseNote (SenderFlag sender) = if sender then tuNoteForSender else tuNoteForOthers
+
+--------
+concatTranslationPair :: SenderFlag -> TranslationPair -> Builder
 concatTranslationPair sender t@TranslationPair {..} = do
   let rightNote = chooseNote sender t
   let note = maybe "" (("\n" <>) . fromText) rightNote
@@ -89,33 +104,31 @@ noRefsFoundMsg = "No time references found."
 
 -- Render text
 renderErrorsForSender :: Template -> Maybe Text
-renderErrorsForSender template = do
-  let sender = True
-  joinTranslationPairs sender <$> renderErrorsForSenderTP template
+renderErrorsForSender template =
+  joinTranslationPairs asForSenderS <$> renderErrorsForSenderTP template
 
 renderAllForOthers :: User -> Template -> Text
-renderAllForOthers user = do
-  let sender = False
-  joinTranslationPairs sender . renderAllForOthersTP user
+renderAllForOthers user =
+  joinTranslationPairs asForOthersS . renderAllForOthersTP user
 
-joinTranslationPairs :: Bool -> TranslationPairs -> Text
+joinTranslationPairs :: SenderFlag -> TranslationPairs -> Text
 joinTranslationPairs sender =
   T.toStrict . toLazyText . fold . NE.toList
     . NE.map ((<> singleton '\n') . concatTranslationPair sender)
 
 -- Render Slack block
-renderSlackBlocks :: Bool -> Maybe TranslationPairs -> [Block]
+renderSlackBlocks :: SenderFlag -> Maybe TranslationPairs -> [Block]
 renderSlackBlocks forSender =
   maybe [noRefsFoundSection]
     (intercalate [BDivider divider] . NE.toList . NE.map mkTranslationBlocks)
   where
-    noRefsFoundSection = BSection $ textSection (PlainText noRefsFoundMsg) Nothing
+    noRefsFoundSection = BSection $ markdownSection $ Mrkdwn noRefsFoundMsg
     mkTranslationBlocks :: TranslationPair -> [Block]
     mkTranslationBlocks timeRef = do
-      let t = (PlainText $ tuTimeRef timeRef, PlainText $ tuTranslation timeRef)
+      let t = (Mrkdwn $ tuTimeRef timeRef, Mrkdwn $ tuTranslation timeRef)
           mbNote = chooseNote forSender timeRef
-          translationBlock = BSection $ fieldsSection Nothing Nothing $ NE.singleton t
-          mkNoteBlock note = BSection $ markdownSection (Mrkdwn note) Nothing
+          translationBlock = BSection $ fieldsSection Nothing $ NE.singleton t
+          mkNoteBlock note = BSection $ markdownSection (Mrkdwn note)
       withMaybe mbNote [translationBlock] $ \note -> [translationBlock, mkNoteBlock note]
 
 renderTemplate :: UTCTime -> User -> NE.NonEmpty TimeReference -> Template
@@ -132,7 +145,7 @@ renderEphemeralMessageTranslationPair
   -> (TimeReference, TimeReferenceToUTCResult)
   -> EitherTemplateUnit
 renderEphemeralMessageTranslationPair now sender (timeRef, result) = case result of
-  TRTUSuccess utcTime _offsetInfo -> do
+  TRTUSuccess (TimeRefSuccess utcTime _offsetInfo) -> do
     let mbSenderTimeZone =
           guard (isNothing $ trLocationRef timeRef)
             $> (uTz sender) :: Maybe TZLabel
@@ -145,7 +158,7 @@ renderEphemeralMessageTranslationPair now sender (timeRef, result) = case result
         [int||#{renderedUserTime} in #{userTzLabel}|]
         Nothing
         Nothing
-  TRTUAmbiguous implicitSenderTimezone tzLabel -> do
+  TRTUAmbiguous (TimeShiftErrorInfo implicitSenderTimezone tzLabel) -> do
     let shownTZ = shownTimezone implicitSenderTimezone tzLabel
     Left $ TranslationPair
       { tuTimeRef = trText timeRef
@@ -159,7 +172,7 @@ renderEphemeralMessageTranslationPair now sender (timeRef, result) = case result
              time, and this particular timestamp can be possible with \
              different offsets._|]
       }
-  TRTUInvalid implicitSenderTimezone tzLabel -> do
+  TRTUInvalid (TimeShiftErrorInfo implicitSenderTimezone tzLabel) -> do
     let shownTZ = shownTimezone implicitSenderTimezone tzLabel
     Left $ TranslationPair
       { tuTimeRef = trText timeRef
