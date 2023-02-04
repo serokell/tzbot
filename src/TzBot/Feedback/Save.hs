@@ -19,7 +19,7 @@ import Data.Time.Zones.All (toTZName)
 import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Logger
-import TzBot.Render (TranslationPairs, renderSlackBlocks)
+import TzBot.Render (TranslationPairs, asForOthersS, renderSlackBlocks)
 import TzBot.RunMonad
 import TzBot.Slack (sendMessage)
 import TzBot.Slack.API
@@ -53,22 +53,21 @@ saveFeedbackSlack entry channelId = sendMessage req
     req = do
       -- We always render the translation for other users (not author),
       -- so the author can see how his message is translated for others
-      let forSender = False
-          pmrChannel = channelId
+      let pmrChannel = channelId
           pmrText = "New user feedback"
           pmrBlocks = NE.nonEmpty $
             [ BHeader (Header "Message")
-            , BSection (textSection (PlainText $ feMessageText entry) Nothing)
+            , BSection $ markdownSection (Mrkdwn $ feMessageText entry)
             , BDivider divider
             , BHeader (Header "Time translation")
-            ] <> renderSlackBlocks forSender (feTimeTranslation entry)
+            ] <> renderSlackBlocks asForOthersS (feTimeTranslation entry)
             <>
             [ BDivider divider
             , BHeader (Header "Details")
-            , BSection $ fieldsSection Nothing Nothing $
+            , BSection $ fieldsSection Nothing $
               ("Message timestamp", show $ feMessageTimestamp entry) :|
-              [ ("Sender timezone", PlainText $ cs $ toTZName $ feSenderTimezone entry)
-              , ("User report", PlainText $ feUserReport entry)
+              [ ("Sender timezone", Mrkdwn $ cs $ toTZName $ feSenderTimezone entry)
+              , ("User report", Mrkdwn $ feUserReport entry)
               ]
             ]
       PostMessageReq {..}

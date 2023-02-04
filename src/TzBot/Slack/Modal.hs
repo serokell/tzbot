@@ -10,7 +10,7 @@ import Data.List (singleton)
 
 import TzBot.Feedback.Dialog.Types
 import TzBot.Instances ()
-import TzBot.Render (TranslationPairs, renderSlackBlocks)
+import TzBot.Render (TranslationPairs, asForOthersS, renderSlackBlocks)
 import TzBot.Slack.API
 import TzBot.Slack.Fixtures qualified as Fixtures
 
@@ -64,13 +64,12 @@ mkBlocks :: Text -> Maybe TranslationPairs -> Block -> [Block]
 mkBlocks shownMessageText translatedMessage block =
   -- We always render the translation for other users (not author),
   -- so the author can see how his message is translated for others
-  let forSender = False in
   [ BHeader Header { hText = PlainText "Message text" }
-  , BSection $ textSection (PlainText shownMessageText) Nothing
+  , BSection $ markdownSection (Mrkdwn shownMessageText)
   , BDivider divider
   , BHeader Header { hText = PlainText "Time references" }
   ]
-  <> renderSlackBlocks forSender translatedMessage
+  <> renderSlackBlocks asForOthersS translatedMessage
   <> [ BDivider divider
   , block
   ]

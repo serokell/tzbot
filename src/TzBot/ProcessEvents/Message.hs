@@ -124,7 +124,7 @@ processMessageEvent evt =
 
     let now = meTs evt
         channelId = meChannel evt
-    let sendAction :: Bool -> TranslationPairs -> UserId -> BotM ()
+    let sendAction :: SenderFlag -> TranslationPairs -> UserId -> BotM ()
         sendAction toSender transl userId = do
           let req = PostEphemeralReq
                 { perUser = userId
@@ -133,7 +133,7 @@ processMessageEvent evt =
                 , perText = joinTranslationPairs toSender transl
                 , perBlocks = NE.nonEmpty $
                   renderSlackBlocks toSender (Just transl) <>
-                  [ BSection $ markdownSection (Mrkdwn Fixtures.helpUsage) Nothing
+                  [ BSection $ markdownSection (Mrkdwn Fixtures.helpUsage)
                     | whetherToShowHelpCmd
                   ]
                 }
@@ -152,7 +152,7 @@ processMessageEvent evt =
         let ephemeralMessage = renderAllForOthersTP sender ephemeralTemplate
         logInfo [int||Received message from the DM, sending translation \
                               to the author|]
-        sendAction False ephemeralMessage (uId sender)
+        sendAction asForOthersS ephemeralMessage (uId sender)
       _ -> do
         usersInChannelIds <- getChannelMembersCached channelId
 
@@ -160,7 +160,7 @@ processMessageEvent evt =
           logInfo
             [int||Found invalid time references, \
                       sending an ephemeral with them to the message sender|]
-          sendAction True errorsMsg (uId sender)
+          sendAction asForSenderS errorsMsg (uId sender)
 
         let notBotAndSameTimeZone u = not (uIsBot u) && uTz u /= uTz sender
             notSender userId = userId /= uId sender
@@ -172,7 +172,7 @@ processMessageEvent evt =
           then do
             userInChannel <- getUserCached userInChannelId
             let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate
-            sendAction False ephemeralMessage (uId userInChannel)
+            sendAction asForOthersS ephemeralMessage (uId userInChannel)
             pure True
           else do
             let whenT :: (Monad m) => Bool -> m Bool -> m Bool
@@ -181,7 +181,7 @@ processMessageEvent evt =
               userInChannel <- getUserCached userInChannelId
               whenT (notBotAndSameTimeZone userInChannel) $ do
                 let ephemeralMessage = renderAllForOthersTP userInChannel ephemeralTemplate
-                sendAction False ephemeralMessage (uId userInChannel)
+                sendAction asForOthersS ephemeralMessage (uId userInChannel)
                 pure True
 
         let failedMsg = "Ephemeral sending failed" :: Builder

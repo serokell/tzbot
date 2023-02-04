@@ -84,6 +84,14 @@ utcToUtcLocalTime = utcToLocalTime utc
 utcLocalTimeToUTC :: LocalTime -> UTCTime
 utcLocalTimeToUTC = localTimeToUTC utc
 
+convertUtcToOffsetTime :: Offset -> UTCTime -> LocalTime
+convertUtcToOffsetTime offset utcTime =
+  addLocalTime (offsetToNominalDiffTime offset) (utcToUtcLocalTime utcTime)
+
+convertOffsetTimeToUtc :: Offset -> LocalTime -> UTCTime
+convertOffsetTimeToUtc offset localTime =
+  utcLocalTimeToUTC $ addLocalTime (negate $ offsetToNominalDiffTime offset) localTime
+
 {- | Converts a time reference to a moment in time (expressed in UTC).
 
   If the time reference contains a timezone abbreviation, and if that abbreviation\
@@ -105,15 +113,13 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
       -- In the case of rigid offset we don't need the `modifyLocal` from
       -- from the `tztime` package because there are no timeshifts that
       -- we should take into account. So we just use plain LocalTime.
-      let eventTimeUTC = utcToUtcLocalTime eventTimestamp
-          offsetNominal = offsetToNominalDiffTime offset
-      let refTimeUTC = eventTimeUTC & (
-            addLocalTime offsetNominal
+      let refTimeUTC = eventTimestamp & (
+            convertUtcToOffsetTime offset
             >>> dayTransition
             >>> TZT.atTimeOfDay trTimeOfDay
-            >>> addLocalTime (negate offsetNominal)
+            >>> convertOffsetTimeToUtc offset
             )
-      TRTUSuccess (utcLocalTimeToUTC refTimeUTC) (Right offset)
+      TRTUSuccess $ TimeRefSuccess refTimeUTC (Right offset)
     Right (Left (tzLabel, implicitSenderTimezone)) -> do
       let eventLocalTime = TZT.fromUTC (TZI.fromLabel tzLabel) eventTimestamp
       let eithRefTime = eventLocalTime & TZT.modifyLocalStrict (
@@ -121,13 +127,15 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
             )
       case eithRefTime of
         Left err -> tzErrorToResult implicitSenderTimezone tzLabel err
-        Right refTime -> TRTUSuccess (TZT.toUTC refTime) (Left tzLabel)
+        Right refTime -> TRTUSuccess $ TimeRefSuccess (TZT.toUTC refTime) (Left tzLabel)
 
   where
   tzErrorToResult :: Bool -> TZLabel -> TZT.TZError -> TimeReferenceToUTCResult
   tzErrorToResult implicitSenderTimezone tzLabel = \case
-    TZT.TZOverlap {} -> TRTUAmbiguous implicitSenderTimezone tzLabel
-    TZT.TZGap {}     -> TRTUInvalid implicitSenderTimezone tzLabel
+    TZT.TZOverlap {} -> TRTUAmbiguous $
+      TimeShiftErrorInfo implicitSenderTimezone tzLabel
+    TZT.TZGap {}     -> TRTUInvalid $
+      TimeShiftErrorInfo implicitSenderTimezone tzLabel
 
   -- This doesn't include setting time, only date changes
   dayTransition :: LocalTime -> LocalTime
@@ -209,21 +217,27 @@ chooseBestYear dayOfMonth monthOfYear now = do
       sortedCandidates = NE.sortBy (compare `on` calcWeight) candidates
   NE.head sortedCandidates
 
-type IsImplicitSenderTimezone = Bool
+data TimeRefSuccess = TimeRefSuccess
+  { trsUtcResult      :: UTCTime
+    -- ^ The result of the conversion.
+  , trsEithTzOffset   :: Either TZLabel Offset
+    -- ^ The timezone or offset that this TimeReference is related to.
+    -- When the `TimeReference` does not explicitly mention a timezone/offset,
+    -- we assume it's related to the sender's timezone.
+  } deriving stock (Eq, Show)
+
+data TimeShiftErrorInfo = TimeShiftErrorInfo
+  { tseiIsImplicitSenderTimezone :: Bool
+  , tseiRefTimeZone :: TZLabel
+  } deriving stock (Eq, Show)
 
 data TimeReferenceToUTCResult
-  = TRTUSuccess
+  = TRTUSuccess TimeRefSuccess
     -- ^ Conversion succeeded.
-      UTCTime
-      -- ^ The result of the conversion.
-      (Either TZLabel Offset)
-      -- ^ The timezone or offset that this TimeReference is related to.
-      -- When the `TimeReference` does not explicitly mention a timezone/offset,
-      -- we assume it's related to the sender's timezone.
-  | TRTUAmbiguous IsImplicitSenderTimezone TZLabel
+  | TRTUAmbiguous TimeShiftErrorInfo
   -- ^ The time reference was ambiguous (e.g. due to a time ocurring twice in the same timezone during DST changes).
   -- See [Edge cases & pitfalls](https://github.com/serokell/tzbot/blob/main/docs/pitfalls.md#ambiguous-times).
-  | TRTUInvalid IsImplicitSenderTimezone TZLabel
+  | TRTUInvalid TimeShiftErrorInfo
   -- ^ The time reference was invalid (e.g. due to a time being skipped in a timezone during DST changes).
   -- See [Edge cases & pitfalls](https://github.com/serokell/tzbot/blob/main/docs/pitfalls.md#invalid-times).
   | TRTUInvalidTimeZoneAbbrev TimeZoneAbbreviation
