@@ -47,6 +47,7 @@ import Text.Interpolation.Nyan (int, rmode')
 import TzBot.Instances ()
 import TzBot.Slack.API (Mrkdwn(Mrkdwn), User(..))
 import TzBot.Slack.API.Block
+import TzBot.TZ (TimeShift(..), checkForTimeshifts)
 import TzBot.TimeReference
 import TzBot.Util
 
@@ -147,12 +148,13 @@ renderOnSuccess
   -> TimeRefSuccess
   -> User
   -> Maybe TranslationPair
-renderOnSuccess (ModalFlag forModal) sender timeRef TimeRefSuccess {..} user = do
+renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess@TimeRefSuccess {..} user = do
   let userTzLabel = uTz user
       renderedUserTime = do
         let q = renderUserTime userTzLabel trsUtcResult
         [int||#{q} in #{userTzLabel}|] :: Text
-      mbRenderedUserTime = case getTzLabelMaybe (uTz sender) timeRef of
+      mbRefTzLabel = getTzLabelMaybe (uTz sender) timeRef
+      mbRenderedUserTime = case mbRefTzLabel of
         Nothing -> Just renderedUserTime
         Just refTzLabel ->
           if refTzLabel /= userTzLabel
@@ -162,11 +164,59 @@ renderOnSuccess (ModalFlag forModal) sender timeRef TimeRefSuccess {..} user = d
                 shouldShowThisTranslation = isNotSender || forModal
             guard shouldShowThisTranslation
             Just "You are in this timezone"
+      totalTimeshifts = checkForTimeshifts timeRef timeRefSucess userTzLabel
+      mbTimeshiftNote = do
+        guard $ not $ null totalTimeshifts
+        Just $ T.strip $ getTimeshiftWarning
+          (trText timeRef)
+          trsUtcResult
+          trsTzInfo
+          userTzLabel
+          totalTimeshifts
+
   mbRenderedUserTime <&> \rt -> TranslationPair
     (getOriginalTimeRef sender timeRef trsOriginalDate)
     rt
-    Nothing
-    Nothing
+    mbTimeshiftNote
+    mbTimeshiftNote
+
+getTimeshiftWarningUnit :: TimeShift -> Text
+getTimeshiftWarningUnit ts@TimeShift {..} = do
+  let prevOffsetTZInfo = tzInfoFromOffset tsBefore
+  [int|Dn|
+  • _At #{renderTimeGeneral "%H:%M, %d %B %Y" prevOffsetTZInfo tsShiftUtc} in #{TZI.tziIdentifier tsTzInfo},
+the clocks are turned #{shiftInfo ts}_.
+    |]
+
+shiftInfo :: TimeShift -> Builder
+shiftInfo TimeShift {..} = do
+  let (positive, hoursDiff, mbMinutesDiff) = getOffsetDiff tsBefore tsAfter
+      direction = if positive then "backward" else "forward" :: Text
+      shownMinutesDiff = mbMinutesDiff <&> \d ->
+        [int|| (and #{d} minutes)|] :: Builder
+  [int||#{direction} #{hoursDiff} hour(s)#{shownMinutesDiff}|]
+
+getOffsetDiff :: Offset -> Offset -> (Bool, Int, Maybe Int)
+getOffsetDiff o1 o2 = do
+  let diff = o1 `diffOffsetMinutes` o2
+      oDiff = abs diff
+      (hoursDiff, minutesDiff) = oDiff `divMod` (let minPerHr = 60 in minPerHr)
+      mbMinutesDiff = guard (minutesDiff /= 0) >> Just minutesDiff
+  (diff >= 0, hoursDiff, mbMinutesDiff)
+
+getTimeshiftWarning :: Text -> UTCTime -> TZI.TZInfo -> TZLabel -> [TimeShift] -> Text
+getTimeshiftWarning refText inferredTime mentionedTzInfo receiversTzLabel ts = do
+  let renderedInferredTime = renderTimeGeneral "%d %B %Y" mentionedTzInfo inferredTime
+      newLine = "\n"
+  [int|n|
+    _Warning: We inferred that "#{refText}" refers to #{renderedInferredTime} in #{TZI.tziIdentifier mentionedTzInfo} and
+    converted it to #{receiversTzLabel}, but there is a time change near this date_:
+
+    #{T.intercalate newLine $ map getTimeshiftWarningUnit ts}
+
+    _Beware that if this inference is not correct and the sender meant a different date,
+    the conversion may not be accurate._
+    |]
 
 getOriginalTimeRef :: User -> TimeReference -> Day -> Text
 getOriginalTimeRef sender timeRef originalDay = do
@@ -246,11 +296,12 @@ renderEphemeralMessageTranslationPair modalFlag sender (timeRef, result) = case 
       where
         implicitSenderTimezone = isNothing $ trLocationRef timeRef
 
-renderUserTime :: TZLabel -> UTCTime -> String
-renderUserTime tzLabel refTime = do
-  let tzInfo = TZI.fromLabel tzLabel
-      refUserLocalTime = TZT.tzTimeLocalTime $ TZT.fromUTC tzInfo refTime
-      -- example:
-      -- 18:23, Monday, 26 December 2016
-      format = "%H:%M, %A, %d %B %Y"
+renderTimeGeneral :: String -> TZI.TZInfo -> UTCTime -> String
+renderTimeGeneral format tzInfo refTime = do
+  let refUserLocalTime = TZT.tzTimeLocalTime $ TZT.fromUTC tzInfo refTime
   formatTime defaultTimeLocale format refUserLocalTime
+
+-- example:
+-- 18:23, Monday, 26 December 2016
+renderUserTime :: TZLabel -> UTCTime -> String
+renderUserTime tzLabel = renderTimeGeneral "%H:%M, %A, %d %B %Y" (TZI.fromLabel tzLabel)

@@ -17,13 +17,20 @@ import Data.Char (isLower)
 import Data.HashMap.Strict qualified as H
 import Data.List (stripPrefix)
 import Data.String.Conversions (cs)
-import Data.Time (UTCTime, defaultTimeLocale, parseTimeM)
+import Data.Time (TimeZone, UTCTime, defaultTimeLocale, parseTimeM)
+import Data.Time.TZInfo qualified as TZI
+import Data.Time.Zones.Types (TZ(..))
+import Data.Vector qualified as V
+import Data.Vector.Unboxed qualified as VU
 import Data.Yaml qualified as Y
+import Formatting (Buildable)
+import Formatting.Buildable (Buildable(..))
 import GHC.Generics
 import Language.Haskell.TH
 import System.Clock (TimeSpec, fromNanoSecs, toNanoSecs)
 import System.Random (randomRIO)
 import Text.Interpolation.Nyan (int, rmode')
+import Text.Printf (printf)
 import Time (KnownDivRat, Nanosecond, Time, floorRat, ns, toUnit)
 
 attach :: (Functor f) => (a -> b) -> f a -> f (a, b)
@@ -31,6 +38,9 @@ attach f = fmap (\x -> (x, f x))
 
 withMaybe :: Maybe a -> b -> (a -> b) -> b
 withMaybe mbVal nothing just = maybe nothing just mbVal
+
+withEither :: Either a b -> (a -> c) -> (b -> c) -> c
+withEither val left right = either left right val
 
 tsToUTC :: String -> Maybe UTCTime
 tsToUTC = parseTimeM False defaultTimeLocale "%s%Q"
@@ -165,3 +175,37 @@ postfixFields = lensRules & lensField .~ mappingNamer (\n -> [n ++ "L"])
 
 whenT :: (Applicative m) => Bool -> m Bool -> m Bool
 whenT cond_ action_ = if cond_ then action_ else pure False
+
+----------------------------------------------------------------------------
+----- Offset
+----------------------------------------------------------------------------
+type NamedOffset = TimeZone
+
+-- | An offset from UTC measured in minutes.
+newtype Offset = Offset { unOffset :: Int }
+  deriving newtype (Eq, Show, Num)
+
+instance Buildable Offset where
+  build = fromString . renderOffset
+
+renderOffset :: Offset -> String
+renderOffset (Offset minutesOffset) = do
+  let sign = if minutesOffset >= 0 then "+" else "-" :: String
+      minutesPerHour = 60
+      (hours, mins) = abs minutesOffset `divMod` minutesPerHour
+  printf ("UTC" <> sign <> "%02d:%02d") hours mins
+
+diffOffsetMinutes :: Offset -> Offset -> Int
+diffOffsetMinutes = (-) `on` unOffset
+
+tzInfoFromOffset :: Offset -> TZI.TZInfo
+tzInfoFromOffset offset@(Offset offsetMinutes) =
+  TZI.TZInfo shownOffset $ TZ
+      (VU.singleton minBound)
+      (VU.singleton $ secondsPerMinute * offsetMinutes)
+      (V.singleton (False, toString shownOffset))
+  where
+    shownOffset = [int||#{offset}|] :: Text
+
+secondsPerMinute :: Int
+secondsPerMinute = 60

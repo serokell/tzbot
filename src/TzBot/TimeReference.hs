@@ -9,17 +9,13 @@ import Universum
 import Control.Arrow ((>>>))
 import Data.List.NonEmpty qualified as NE
 import Data.Time
-import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear, Year)
+import Data.Time.Calendar.Compat
 import Data.Time.TZInfo qualified as TZI
 import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
-import Data.Time.Zones.Types (TZ(..))
-import Data.Vector qualified as V
-import Data.Vector.Unboxed qualified as VU
 import Formatting (Buildable)
-import Formatting.Buildable (Buildable(..))
-import Text.Interpolation.Nyan (int, rmode')
-import Text.Printf (printf)
+
+import TzBot.Util (Offset(..), tzInfoFromOffset)
 
 {- | An offset from UTC (e.g. @UTC+01:00@) with an optional timezone abbreviation (e.g. @BST@).
 
@@ -35,8 +31,6 @@ We use this type alias to make this distinction a bit more clear.
 
 (In fact, the @time@ package does not support timezones at all.)
 -}
-type NamedOffset = TimeZone
-
 type TimeReferenceText = Text
 
 -- | A reference to a point in time, e.g. "tuesday at 10am", "3pm CST on July 7th"
@@ -87,23 +81,6 @@ data UnknownTimeZoneAbbrev = UnknownTimeZoneAbbrev
     -- abbreviations that are similar enough to what they wrote, e.g. @GMT@.
   } deriving stock (Eq, Show)
 
--- | An offset from UTC measured in minutes.
-newtype Offset = Offset { unOffset :: Int }
-  deriving newtype (Eq, Show, Num)
-
-instance Buildable Offset where
-  build = fromString . renderOffset
-
-renderOffset :: Offset -> String
-renderOffset (Offset minutesOffset) = do
-  let sign = if minutesOffset >= 0 then "+" else "-" :: String
-      minutesPerHour = 60
-      (hours, mins) = abs minutesOffset `divMod` minutesPerHour
-  printf ("UTC" <> sign <> "%02d:%02d") hours mins
-
-secondsPerMinute :: Int
-secondsPerMinute = 60
-
 {- | Converts a time reference to a moment in time (expressed in UTC).
 
   If the time reference contains a timezone abbreviation, and if that abbreviation\
@@ -132,9 +109,10 @@ timeReferenceToUTC sendersTZLabel eventTimestamp timeRef@TimeReference {..} =
             Nothing -> error "impossible happened: got TZError for a static offset"
             Just refTzLabel -> tzErrorToResult refTzLabel err
         Right refTime -> TRTUSuccess $ TimeRefSuccess
-          (TZT.toUTC refTime)
-          (localDay $ TZT.tzTimeLocalTime refTime)
-
+            { trsUtcResult = TZT.toUTC refTime
+            , trsTzInfo = tzInfo
+            , trsOriginalDate = localDay $ TZT.tzTimeLocalTime refTime
+            }
   where
   tzErrorToResult :: TZLabel -> TZT.TZError -> TimeReferenceToUTCResult
   tzErrorToResult tzLabel = \case
@@ -169,15 +147,6 @@ timeReferenceToUTC sendersTZLabel eventTimestamp timeRef@TimeReference {..} =
     Just (OffsetRef offset) -> pure $ tzInfoFromOffset offset
     Just (TimeZoneAbbreviationRef abbrev) -> pure $ tzInfoFromOffset $ tzaiOffsetMinutes abbrev
     Just (UnknownTimeZoneAbbreviationRef unknownAbbrev) -> Left unknownAbbrev
-
-  tzInfoFromOffset :: Offset -> TZI.TZInfo
-  tzInfoFromOffset (Offset offsetMinutes) =
-    TZI.TZInfo shownOffset $ TZ
-        (VU.singleton minBound)
-        (VU.singleton $ secondsPerMinute * offsetMinutes)
-        (V.singleton (False, toString shownOffset))
-    where
-      shownOffset = [int||#{offsetMinutes}|] :: Text
 
 -- | Given a day of month and current time, try to figure out what day was really meant.
 -- Algorithm:
@@ -231,11 +200,14 @@ chooseBestYear dayOfMonth monthOfYear now = do
   NE.head sortedCandidates
 
 data TimeRefSuccess = TimeRefSuccess
-  { trsUtcResult      :: UTCTime
+  { trsUtcResult :: UTCTime
     -- ^ The result of the conversion.
+  , trsTzInfo :: TZI.TZInfo
+    -- ^ TZInfo, obtained either from a TZLabel or from a static offset.
   , trsOriginalDate :: Day
-    -- ^ The day that was originally mentioned by the sender
-    -- in specified or implicit sender's timezone.
+    -- ^ The date _before_ the conversion to UTC.
+    -- This date is in the timezone/offset specified by the user, if one was specified,
+    -- or in the sender's current timezone otherwise.
   } deriving stock (Eq, Show)
 
 data TimeShiftErrorInfo = TimeShiftErrorInfo
