@@ -9,9 +9,7 @@ import Universum
 import Control.Arrow ((>>>))
 import Data.List.NonEmpty qualified as NE
 import Data.Time
-  (Day, DayOfWeek, LocalTime(localDay), TimeOfDay, TimeZone, UTCTime, diffLocalTime, nominalDay,
-  toGregorian)
-import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
+import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear, Year)
 import Data.Time.TZInfo qualified as TZI
 import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
@@ -59,7 +57,7 @@ getTzLabelMaybe senderTz timeRef = case trLocationRef timeRef of
 data DateReference
   = DaysFromToday Int
   | DayOfWeekRef DayOfWeek
-  | DayOfMonthRef DayOfMonth (Maybe MonthOfYear)
+  | DayOfMonthRef DayOfMonth (Maybe (MonthOfYear, Maybe Year))
   deriving stock (Eq, Show)
 
 data LocationReference
@@ -159,7 +157,10 @@ timeReferenceToUTC sendersTZLabel eventTimestamp timeRef@TimeReference {..} =
       TZT.atFirstDayOfWeekOnAfter dayOfWeek eventLocalTime
     Just (DayOfMonthRef dayOfMonth mbMonthOfYear) -> case mbMonthOfYear of
       Nothing -> chooseBestMonth dayOfMonth eventLocalTime
-      Just monthOfYear -> chooseBestYear dayOfMonth monthOfYear eventLocalTime
+      Just (monthOfYear, mbYear) -> case mbYear of
+        Nothing -> chooseBestYear dayOfMonth monthOfYear eventLocalTime
+        Just year ->
+          TZT.atDay (fromGregorian year monthOfYear dayOfMonth) eventLocalTime
 
   eithTzInfo :: Either UnknownTimeZoneAbbrev TZI.TZInfo
   eithTzInfo = case trLocationRef of
