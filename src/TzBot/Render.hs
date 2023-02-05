@@ -9,12 +9,10 @@ module TzBot.Render
   , Template
 
     -- * Render generic
-  , renderAllForOthersTP
-  , renderErrorsForSenderTP
+  , renderAllTP
 
     -- * Render text
-  , renderErrorsForSender
-  , renderAllForOthers
+  , renderAll
   , joinTranslationPairs
 
     -- * Render Slack
@@ -27,6 +25,10 @@ module TzBot.Render
   , SenderFlag
   , asForSenderS
   , asForOthersS
+
+  , ModalFlag
+  , asForModalM
+  , asForMessageM
   ) where
 
 import Universum
@@ -42,7 +44,7 @@ import Data.Time.Zones.All (TZLabel)
 import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Instances ()
-import TzBot.Slack.API (Mrkdwn(Mrkdwn), User(uTz))
+import TzBot.Slack.API (Mrkdwn(Mrkdwn), User(..))
 import TzBot.Slack.API.Block
 import TzBot.TimeReference
 import TzBot.Util
@@ -52,7 +54,7 @@ import TzBot.Util
 -- We use `Left` to keep translation errors (invalid/ambiguous time,
 -- invalid offset abbreviation) and they are common for all users,
 -- and valid translations (`Right`) depend on the receiver timezone.
-type EitherTemplateUnit = Either TranslationPair (User -> TranslationPair)
+type EitherTemplateUnit = Either TranslationPair (User -> Maybe TranslationPair)
 
 data TranslationPair = TranslationPair
   { tuTimeRef :: Text
@@ -90,11 +92,9 @@ concatTranslationPair sender t@TranslationPair {..} = do
   [int||#{tuTimeRef}:  #{tuTranslation}#{note}|]
 
 -- Render generic
-renderErrorsForSenderTP :: Template -> Maybe TranslationPairs
-renderErrorsForSenderTP (Template lst) = NE.nonEmpty $ lefts $ NE.toList lst
-
-renderAllForOthersTP :: User -> Template -> TranslationPairs
-renderAllForOthersTP user = NE.map (either id ($ user)) . unTemplate
+renderAllTP :: User -> Template -> Maybe TranslationPairs
+renderAllTP user =
+  nonEmpty . mapMaybe (either Just ($ user)) . NE.toList . unTemplate
 
 -- | We show this message because we may have not found
 -- any time references while actually there were.
@@ -102,13 +102,9 @@ noRefsFoundMsg :: Text
 noRefsFoundMsg = "No time references found."
 
 -- Render text
-renderErrorsForSender :: Template -> Maybe Text
-renderErrorsForSender template =
-  joinTranslationPairs asForSenderS <$> renderErrorsForSenderTP template
-
-renderAllForOthers :: User -> Template -> Text
-renderAllForOthers user =
-  joinTranslationPairs asForOthersS . renderAllForOthersTP user
+renderAll :: User -> Template -> Maybe Text
+renderAll user =
+  fmap (joinTranslationPairs asForSenderS) . renderAllTP user
 
 joinTranslationPairs :: SenderFlag -> TranslationPairs -> Text
 joinTranslationPairs sender =
@@ -130,18 +126,44 @@ renderSlackBlocks forSender =
           mkNoteBlock note = BSection $ markdownSection $ Mrkdwn note
       withMaybe mbNote [translationBlock] $ \note -> [translationBlock, mkNoteBlock note]
 
-renderTemplate :: UTCTime -> User -> NE.NonEmpty TimeReference -> Template
-renderTemplate now sender timeRefs =
-  Template $ NE.map (renderEphemeralMessageTranslationPair sender)
+renderTemplate :: ModalFlag -> UTCTime -> User -> NE.NonEmpty TimeReference -> Template
+renderTemplate modalFlag now sender timeRefs =
+  Template $ NE.map (renderEphemeralMessageTranslationPair modalFlag sender)
     $ attach (timeReferenceToUTC (uTz sender) now) timeRefs
 
-renderOnSuccess :: User -> TimeReference -> TimeRefSuccess -> User -> TranslationPair
-renderOnSuccess sender timeRef TimeRefSuccess {..} user = do
+--
+newtype ModalFlag = ModalFlag Bool
+
+asForModalM, asForMessageM :: ModalFlag
+asForModalM = ModalFlag True
+asForMessageM = ModalFlag False
+
+--
+renderOnSuccess
+  :: ModalFlag
+  -> User
+  -> TimeReference
+  -> TimeRefSuccess
+  -> User
+  -> Maybe TranslationPair
+renderOnSuccess (ModalFlag forModal) sender timeRef TimeRefSuccess {..} user = do
   let userTzLabel = uTz user
-      renderedUserTime = renderUserTime userTzLabel trsUtcResult
-  TranslationPair
+      renderedUserTime = do
+        let q = renderUserTime userTzLabel trsUtcResult
+        [int||#{q} in #{userTzLabel}|] :: Text
+      mbRenderedUserTime = case trsEithTzOffset of
+        Right _ -> Just renderedUserTime
+        Left refTzLabel ->
+          if refTzLabel /= userTzLabel
+          then Just renderedUserTime
+          else do
+            let isNotSender = ((/=) `on` uId) sender user
+                shouldShowThisTranslation = isNotSender || forModal
+            guard shouldShowThisTranslation
+            Just "You are in this timezone"
+  mbRenderedUserTime <&> \rt -> TranslationPair
     (getOriginalTimeRef sender timeRef trsOriginalDate)
-    [int||#{renderedUserTime} in #{userTzLabel}|]
+    rt
     Nothing
     Nothing
 
@@ -162,17 +184,18 @@ getOriginalTimeRef sender timeRef originalDay = do
 -- and under `Right` we collect valid time references that should be rendered differently
 -- for each user.
 renderEphemeralMessageTranslationPair
-  :: User
+  :: ModalFlag
+  -> User
   -> (TimeReference, TimeReferenceToUTCResult)
   -> EitherTemplateUnit
-renderEphemeralMessageTranslationPair sender (timeRef, result) = case result of
+renderEphemeralMessageTranslationPair modalFlag sender (timeRef, result) = case result of
   TRTUSuccess timeRefSuc ->
-    Right $ renderOnSuccess sender timeRef timeRefSuc
+    Right $ renderOnSuccess modalFlag sender timeRef timeRefSuc
   TRTUAmbiguous TimeShiftErrorInfo {..} -> do
     let shownTZ = shownTimezone tseiIsImplicitSenderTimezone tseiRefTimeZone
     Left $ TranslationPair
       { tuTimeRef = getOriginalTimeRef sender timeRef tseiOriginalDate
-      , tuTranslation = "ambiguous because of the time shift"
+      , tuTranslation = "Ambiguous because of the time shift"
       , tuNoteForSender =
         Just [int||_There is a timeshift in #{shownTZ True} around the specified \
              time and this particular timestamp can be possible with \
@@ -186,7 +209,7 @@ renderEphemeralMessageTranslationPair sender (timeRef, result) = case result of
     let shownTZ = shownTimezone tseiIsImplicitSenderTimezone tseiRefTimeZone
     Left $ TranslationPair
       { tuTimeRef = getOriginalTimeRef sender timeRef tseiOriginalDate
-      , tuTranslation = "invalid because of the time shift"
+      , tuTranslation = "Invalid because of the time shift"
       , tuNoteForSender =
         Just [int||_There is a timeshift in #{shownTZ True} around the specified \
              time and this particular timestamp does not exist, \
