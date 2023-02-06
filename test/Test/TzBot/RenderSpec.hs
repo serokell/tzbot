@@ -90,6 +90,20 @@ test_renderSpec = TestGroup "Render"
           "\"10am on the 21st\", 21 January 2023 in Europe/Moscow"
           "02:00, Saturday, 21 January 2023 in America/Havana"
       ]
+    , testCase "Unknown timezone abbreviation, no similar known ones" $
+      mkChatCase arbitraryTime1 "10am KAMAZ" userMoscow userHavana
+      [ translWithoutNotes
+        "\"10am KAMAZ\""
+        "Contains unrecognized timezone abbreviation: KAMAZ"
+      ]
+    , testCase "Unknown timezone abbreviation, some similar known ones" $
+      mkChatCase arbitraryTime1 "10am WETS" userMoscow userHavana
+      [ TranslationPair
+        "\"10am WETS\""
+        "Contains unrecognized timezone abbreviation: WETS"
+        (Just "_Maybe you meant: WET, WEST_")
+        Nothing
+      ]
     ]
   , TestGroup "Modal"
     [ testCase "Back to author, same timezone" $

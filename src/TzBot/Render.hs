@@ -35,7 +35,8 @@ import Universum
 
 import Data.Aeson (ToJSON)
 import Data.List.NonEmpty qualified as NE
-import Data.Text.Lazy qualified as T
+import Data.Text qualified as T
+import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Builder (Builder, fromText, singleton, toLazyText)
 import Data.Time.Compat (Day, UTCTime, defaultTimeLocale, formatTime)
 import Data.Time.TZInfo qualified as TZI
@@ -108,7 +109,7 @@ renderAll user =
 
 joinTranslationPairs :: SenderFlag -> TranslationPairs -> Text
 joinTranslationPairs sender =
-  T.toStrict . toLazyText . fold . NE.toList
+  TL.toStrict . toLazyText . fold . NE.toList
     . NE.map ((<> singleton '\n') . concatTranslationPair sender)
 
 -- Render Slack block
@@ -219,12 +220,17 @@ renderEphemeralMessageTranslationPair modalFlag sender (timeRef, result) = case 
              time, and this particular timestamp does not exist._|]
       }
 
-  TRTUInvalidTimeZoneAbbrev abbrev ->
+  TRTUInvalidTimeZoneAbbrev UnknownTimeZoneAbbrev {..} -> do
+    let mbNeCandidates = nonEmpty utzaCandidates
+        mbCandidatesNoteForSender = flip fmap mbNeCandidates \neCandidates -> do
+          let renderedCandidates =
+                T.intercalate ", " $
+                  map unTimeZoneAbbreviation $ NE.toList neCandidates
+          [int||_Maybe you meant: #{renderedCandidates}_|]
     Left $ TranslationPair
-      (trText timeRef)
-      [int||contains invalid timezone abbreviation: #{abbrev}|]
-      Nothing -- TODO: We can find some abbreviations that are similar to
-              -- what the sender defined and that we know about
+      [int||"#{trText timeRef}"|]
+      [int||Contains unrecognized timezone abbreviation: #{utzaAbbrev}|]
+      mbCandidatesNoteForSender
       Nothing
   where
     shownTimezone :: Bool -> TZLabel -> Bool -> Builder
