@@ -63,9 +63,6 @@ common developers' activities.
 
 ## Setting up a dev environment
 
-**NOTE**: Most [issues](https://github.com/serokell/tzbot/issues) (except #3)
-do not require setting up a Slack workspace. They can be worked on in isolation.
-
 1. [Create a Slack Workspace](https://slack.com/get-started#/createnew)
 1. Create a new Slack App
     * Go to <https://api.slack.com/apps> and pick "Create New App" > "From an app manifest"
@@ -86,6 +83,8 @@ do not require setting up a Slack workspace. They can be worked on in isolation.
     * Open up the Slack client and log into the workspace you created in step 1.
     * Right click on a channel name and select
       "Open channel details" > "Integrations" > "Add apps" > "tzbot"
+1. To allow users to DM the bot, go `https://api.slack.com/apps/(app_id)` -> `App Home`
+   and set two flags around `Message Tabs` section: one to the right of it and one more below.
 1. Run the bot with `make run` (or `cabal run tzbot-exe` / `stack run`).
 
  [time-zones-offsets]: https://spin.atomicobject.com/2016/07/06/time-zones-offsets/
