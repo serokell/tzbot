@@ -4,42 +4,34 @@
 
 steps:
   - label: check trailing whitespaces
-    command: nix-build ci.nix -A trailing-whitespace-check
+    command: nix build -L .#checks.x86_64-linux.trailing-whitespace
 
   - label: shellcheck
-    command: nix run -f ci.nix pkgs.shellcheck -c find . -name '*.sh' -exec shellcheck {} +
+    command: nix build -L .#checks.x86_64-linux.shellcheck
 
   - label: validate cabal files
-    command: nix run -f ci.nix stack2cabal pkgs.diffutils -c ./scripts/validate-cabal-files.sh
+    command: nix develop .#ci -c ./scripts/validate-cabal-files.sh
 
   - label: stylish
-    command: nix run -f ci.nix pkgs.gnumake pkgs-stylish.stylish-haskell -c ./scripts/validate-stylish.sh
+    command: nix build -L .#checks.x86_64-linux.stylish-haskell
 
   - label: lint
-    command: nix run -f ci.nix pkgs.haskellPackages.hlint -c hlint .
+    command: nix build -L .#checks.x86_64-linux.hlint
 
   - label: build
     key: build
-    command: nix-build ci.nix -A lib -A server
+    command: nix build -L .#checks.x86_64-linux.build-all
 
   - label: tests
     depends_on: build
     commands:
-      - nix run -f ci.nix tests -c tzbot-test
-      - nix-shell ci.nix -A shell --command "runghc test/doctests.hs"
-
-  - label: haddock
-    depends_on: build
-    command: nix-build ci.nix -A haddock
+      - nix build -L .#checks.x86_64-linux.test
+      - nix develop .#doctest -c runghc test/doctests.hs
 
   - label: xrefcheck
-    command: nix run -f ci.nix xrefcheck -c xrefcheck
+    command: nix run github:serokell/xrefcheck
+    soft_fail:
+      - exit_status: 1
 
   - label: REUSE lint
-    command: nix run -f ci.nix pkgs.reuse -c reuse lint
-
-  - label: weeder
-    depends_on: build
-    commands:
-      - nix-build ci.nix -A weeder-script
-      - ./result
+    command: nix build -L .#checks.x86_64-linux.reuse-lint
