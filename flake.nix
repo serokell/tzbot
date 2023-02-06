@@ -24,7 +24,9 @@
   };
 
   outputs = { self, nixpkgs, haskell-nix, hackage, stackage, serokell-nix, flake-compat, flake-utils, ... }@inputs:
-  flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
+  {
+    nixosModules.default = import ./module.nix inputs;
+  } // (flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
     let
       haskellPkgs = haskell-nix.legacyPackages."${system}";
       pkgs = import nixpkgs {
@@ -115,5 +117,5 @@
       packages = {
         tzbot = hs-pkg.components.exes.tzbot-exe;
       };
-    });
+    }));
 }
