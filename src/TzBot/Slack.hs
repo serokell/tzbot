@@ -19,6 +19,7 @@ module TzBot.Slack
   , startModal
   , updateModal
   , retrieveOneMessageFromThread
+  , getMessagePermalinkCached
   ) where
 
 import Universum hiding (toString)
@@ -62,7 +63,7 @@ getUserCached :: UserId -> BotM User
 getUserCached userId =
   katipAddNamespaceText "getUser" $ do
   cache <- asks bsUserInfoCache
-  Cache.fetchWithCacheRandomized userId getUser cache
+  Cache.fetchWithCache userId getUser cache
 
 -- | Get a list of a channel's members.
 getChannelMembers :: ChannelId -> BotM (S.Set UserId)
@@ -77,7 +78,7 @@ getChannelMembersCached :: ChannelId -> BotM (S.Set UserId)
 getChannelMembersCached channelId =
   katipAddNamespaceText "getChannelMembers" $ do
   cache <- asks bsConversationMembersCache
-  Cache.fetchWithCacheRandomized channelId getChannelMembers cache
+  Cache.fetchWithCache channelId getChannelMembers cache
 
 -- | Post an "ephemeral message", a message only visible to the given user.
 sendEphemeralMessage :: PostEphemeralReq -> BotM ()
@@ -156,6 +157,14 @@ updateModal req = do
   token <- getBotToken
   void $ updateView token req >>= handleSlackErrorSingle "views.update"
 
+getMessagePermalinkCached :: ChannelId -> MessageId -> BotM Text
+getMessagePermalinkCached channelId msgId =
+  asks bsMessageLinkCache >>=
+    Cache.fetchWithCache msgId \msgId' -> do
+      token <- getBotToken
+      resp <- getPermalink token channelId msgId'
+      handleSlackErrorSingle "chat.getPermalink" resp
+
 getBotToken :: BotM Auth.Token
 getBotToken = do
   BotToken bt <- asks $ cBotToken . bsConfig
@@ -222,6 +231,11 @@ openView
   :: Auth.Token -> OpenViewReq -> BotM (SlackResponse $ SlackContents "view" Value)
 updateView
   :: Auth.Token -> UpdateViewReq -> BotM (SlackResponse $ SlackContents "view" Value)
+getPermalink
+  :: Auth.Token
+  -> ChannelId
+  -> MessageId
+  -> BotM (SlackResponse (SlackContents "permalink" Text))
 
 usersInfo
   :<|> conversationMembers
@@ -230,7 +244,8 @@ usersInfo
   :<|> conversationHistory
   :<|> conversationReplies
   :<|> openView
-  :<|> updateView =
+  :<|> updateView
+  :<|> getPermalink =
   hoistClient api naturalTransformation (client api)
   where
     baseUrl = BaseUrl Https "slack.com" 443 "api"

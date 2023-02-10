@@ -128,7 +128,7 @@ renderSlackBlocks forSender =
       let t = (Mrkdwn $ tuTimeRef timeRef, Mrkdwn $ tuTranslation timeRef)
           mbNote = chooseNote forSender timeRef
           translationBlock = BSection $ fieldsSection Nothing $ NE.singleton t
-          mkNoteBlock note = BSection $ markdownSection (Mrkdwn note)
+          mkNoteBlock note = BSection $ markdownSection $ Mrkdwn note
       withMaybe mbNote [translationBlock] $ \note -> [translationBlock, mkNoteBlock note]
 
 renderTemplate :: UTCTime -> User -> NE.NonEmpty TimeReference -> Template

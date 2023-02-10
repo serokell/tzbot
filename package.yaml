@@ -72,6 +72,7 @@ library:
   - utf8-string
   - validation
   - yaml
+  - utf8-string
 
 executables:
   tzbot-exe:

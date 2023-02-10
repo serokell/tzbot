@@ -87,8 +87,6 @@ handler shutdownRef bState _cfg e = run $ do
     run action = void $ runBotM bState $ do
       eithRes <- catchAllErrors action
       whenLeft eithRes $ \eithErr -> do
-        let logException :: (Exception e) => e -> BotM ()
-            logException err = logError [int||Error occured: #s{err}|]
         case eithErr of
           Left someExc
             | Just UserInterrupt <- fromException someExc ->

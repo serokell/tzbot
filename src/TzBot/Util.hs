@@ -192,3 +192,6 @@ catchAllErrors action = fmap reorder $ try $ tryError action
   reorder (Left e) = Left (Left e)
   reorder (Right (Left e)) = Left (Right e)
   reorder (Right (Right r)) = Right r
+
+whenT :: (Applicative m) => Bool -> m Bool -> m Bool
+whenT cond_ action_ = if cond_ then action_ else pure False
