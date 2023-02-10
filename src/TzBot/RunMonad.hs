@@ -7,14 +7,11 @@ module TzBot.RunMonad where
 import Universum
 
 import Control.Lens (makeLensesWith)
-import Control.Monad.Base (MonadBase)
-import Control.Monad.Except (MonadError)
-import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Set qualified as S
 import Katip qualified as K
 import Network.HTTP.Client (Manager)
-import Servant.Client (ClientError)
 import Text.Interpolation.Nyan (int, rmode')
+import UnliftIO (MonadUnliftIO)
 
 import TzBot.Cache (TzCache)
 import TzBot.Config.Types (BotConfig)
@@ -44,24 +41,19 @@ data BotState = BotState
 makeLensesWith postfixFields ''BotState
 
 newtype BotM a = BotM
-  { unBotM :: ReaderT BotState (ExceptT BotException IO) a
+  { unBotM :: ReaderT BotState IO a
   }
   deriving newtype
     ( Functor, Applicative, Monad
-    , MonadReader BotState, MonadError BotException
-    , MonadIO, MonadBaseControl IO, MonadBase IO
+    , MonadReader BotState
+    , MonadIO, MonadUnliftIO
     )
 
-runBotM :: BotState -> BotM a -> IO (Either BotException a)
+runBotM :: BotState -> BotM a -> IO a
 runBotM state action =
   action
     & unBotM
     & flip runReaderT state
-    & runExceptT
-
-runOrThrowBotM :: BotState -> BotM a -> IO a
-runOrThrowBotM state action =
-  runBotM state action >>= either throwM pure
 
 instance K.Katip BotM where
   localLogEnv f = local (over bsLogEnvL f)
@@ -74,7 +66,8 @@ instance K.KatipContext BotM where
   getKatipNamespace = view bsLogNamespaceL
 
 runKatipWithBotState :: BotState -> K.KatipContextT m a -> m a
-runKatipWithBotState BotState {..} action = K.runKatipContextT bsLogEnv bsLogContext bsLogNamespace action
+runKatipWithBotState BotState {..} action =
+  K.runKatipContextT bsLogEnv bsLogContext bsLogNamespace action
 ----------------------------------------------------------------------------
 -- Exceptions
 ----------------------------------------------------------------------------
@@ -86,7 +79,6 @@ type ErrorDescription = Text
 data BotException
   = EndpointFailed EndpointName ErrorDescription
   | UnexpectedResult EndpointName FunctionName ErrorDescription
-  | ServantError ClientError
   deriving stock (Show, Generic)
 
 instance Exception BotException where
@@ -100,5 +92,3 @@ instance Exception BotException where
       [int|s|
         '#{funcName}', unexpected result from endpoint '#{endpoint}': #{err}
       |]
-    ServantError clientError ->
-      displayException clientError

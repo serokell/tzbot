@@ -5,7 +5,6 @@
 module TzBot.Slack
   ( BotM(..)
   , runBotM
-  , runOrThrowBotM
   , AppLevelToken(..)
   , BotToken(..)
   , BotState(..)
@@ -24,7 +23,6 @@ module TzBot.Slack
 
 import Universum hiding (toString)
 
-import Control.Monad.Except (throwError)
 import Data.Aeson (Value)
 import Data.ByteString.UTF8 (toString)
 import Data.DList qualified as DList
@@ -40,13 +38,13 @@ import Servant.Client.Core
   (ClientError(FailureResponse), ResponseF(responseHeaders, responseStatusCode))
 import Text.Interpolation.Nyan (int, rmode', rmode's)
 import Time.Units (sec, threadDelay)
+import UnliftIO.Exception qualified as UnliftIO
 
 import TzBot.Cache qualified as Cache
 import TzBot.Config
 import TzBot.Logger
 import TzBot.RunMonad
-  (BotException(..), BotM(..), BotState(..), ErrorDescription, runBotM, runKatipWithBotState,
-  runOrThrowBotM)
+  (BotException(..), BotM(..), BotState(..), ErrorDescription, runBotM, runKatipWithBotState)
 import TzBot.Slack.API
   (ChannelId, Cursor, Limit(..), Message(..), MessageId(..), OpenViewReq(..), PostEphemeralReq(..),
   PostMessageReq(..), SlackContents(..), SlackResponse(..), ThreadId, UpdateViewReq(..), User,
@@ -107,7 +105,7 @@ retrieveOneMessage channelId messageId = do
   case safeHead msgs of
     Just msg -> pure msg
     Nothing ->
-      throwError $
+      UnliftIO.throwIO $
         UnexpectedResult endpointName functionName
           $ mkErrorMessage messageId Nothing
 
@@ -133,7 +131,7 @@ retrieveOneMessageFromThread channelId threadId messageId = do
   case find (\m -> mMessageId m == messageId) msgs of
     Just msg -> pure msg
     Nothing ->
-      throwError $
+      UnliftIO.throwIO $
         UnexpectedResult endpointName functionName
           $ mkErrorMessage messageId $ Just threadId
 
@@ -175,7 +173,7 @@ handleSlackError endpoint = \case
   SRSuccess a -> pure a
   SRError err_ metadata -> do
     logError [int||#{endpoint} error: #{err_}; metadata: #s{metadata}|]
-    throwError $ EndpointFailed endpoint err_
+    UnliftIO.throwIO $ EndpointFailed endpoint err_
 
 handleSlackErrorSingle :: Text -> SlackResponse $ SlackContents key a -> BotM a
 handleSlackErrorSingle endpoint = fmap scContents . handleSlackError endpoint
@@ -261,8 +259,8 @@ usersInfo
           handleTooManyRequests (runClientM act clientEnv)) (cMaxRetries config)) >>= \case
         Right a -> pure a
         Left clientError -> do
-          logError [int||Client call failed: ${show @Text clientError}|]
-          throwError $ ServantError clientError
+          logError [int||Client call failed: #s{clientError}|]
+          UnliftIO.throwIO clientError
 
 -- | Handles slack API response with status code 429 @Too many requests@.
 -- If action result is success, then return result. If action result is error
