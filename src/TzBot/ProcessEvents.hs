@@ -3,22 +3,17 @@
 -- SPDX-License-Identifier: MPL-2.0
 
 module TzBot.ProcessEvents
-  ( handler
-  ) where
+  ( handleSlashCommand
+  , handleRawEvent
+  , handleRawBlockAction
+  , handleRawInteractive) where
 
 import Universum
 
-import Control.Exception (AsyncException(UserInterrupt))
 import Data.Aeson (FromJSON(..), Value)
 import Data.Aeson.Types (parseEither)
-import Slacker
-  (DisconnectBody(DisconnectBody), EventsApiEnvelope(EventsApiEnvelope, eaeEnvelopeId),
-  HelloBody(..), SlackConfig, SlashCommandsEnvelope(SlashCommandsEnvelope, sceEnvelopeId),
-  SocketModeEvent(..), pattern BlockAction, pattern Command, pattern EventValue,
-  pattern Interactive)
-import Slacker.SocketMode (InteractiveEnvelope(..))
+import Slacker (SlashCommand, scCommand)
 import Text.Interpolation.Nyan (int, rmode', rmode's)
-import UnliftIO.Exception qualified as UnliftIO
 
 import TzBot.Logger
 import TzBot.ProcessEvents.BlockAction qualified as B
@@ -26,12 +21,12 @@ import TzBot.ProcessEvents.ChannelEvent (processMemberJoinedChannel, processMemb
 import TzBot.ProcessEvents.Command (processHelpCommand)
 import TzBot.ProcessEvents.Interactive qualified as I
 import TzBot.ProcessEvents.Message (processMessageEvent)
-import TzBot.RunMonad (BotM, BotState(..), runBotM)
+import TzBot.RunMonad (BotM)
 import TzBot.Slack.API.Block (ActionId(..))
 import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.Util (encodeText)
 
-{- |
+{-
 After the message event came, the bot sends some ephemerals
 containing translations of time references in that message.
 
@@ -51,54 +46,43 @@ event comes, and the bot collects user feedback in the configured way.
 
 The bot also has a command `\tzhelp`, should return help message in response.
  -}
-handler :: IORef (IO ()) -> BotState -> SlackConfig -> SocketModeEvent -> IO ()
-handler shutdownRef bState _cfg e = run $ do
-  logDebug [int||Received Slack event: #{show @Text e}|]
-  case e of
-    Command cmdType slashCmd -> case cmdType of
-      Fixtures.HelpCommand -> katipAddNamespaceText cmdType $ processHelpCommand slashCmd
-      unknownCmd           -> logWarn [int||Unknown command #{unknownCmd}|]
 
-    EventValue eventType evtRaw
-      | eventType == "message" ->
-        decodeAndProcess eventType envelopeIdentifier processMessageEvent evtRaw
-      | eventType == "member_joined_channel" ->
-        decodeAndProcess eventType envelopeIdentifier processMemberJoinedChannel evtRaw
-      | eventType == "member_left_channel" ->
-        decodeAndProcess eventType envelopeIdentifier processMemberLeftChannel evtRaw
-      | otherwise -> logWarn [int||Unrecognized EventValue #{encodeText evtRaw}|]
+handleSlashCommand :: SlashCommand -> BotM ()
+handleSlashCommand slashCmd = do
+  let cmdType = scCommand slashCmd
+  case cmdType of
+    Fixtures.HelpCommand -> katipAddNamespaceText cmdType $ processHelpCommand slashCmd
+    unknownCmd           -> logWarn [int||Unknown command #{unknownCmd}|]
 
-    -- BlockAction events form a subset of Interactive, so check them first
-    BlockAction actionId blockActionRaw
-      | actionId == unActionId Fixtures.reportButtonActionId ->
-        decodeAndProcess actionId envelopeIdentifier B.processReportButtonToggled blockActionRaw
-      | otherwise ->
-        logWarn [int||Unrecognized BlockAction #s{e}|]
-
-    Interactive interactiveType interactiveRaw
-      | interactiveType == "message_action" ->
-        decodeAndProcess interactiveType envelopeIdentifier I.processInteractive interactiveRaw
-      | interactiveType == "view_submission" ->
-        decodeAndProcess interactiveType envelopeIdentifier I.processViewSubmission interactiveRaw
-      | otherwise ->
-        logWarn [int||Unrecognized Interactive event #s{e}|]
-    _ -> logWarn [int||Unknown SocketModeEvent #s{e}|]
+handleRawEvent :: Text -> Text -> Value -> BotM ()
+handleRawEvent envelopeIdentifier eventType evtRaw
+      | eventType == "message" =
+        go processMessageEvent
+      | eventType == "member_joined_channel" =
+        go processMemberJoinedChannel
+      | eventType == "member_left_channel" =
+        go processMemberLeftChannel
+      | otherwise = logWarn [int||Unrecognized EventValue #{encodeText evtRaw}|]
   where
-    run :: BotM a -> IO ()
-    run action = void $ runBotM bState $ do
-      eithRes <- UnliftIO.trySyncOrAsync action
-      whenLeft eithRes $ \e -> do
-        case fromException e of
-          Just UserInterrupt -> liftIO $ join $ readIORef shutdownRef
-          _ -> logError [int||Error occured: #{displayException e}|]
+    go :: (FromJSON a) => (a -> BotM ()) -> BotM ()
+    go action = decodeAndProcess eventType envelopeIdentifier action evtRaw
 
-    envelopeIdentifier :: Text
-    envelopeIdentifier = case e of
-      EventsApi EventsApiEnvelope {..} -> eaeEnvelopeId
-      SlashCommands SlashCommandsEnvelope {..} -> sceEnvelopeId
-      InteractiveEvent InteractiveEnvelope {..} -> ieEnvelopeId
-      Hello HelloBody {} -> "hello_body"
-      Disconnect DisconnectBody {} -> "disconnect_body"
+-- BlockAction events form a subset of Interactive, so check them first
+handleRawBlockAction :: Text -> Text -> Value -> BotM ()
+handleRawBlockAction envelopeIdentifier actionId blockActionRaw
+  | actionId == unActionId Fixtures.reportButtonActionId =
+    decodeAndProcess actionId envelopeIdentifier B.processReportButtonToggled blockActionRaw
+  | otherwise =
+    logWarn [int||Unrecognized BlockAction identifier #{actionId}|]
+
+handleRawInteractive :: Text -> Text -> Value -> BotM ()
+handleRawInteractive envelopeIdentifier interactiveType interactiveRaw
+  | interactiveType == "message_action" =
+    decodeAndProcess interactiveType envelopeIdentifier I.processInteractive interactiveRaw
+  | interactiveType == "view_submission" =
+    decodeAndProcess interactiveType envelopeIdentifier I.processViewSubmission interactiveRaw
+  | otherwise =
+    logWarn [int||Unrecognized Interactive event type #{interactiveType}|]
 
 decodeAndProcess :: FromJSON a => Text -> Text -> (a -> BotM b) -> Value -> BotM ()
 decodeAndProcess interactiveType envelopeIdentifier processFunc raw = do

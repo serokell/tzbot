@@ -79,6 +79,12 @@ inverseHelpUsageChance: 15
 # Envvar: #{CT.logLevelEnv}
 #
 logLevel: Info
+
+
+# Port on which to run (server mode only).
+# Envvar : #{CT.serverPortEnv}
+#
+port: 8912
   |]
 
 -- This prevents Config.Default.defaultConfigText to be incorrect on compiling.
