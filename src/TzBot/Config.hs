@@ -30,7 +30,8 @@ import TzBot.Config.Default (defaultConfigTrick)
 import TzBot.Config.Types as Types
   (AppLevelToken(..), BotToken(..), Config(..), ConfigField, ConfigStage(..), Env, EnvVarName,
   FieldName, appTokenEnv, botTokenEnv, cacheConvMembersEnv, cacheReportDialogEnv, cacheUsersEnv,
-  feedbackChannelEnv, feedbackFileEnv, inverseHelpUsageChanceEnv, logLevelEnv, maxRetriesEnv)
+  feedbackChannelEnv, feedbackFileEnv, inverseHelpUsageChanceEnv, logLevelEnv, maxRetriesEnv,
+  serverPortEnv, signingKeyEnv)
 import TzBot.Instances ()
 
 data LoadConfigError
@@ -112,6 +113,8 @@ readConfigWithEnv env mbPath =
   cCacheReportDialog        <- fetchOptional cacheReportDialogEnv cCacheReportDialog
   cInverseHelpUsageChance   <- fetchOptional inverseHelpUsageChanceEnv cInverseHelpUsageChance
   cLogLevel                 <- fetchOptional logLevelEnv          cLogLevel
+  cPort                     <- fetchOptional serverPortEnv        cPort
+  cSigningKey               <- fetchRequired "signingKey" signingKeyEnv cSigningKey
   pure Config {..}
   where
     handleFunc :: Y.ParseException -> IO (Either [LoadConfigError] $ Config 'CSFinal)

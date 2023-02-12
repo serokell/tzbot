@@ -29,6 +29,7 @@ library:
   - case-insensitive
   - clock
   - containers
+  - cryptonite
   - directory
   - fmt
   - deriving-aeson
@@ -37,6 +38,7 @@ library:
   - formatting
   - guid
   - glider-nlp
+  - http-api-data
   - http-client
   - http-client-tls
   - http-types
@@ -45,10 +47,12 @@ library:
   - lens-aeson
   - managed
   - megaparsec
+  - memory
   - nyan-interpolation
   - o-clock
   - random
   - optparse-applicative
+  - servant
   - servant-auth
   - servant-auth-client
   - servant-client
@@ -69,6 +73,8 @@ library:
   - validation
   - yaml
   - utf8-string
+  - wai
+  - warp
 
 executables:
   tzbot-exe:

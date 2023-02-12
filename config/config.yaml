@@ -60,3 +60,14 @@ inverseHelpUsageChance: 15
 # Envvar: SLACK_TZ_LOG_LEVEL
 #
 logLevel: Info
+
+
+# Port on which to run (server mode only).
+# Envvar: SLACK_TZ_PORT
+#
+port: 8912
+
+# Signing key used to verify Slack signatures (server mode only).
+# Envvar: SLACK_TZ_SIGNING_SECRET
+#
+# signingKey: 12345qwerty

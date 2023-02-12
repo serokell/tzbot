@@ -79,6 +79,17 @@ inverseHelpUsageChance: 15
 # Envvar: #{CT.logLevelEnv}
 #
 logLevel: Info
+
+
+# Port on which to run (server mode only).
+# Envvar: #{CT.serverPortEnv}
+#
+port: 8912
+
+# Signing key used to verify Slack signatures (server mode only).
+# Envvar: #{CT.signingKeyEnv}
+#
+# signingKey: 12345qwerty
   |]
 
 -- This prevents Config.Default.defaultConfigText to be incorrect on compiling.

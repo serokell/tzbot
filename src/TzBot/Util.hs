@@ -23,11 +23,13 @@ import Data.Yaml qualified as Y
 import GHC.Generics
 import GHC.IO (unsafePerformIO)
 import Language.Haskell.TH
+import Servant (QueryParam', Required)
 import System.Clock (TimeSpec, fromNanoSecs, toNanoSecs)
 import System.Environment (lookupEnv)
 import System.Random (randomRIO)
 import Text.Interpolation.Nyan (int, rmode')
 import Time (KnownDivRat, Nanosecond, Time, floorRat, ns, toUnit)
+import Web.FormUrlEncoded qualified as Form
 
 attach :: (Functor f) => (a -> b) -> f a -> f (a, b)
 attach f = fmap (\x -> (x, f x))
@@ -80,9 +82,17 @@ x +- y = (x - y, x + y)
 decodeMaybe :: FromJSON a => Value -> Maybe a
 decodeMaybe = parseMaybe parseJSON
 
+defaultRecordFieldModifier :: String -> String
+defaultRecordFieldModifier = camelTo2 '_' . dropWhile isLower
+
+defaultFromFormOptions :: Form.FormOptions
+defaultFromFormOptions = Form.defaultFormOptions
+  { Form.fieldLabelModifier = defaultRecordFieldModifier
+  }
+
 defaultRecordOptions :: Options
 defaultRecordOptions = defaultOptions
-  { fieldLabelModifier = camelTo2 '_' . dropWhile isLower
+  { fieldLabelModifier = defaultRecordFieldModifier
   , omitNothingFields = True
   }
 
@@ -175,3 +185,8 @@ postfixFields = lensRules & lensField .~ mappingNamer (\n -> [n ++ "L"])
 
 whenT :: (Applicative m) => Bool -> m Bool -> m Bool
 whenT cond_ action_ = if cond_ then action_ else pure False
+
+----------------------------------------------------------------------------
+---- servant
+----------------------------------------------------------------------------
+type MandatoryParam = QueryParam' '[Required, Strict]

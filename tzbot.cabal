@@ -25,6 +25,11 @@ source-repository head
 library
   exposed-modules:
       TzBot.BotMain
+      TzBot.BotMain.Common
+      TzBot.BotMain.Server
+      TzBot.BotMain.Server.Extractors
+      TzBot.BotMain.Server.Verification
+      TzBot.BotMain.SocketMode
       TzBot.Cache
       TzBot.Config
       TzBot.Config.Default
@@ -122,6 +127,7 @@ library
     , case-insensitive
     , clock
     , containers
+    , cryptonite
     , deriving-aeson
     , directory
     , dlist
@@ -129,6 +135,7 @@ library
     , formatting
     , glider-nlp
     , guid
+    , http-api-data
     , http-client
     , http-client-tls
     , http-types
@@ -137,10 +144,12 @@ library
     , lens-aeson
     , managed
     , megaparsec
+    , memory
     , nyan-interpolation
     , o-clock
     , optparse-applicative
     , random
+    , servant
     , servant-auth
     , servant-auth-client
     , servant-client
@@ -160,6 +169,8 @@ library
     , unordered-containers
     , utf8-string
     , validation
+    , wai
+    , warp
     , yaml
   default-language: Haskell2010
 

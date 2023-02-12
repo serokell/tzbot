@@ -6,29 +6,16 @@ module TzBot.BotMain where
 
 import Universum
 
-import Control.Monad.Managed (managed, runManaged)
 import Data.ByteString qualified as BS
-import Network.HTTP.Client (newManager)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Options.Applicative (execParser)
-import Slacker
-  (defaultSlackConfig, handleThreadExceptionSensibly, runSocketMode, setApiToken, setAppToken,
-  setGracefulShutdownHandler, setOnException)
 import System.Directory (doesFileExist)
 import Text.Interpolation.Nyan (int, rmode')
-import Time (hour)
 
-import TzBot.Cache
-  (TzCacheSettings(tcsExpiryRandomAmplitudeFraction), defaultTzCacheSettings, withTzCache,
-  withTzCacheDefault)
-import TzBot.Config
+import TzBot.BotMain.Server (runServer)
+import TzBot.BotMain.Server.Verification (runVerificationServer)
+import TzBot.BotMain.SocketMode (runSocketMode)
 import TzBot.Config.Default (defaultConfigText)
-import TzBot.Config.Types (BotConfig)
-import TzBot.Logger
 import TzBot.Options
-import TzBot.ProcessEvents (handler)
-import TzBot.RunMonad
-import TzBot.Util (withMaybe)
 
 {- |
 Usage:
@@ -43,7 +30,11 @@ main = do
   cliOptions <- execParser totalParser
   case cliOptions of
     DumpConfig dumpOpts -> dumpConfig dumpOpts
-    DefaultCommand op -> run op
+    RunSocketMode opts -> runSocketMode opts
+    RunServer opts ->
+      if rsoVerification opts
+      then runVerificationServer opts
+      else runServer opts
 
 dumpConfig :: DumpOptions -> IO ()
 dumpConfig = \case
@@ -57,51 +48,3 @@ dumpConfig = \case
       (hPutStrLn @Text stderr [int||File #{path} already exists, \
                                 use --force to overwrite|] >> exitFailure)
       writeAction
-
-run :: Options -> IO ()
-run opts = do
-  let mbConfigFilePath = oConfigFile opts
-  bsConfig@Config {..} <- readConfig mbConfigFilePath
-  runManaged $ do
-
-    let fifteenPercentAmplitudeSettings = defaultTzCacheSettings
-          { tcsExpiryRandomAmplitudeFraction = Just 0.15
-          }
-
-    gracefulShutdownContainer <- liftIO $ newIORef $ (pure () :: IO ())
-    let extractShutdownFunction :: IO () -> IO ()
-        extractShutdownFunction = writeIORef gracefulShutdownContainer
-    let sCfg = defaultSlackConfig
-              & setApiToken (unBotToken cBotToken)
-              & setAppToken (unAppLevelToken cAppToken)
-              & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
-              & setGracefulShutdownHandler extractShutdownFunction
-
-    bsManager <- liftIO $ newManager tlsManagerSettings
-    bsFeedbackConfig <-
-      managed $ withFeedbackConfig bsConfig
-    bsUserInfoCache <-
-      managed $ withTzCache fifteenPercentAmplitudeSettings cCacheUsersInfo
-    bsConversationMembersCache <-
-      managed $ withTzCache fifteenPercentAmplitudeSettings cCacheConversationMembers
-    let defaultMessageInfoCachingTime = hour 1
-    bsMessageCache <-
-      managed $ withTzCacheDefault defaultMessageInfoCachingTime
-    bsMessageLinkCache <-
-      managed $ withTzCacheDefault defaultMessageInfoCachingTime
-    bsReportEntries <-
-      managed $ withTzCacheDefault cCacheReportDialog
-    -- auto-acknowledge received messages
-    (bsLogNamespace, bsLogContext, bsLogEnv) <- managed $ withLogger cLogLevel
-    liftIO $ runSocketMode sCfg $ handler gracefulShutdownContainer BotState {..}
-
-withFeedbackConfig :: BotConfig -> (FeedbackConfig -> IO a) -> IO a
-withFeedbackConfig Config {..} action = do
-  let fcFeedbackChannel = cFeedbackChannel
-  withFeedbackFile cFeedbackFile $ \fcFeedbackFile ->
-    action FeedbackConfig {..}
-  where
-    withFeedbackFile :: Maybe FilePath -> (Maybe Handle -> IO a) -> IO a
-    withFeedbackFile mbPath action =
-      withMaybe mbPath (action Nothing) $ \path ->
-        withFile path AppendMode (action . Just)
