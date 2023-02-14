@@ -84,16 +84,15 @@ Hello!
 
 I am *tzbot* - the time zone bot.
 
-I can capture time references inside messages and translate them to your
-time zone.
-Whenever the message is posted in the channel I'm in, if this
-message contains any time references, I will translate them and send it
-to you via an ephemeral message. If a time reference is invalid for some
-reason, I will say what's wrong with it.
+Invite me to a channel and whenever a message with time references such as
+"Let's meet at 10am" is posted, I will convert them to your time zone.
+If a time reference is invalid for some reason, I will tell you why and how
+to fix it.
 
-Also you can trigger the message translation yourself,
-by using entrypoints in the Slack message context menu; this works
-in every channel of the workspace (including direct messages).
-There you also can report the bot working wrongly,
-we will be very grateful for your feedback!
+You can also manually ask me to translate time references by opening the
+context menu `⋮` next to a message and selecting "Translate time refs".
+This works in all channels of the workspace, including direct messages.
+
+Finally, you can select "Report an issue" from the context menu `⋮` to
+report any issue with the bot. Your feedback is greatly appreciated!
 |]
