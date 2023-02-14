@@ -48,6 +48,7 @@ configLoadingSpec =
             , (cacheReportDialogEnv, "3m")
             , (inverseHelpUsageChanceEnv, "15")
             , (logLevelEnv, "Info")
+            , (serverPortEnv, "8912")
             ]
       eithConfig <- readConfigWithEnv env (Just "config/nonexistent.yaml")
       eithConfig `shouldSatisfy` isRight

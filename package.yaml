@@ -37,6 +37,7 @@ library:
   - formatting
   - guid
   - glider-nlp
+  - http-api-data
   - http-client
   - http-client-tls
   - http-types
@@ -49,6 +50,7 @@ library:
   - o-clock
   - random
   - optparse-applicative
+  - servant
   - servant-auth
   - servant-auth-client
   - servant-client
@@ -69,6 +71,7 @@ library:
   - validation
   - yaml
   - utf8-string
+  - warp
 
 executables:
   tzbot-exe:

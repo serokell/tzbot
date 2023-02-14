@@ -7,17 +7,24 @@ module TzBot.Options where
 import Universum
 
 import Options.Applicative
+import Text.Interpolation.Nyan (int)
 
 data Command
-  = DefaultCommand Options
+  = RunServer RunServerOptions
+  | RunSocketMode RunSocketModeOptions
   | DumpConfig DumpOptions
 
 data DumpOptions
   = DOStdOut
   | DOFile FilePath Bool
 
-data Options = Options
-  { oConfigFile :: Maybe FilePath
+data RunServerOptions = RunServerOptions
+  { rsoConfigFile   :: Maybe FilePath
+  , rsoVerification :: Bool
+  }
+
+newtype RunSocketModeOptions = RunSocketModeOptions
+  { rsmoConfigFile   :: Maybe FilePath
   }
 
 totalParser :: ParserInfo Command
@@ -25,20 +32,26 @@ totalParser = info (commandParserWithDefault <**> helper) $
   mconcat
   [ fullDesc
   , progDesc
-      "Perform time references translation on new messages post to \
-       \Slack conversations or on direct user triggers."
+    [int|n|
+      Perform time references translation on new messages post to
+      Slack conversations or on direct user triggers.
+      |]
   , header "Slack timezone bot"
   , footer configAndEnvironmentNote
   ]
 
+----------------------------------------------------------------------------
+---- Commands
+----------------------------------------------------------------------------
 commandParserWithDefault :: Parser Command
 commandParserWithDefault = asum
-  [ commandParser
-  , DefaultCommand <$> optionsParser
+  [ dumpCommandParser
+  , runServerCommandParser
+  , runSocketModeParser
   ]
 
-commandParser :: Parser Command
-commandParser = hsubparser $
+dumpCommandParser :: Parser Command
+dumpCommandParser = hsubparser $
   command "dump-config" $
     info (DumpConfig <$> dumpOptionsParser) (progDesc "Dump default config")
 
@@ -51,16 +64,42 @@ dumpOptionsParser = asum [stdoutParser, dumpFileParser]
     fileOption = (long "file" <> short 'f' <> metavar "FILEPATH" <> help "Dump to file FILEPATH")
     forceOption = switch (long "force" <> help "Whether to overwrite existing file")
 
-optionsParser :: Parser Options
-optionsParser = Options <$> do
-  optional $
-    strOption
-      (long "config" <> short 'c' <> metavar "FILEPATH" <> help "Load configuration from FILEPATH")
+runServerCommandParser :: Parser Command
+runServerCommandParser = hsubparser $
+  command "server" $
+    info (RunServer <$> runServerOptionsParser) (progDesc "Run the bot as a server")
 
+runServerOptionsParser :: Parser RunServerOptions
+runServerOptionsParser = do
+  rsoConfigFile <- optional configOptionParser
+  rsoVerification <- switch (long "verification" <> help "Run server in the verification mode")
+  pure RunServerOptions {..}
+
+runSocketModeParser :: Parser Command
+runSocketModeParser = hsubparser $
+  command "socket-mode" $
+    info (RunSocketMode <$> runSocketModeOptionsParser) (progDesc "Run the bot in the socket mode")
+
+runSocketModeOptionsParser :: Parser RunSocketModeOptions
+runSocketModeOptionsParser = RunSocketModeOptions <$> optional configOptionParser
+
+----------------------------------------------------------------------------
+---- Common
+----------------------------------------------------------------------------
+configOptionParser :: Parser FilePath
+configOptionParser = strOption
+  (long "config" <> short 'c' <> metavar "FILEPATH"
+    <> help "Load configuration from FILEPATH")
+
+----------------------------------------------------------------------------
+---- Footer
+----------------------------------------------------------------------------
 configAndEnvironmentNote :: String
 configAndEnvironmentNote =
-  "Configuration parameters can be also specified using environment\
-  \ variables, for details run `tzbot dump-config -f <filepath>` and\
-  \ see the config fields descriptions. If all the parameters are contained\
-  \ by either envvars or the default config, the additional config file is\
-  \ not required."
+  [int|n|
+    Configuration parameters can be also specified using environment
+    variables, for details run `tzbot dump-config -f <filepath>` and
+    see the config fields descriptions. If all the parameters are contained
+    by either envvars or the default config, the additional config file is
+    not required.
+    |]

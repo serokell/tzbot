@@ -60,3 +60,9 @@ inverseHelpUsageChance: 15
 # Envvar: SLACK_TZ_LOG_LEVEL
 #
 logLevel: Info
+
+
+# Port on which to run (server mode only).
+# Envvar : SLACK_TZ_PORT
+#
+port: 8912

@@ -45,7 +45,7 @@ appTokenEnv, botTokenEnv, maxRetriesEnv,
   cacheUsersEnv, cacheConvMembersEnv,
   feedbackChannelEnv, feedbackFileEnv,
   cacheReportDialogEnv, inverseHelpUsageChanceEnv,
-  logLevelEnv :: EnvVarName
+  logLevelEnv, serverPortEnv :: EnvVarName
 appTokenEnv = "SLACK_TZ_APP_TOKEN"
 botTokenEnv = "SLACK_TZ_BOT_TOKEN"
 maxRetriesEnv = "SLACK_TZ_MAX_RETRIES"
@@ -56,6 +56,7 @@ feedbackFileEnv = "SLACK_TZ_FEEDBACK_FILE"
 cacheReportDialogEnv = "SLACK_TZ_CACHE_REPORT_DIALOG"
 inverseHelpUsageChanceEnv = "SLACK_TZ_INVERSE_HELP_USAGE_CHANCE"
 logLevelEnv = "SLACK_TZ_LOG_LEVEL"
+serverPortEnv = "SLACK_TZ_PORT"
 
 -- | Overall config.
 data Config f = Config
@@ -80,6 +81,8 @@ data Config f = Config
     -- to the ephemeral message.
   , cLogLevel                 :: Severity
     -- ^ Log level.
+  , cPort                     :: Int
+    -- ^ Port on which to run (server mode only).
   } deriving stock (Generic)
 
 deriving stock instance Eq (Config 'CSInterm)

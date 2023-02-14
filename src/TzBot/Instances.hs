@@ -16,7 +16,13 @@ import Data.Time.Zones.All (TZLabel, toTZName)
 import Data.Time.Zones.All qualified as TZ
 import Formatting.Buildable (Buildable(..))
 import Glider.NLP.Tokenizer (Token(..))
+import Slacker (SlashCommand)
 import Time (KnownRatName, Time, unitsF, unitsP)
+import Web.FormUrlEncoded (FromForm(..), genericFromForm)
+
+import Servant (FromHttpApiData)
+import Servant.API (FromHttpApiData(..))
+import TzBot.Util (decodeText, defaultFromFormOptions)
 
 instance Buildable TZLabel where
   build = build . T.decodeUtf8 . toTZName
@@ -40,3 +46,9 @@ instance KnownRatName unit => ToJSON (Time unit) where
   toJSON = String . fromString . unitsF
 
 deriving stock instance Ord Token
+
+instance FromForm SlashCommand where
+  fromForm = genericFromForm defaultFromFormOptions
+
+instance FromHttpApiData Value where
+  parseUrlPiece t = maybe (Left "invalid JSON value") Right $ decodeText t
