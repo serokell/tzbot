@@ -15,6 +15,7 @@ import Slacker
   (defaultSlackConfig, handleThreadExceptionSensibly, runSocketMode, setApiToken, setAppToken,
   setGracefulShutdownHandler, setOnException)
 import System.Directory (doesFileExist)
+import System.IO (BufferMode(..), hSetBuffering)
 import Text.Interpolation.Nyan (int, rmode')
 import Time (hour)
 
@@ -104,4 +105,7 @@ withFeedbackConfig Config {..} action = do
     withFeedbackFile :: Maybe FilePath -> (Maybe Handle -> IO a) -> IO a
     withFeedbackFile mbPath action =
       withMaybe mbPath (action Nothing) $ \path ->
-        withFile path AppendMode (action . Just)
+        withFile path AppendMode \handle -> do
+          -- Use `LineBuffering` so that feedback is flushed to the file immediately.
+          hSetBuffering handle LineBuffering
+          action $ Just handle
