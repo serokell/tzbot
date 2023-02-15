@@ -39,7 +39,7 @@ data MessageDetails
   deriving stock (Eq, Show, Generic)
 
 instance FromJSON MessageEvent where
-  parseJSON = withObject "" $ \o -> do
+  parseJSON = withObject "MessageEvent" $ \o -> do
     meChannel <- o .: "channel"
     meChannelType <- o .:? "channel_type"
     meTs <- fetchSlackTimestamp "ts" o
