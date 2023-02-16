@@ -8,7 +8,6 @@ import Universum hiding (last, try)
 
 import Control.Lens (LensRules, lensField, lensRules, mappingNamer)
 import Data.Aeson
-import Data.Aeson qualified as AeKey
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Key qualified as AeKey
@@ -21,10 +20,8 @@ import Data.String.Conversions (cs)
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeM)
 import Data.Yaml qualified as Y
 import GHC.Generics
-import GHC.IO (unsafePerformIO)
 import Language.Haskell.TH
 import System.Clock (TimeSpec, fromNanoSecs, toNanoSecs)
-import System.Environment (lookupEnv)
 import System.Random (randomRIO)
 import Text.Interpolation.Nyan (int, rmode')
 import Time (KnownDivRat, Nanosecond, Time, floorRat, ns, toUnit)
@@ -139,13 +136,6 @@ neConcatMap func ns = foldr1 (<>) $ fmap func ns
 >>> neConcatMap (\x -> x :| [x + 1]) $ 1 :| [2,3]
 1 :| [2,2,3,3,4]
  -}
-
-----
-{-# NOINLINE isDevEnvironment #-}
-isDevEnvironment :: Bool
-isDevEnvironment = unsafePerformIO $ do
-  env <- lookupEnv "SLACK_TZ_DEVENV"
-  pure $ env == Just "true"
 
 ----
 stripPrefixIfPresent :: Eq a => [a] -> [a] -> [a]

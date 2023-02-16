@@ -26,7 +26,7 @@ import TzBot.Slack.API
 import TzBot.Slack.Events
 import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.TimeReference (TimeReference(..))
-import TzBot.Util (isDevEnvironment, whenT, withMaybe)
+import TzBot.Util (whenT, withMaybe)
 
 data MessageEventType = METMessage | METMessageEdited
   deriving stock (Eq)
@@ -108,8 +108,7 @@ processMessageEvent' evt mEventType sender timeRefs =
   mbThreadId = mThreadId msg
 
   notBot u = not (uIsBot u)
-  notSameTimeZone u = uTz u /= uTz sender
-  notBotAndSameTimeZone u = notBot u && notSameTimeZone u
+  isSender userId = uId sender == userId
 
   getWhetherToShowHelpCmd :: BotM Bool
   getWhetherToShowHelpCmd = do
@@ -179,22 +178,20 @@ processMessageEvent' evt mEventType sender timeRefs =
 
   handleChannelMessageCommon :: Maybe Text -> NonEmpty TimeReference -> BotM ()
   handleChannelMessageCommon mbPermalink neTimeRefs = do
-    let ephemeralTemplate = renderTemplate now sender neTimeRefs
-    whenJust (renderErrorsForSenderTP ephemeralTemplate) $ \errorsMsg -> do
-      logInfo
-        [int|n|
-          Found invalid time references,
-          sending an ephemeral with them to the message sender
-          |]
-      sendAction mbPermalink asForSenderS errorsMsg (uId sender)
+    let ephemeralTemplate = renderTemplate asForMessageM now sender neTimeRefs
 
     let sendActionLocal userInChannelId = do
           userInChannel <- getUserCached userInChannelId
-          whenT (isDevEnvironment || notBotAndSameTimeZone userInChannel) do
-            let ephemeralMessage =
-                  renderAllForOthersTP userInChannel ephemeralTemplate
-            sendAction mbPermalink asForOthersS ephemeralMessage (uId userInChannel)
-            pure True
+          whenT (notBot userInChannel) do
+            let mbEphemeralMessage =
+                  renderAllTP userInChannel ephemeralTemplate
+            let senderFlag =
+                  if isSender $ uId userInChannel
+                  then asForSenderS
+                  else asForOthersS
+            withMaybe mbEphemeralMessage (pure False) \eph -> do
+              sendAction mbPermalink senderFlag eph (uId userInChannel)
+              pure True
     ephemeralsMailing channelId sendActionLocal
 
   handleDirectMessage :: BotM ()
@@ -209,15 +206,20 @@ processMessageEvent' evt mEventType sender timeRefs =
     -- to translate some time references and we send the translation
     -- only to him, showing it in the way how other users would see
     -- it if it were sent to the common channel.
-      let ephemeralTemplate = renderTemplate now sender neTimeRefs
-      let ephemeralMessage = renderAllForOthersTP sender ephemeralTemplate
-      logInfo [int||
-        Received message from the DM, sending translation to the author|]
-      sendAction Nothing asForOthersS ephemeralMessage (uId sender)
+      let mbEphemeralMessage = renderAllTP sender $
+            renderTemplate asForModalM now sender neTimeRefs
+      whenJust mbEphemeralMessage $ \eph -> do
+        logInfo [int||
+          Received message from the DM, sending translation to the author
+          |]
+        sendAction Nothing asForOthersS eph (uId sender)
 
 ephemeralsMailing
   :: ChannelId
   -> (UserId -> BotM Bool)
+  -- ^ This function should return `True` if message was sent successfully and `False`
+  -- if message shouldn't be sent (e.g. for bots or to sender in some cases). This is
+  -- then used for logging statistics
   -> BotM ()
 ephemeralsMailing channelId sendAction = do
   usersInChannelIds <- getChannelMembersCached channelId
