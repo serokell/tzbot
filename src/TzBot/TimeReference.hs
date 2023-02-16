@@ -95,7 +95,7 @@ timeReferenceToUTC
   -> UTCTime -- ^ The time at which the message was sent.
   -> TimeReference -- ^ A time reference to translate to UTC.
   -> TimeReferenceToUTCResult
-timeReferenceToUTC sendersTZLabel eventTimestamp timeRef@TimeReference {..} =
+timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
   case eithTzInfo of
     Left abbrev -> TRTUInvalidTimeZoneAbbrev abbrev
     Right tzInfo -> do
@@ -104,23 +104,21 @@ timeReferenceToUTC sendersTZLabel eventTimestamp timeRef@TimeReference {..} =
             dayTransition >>> TZT.atTimeOfDay trTimeOfDay
             )
       case eithRefTime of
-        Left err -> do
-          case getTzLabelMaybe sendersTZLabel timeRef of
-            Nothing -> error "impossible happened: got TZError for a static offset"
-            Just refTzLabel -> tzErrorToResult refTzLabel err
+        Left err -> tzErrorToResult err
         Right refTime -> TRTUSuccess $ TimeRefSuccess
             { trsUtcResult = TZT.toUTC refTime
             , trsTzInfo = tzInfo
             , trsOriginalDate = localDay $ TZT.tzTimeLocalTime refTime
             }
   where
-  tzErrorToResult :: TZLabel -> TZT.TZError -> TimeReferenceToUTCResult
-  tzErrorToResult tzLabel = \case
-    TZT.TZOverlap invalidTime _ _ -> TRTUAmbiguous $
-      TimeShiftErrorInfo tzLabel (localDay invalidTime)
-    TZT.TZGap invalidTime _ _ -> TRTUInvalid $
-      TimeShiftErrorInfo tzLabel (localDay invalidTime)
-
+  tzErrorToResult :: TZT.TZError -> TimeReferenceToUTCResult
+  tzErrorToResult = \case
+    TZT.TZOverlap invalidTime first_ second_ -> TRTUAmbiguous $
+      OverlapInfo first_ second_ $
+        TimeShiftErrorInfo (localDay invalidTime)
+    TZT.TZGap invalidTime first_ second_ -> TRTUInvalid $
+      GapInfo first_ second_ $
+        TimeShiftErrorInfo (localDay invalidTime)
   -- This doesn't include setting time, only date changes
   dayTransition :: LocalTime -> LocalTime
   dayTransition eventLocalTime = case trDateRef of
@@ -210,21 +208,42 @@ data TimeRefSuccess = TimeRefSuccess
     -- or in the sender's current timezone otherwise.
   } deriving stock (Eq, Show)
 
-data TimeShiftErrorInfo = TimeShiftErrorInfo
-  { tseiRefTimeZone :: TZLabel
-    -- ^ Timezone label associated with original time reference.
-  , tseiOriginalDate :: Day
+newtype TimeShiftErrorInfo = TimeShiftErrorInfo
+  { tseiOriginalDate :: Day
     -- ^ The day that was originally mentioned by the sender
     -- in specified or implicit sender's timezone.
   } deriving stock (Eq, Show)
 
+-- | Result of converting `LocalTime` that can be possible
+-- with two different offsets.
+data OverlapInfo = OverlapInfo
+  { oiFirstOccurrence :: TZT.TZTime
+    -- ^ Instance with the earlier offset.
+  , oiSecondOccurrence :: TZT.TZTime
+    -- ^ Instance with the later offset.
+  , oiErrorInfo :: TimeShiftErrorInfo
+  } deriving stock (Eq, Show)
+
+data GapInfo = GapInfo
+  { giPreviousTime :: TZT.TZTime
+  -- ^ The local time specified by the user shifted backward by the length of the gap.
+  -- E.g., if they said "2:30am" but the clocks were turned forward 1 hour at 2am (such that 2:30am did not occur),
+  -- then this field would be 2:30am - 1 hour = 1:30am.
+  , giNextTime :: TZT.TZTime
+  -- ^ The local time specified by the user shifted forward by the length of the gap.
+  -- E.g., if they said "2:30am" but the clocks were turned forward 1 hour at 2am (such that 2:30am did not occur),
+  -- then this field would be 2:30am + 1 hour = 3:30am.
+  , giErrorInfo :: TimeShiftErrorInfo
+  } deriving stock (Show, Generic, Eq)
+
+
 data TimeReferenceToUTCResult
   = TRTUSuccess TimeRefSuccess
     -- ^ Conversion succeeded.
-  | TRTUAmbiguous TimeShiftErrorInfo
+  | TRTUAmbiguous OverlapInfo
   -- ^ The time reference was ambiguous (e.g. due to a time ocurring twice in the same timezone during DST changes).
   -- See [Edge cases & pitfalls](https://github.com/serokell/tzbot/blob/main/docs/pitfalls.md#ambiguous-times).
-  | TRTUInvalid TimeShiftErrorInfo
+  | TRTUInvalid GapInfo
   -- ^ The time reference was invalid (e.g. due to a time being skipped in a timezone during DST changes).
   -- See [Edge cases & pitfalls](https://github.com/serokell/tzbot/blob/main/docs/pitfalls.md#invalid-times).
   | TRTUInvalidTimeZoneAbbrev UnknownTimeZoneAbbrev
@@ -236,6 +255,7 @@ data TimeReferenceToUTCResult
 
 data TimeZoneAbbreviationInfo = TimeZoneAbbreviationInfo
   { tzaiAbbreviation :: TimeZoneAbbreviation
-  , tzaiOffsetMinutes :: Offset -- ^ Offset from UTC in minutes.
+  , tzaiOffsetMinutes :: Offset
+    -- ^ Offset from UTC in minutes.
   , tzaiFullName :: Text
   } deriving stock (Eq, Show)

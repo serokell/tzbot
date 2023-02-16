@@ -114,6 +114,46 @@ test_renderSpec = TestGroup "Render"
           "\"10am MSK\", 30 January 2023, Moscow Time (UTC+03:00) "
           "02:00, Monday, 30 January 2023 in America/Havana"
       ]
+    , TestGroup "Overlap"
+      [ testCase "Explicit timezone" $
+        mkChatCase arbitraryTime1 "0:30 in america/havana on the 6th november" userHavana userMoscow
+        [ TranslationPair
+          { tuTimeRef = "\"0:30 in america/havana on the 6th november\""
+          , tuTranslation = "Ambiguous time"
+          , tuNoteForSender = Just "_At 01:00, the clocks are turned backward 1 hour(s) to 00:00 and this particular time occurs twice in America/Havana, first with the offset UTC-04:00 and then with UTC-05:00. Please edit your message or write a new one and specify an offset explicitly._"
+          , tuNoteForOthers = Just "_At 01:00, the clocks are turned backward 1 hour(s) to 00:00 and this particular time occurs twice in America/Havana, first with the offset UTC-04:00 and then with UTC-05:00._"
+          }
+        ]
+      , testCase "Implicit timezone" $
+        mkChatCase arbitraryTime1 "0:30 on the 6th november" userHavana userMoscow
+        [ TranslationPair
+          { tuTimeRef = "\"0:30 on the 6th november\" in America/Havana"
+          , tuTranslation = "Ambiguous time"
+          , tuNoteForSender = Just "_At 01:00, the clocks are turned backward 1 hour(s) to 00:00 and this particular time occurs twice in your timezone (America/Havana), first with the offset UTC-04:00 and then with UTC-05:00. Please edit your message or write a new one and specify an offset explicitly._"
+          , tuNoteForOthers = Just "_At 01:00, the clocks are turned backward 1 hour(s) to 00:00 and this particular time occurs twice in the sender's timezone (America/Havana), first with the offset UTC-04:00 and then with UTC-05:00._"
+          }
+        ]
+      ]
+    , TestGroup "Gap"
+      [ testCase "Explicit timezone" $
+        mkChatCase arbitraryTime1 "0:30 in america/havana on the 12th march" userHavana userMoscow
+        [ TranslationPair
+          { tuTimeRef = "\"0:30 in america/havana on the 12th march\""
+          , tuTranslation = "Invalid time"
+          , tuNoteForSender = Just "_At 00:00, the clocks are turned forward 1 hour(s) to 01:00 and this particular time does not occur in America/Havana. Please edit your message or write a new one and amend the time. Did you mean 23:30 or 01:30 instead?_"
+          , tuNoteForOthers = Just "_At 00:00, the clocks are turned forward 1 hour(s) to 01:00 and this particular time does not occur in America/Havana._"
+          }
+        ]
+      , testCase "Implicit timezone" $
+        mkChatCase arbitraryTime1 "0:30 on the 12th march" userHavana userMoscow
+        [ TranslationPair
+          { tuTimeRef = "\"0:30 on the 12th march\" in America/Havana"
+          , tuTranslation = "Invalid time"
+          , tuNoteForSender = Just "_At 00:00, the clocks are turned forward 1 hour(s) to 01:00 and this particular time does not occur in your timezone (America/Havana). Please edit your message or write a new one and amend the time. Did you mean 23:30 or 01:30 instead?_"
+          , tuNoteForOthers = Just "_At 00:00, the clocks are turned forward 1 hour(s) to 01:00 and this particular time does not occur in the sender's timezone (America/Havana)._"
+          }
+        ]
+      ]
     ]
   , TestGroup "Modal"
     [ testCase "Back to author, same timezone" $

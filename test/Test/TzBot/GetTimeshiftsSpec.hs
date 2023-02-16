@@ -10,7 +10,7 @@ module Test.TzBot.GetTimeshiftsSpec
 import Universum
 
 import Data.Time (UTCTime)
-import Data.Time.TZInfo (TZLabel(..))
+import Data.Time.TZInfo
 import Data.Time.TZInfo qualified as TZI
 import Data.Time.TZTime (toUTC)
 import Data.Time.TZTime.QQ (tz)

@@ -7,6 +7,7 @@
 /.direnv
 .stack-work
 hie.yaml
+stack-hie.yaml*
 .vscode/
 result
 *.txt

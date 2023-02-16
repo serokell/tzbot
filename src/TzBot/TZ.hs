@@ -6,23 +6,24 @@ module TzBot.TZ
   ( TimeShift (..)
   , checkForTimeshifts
   , checkForTimeshifts'
+  , findLastTimeshift
   ) where
 
 import Universum
 
 import Data.Bits (shiftR)
+import Data.List (nub)
 import Data.List qualified
 import Data.Time (TimeZone(TimeZone, timeZoneMinutes), UTCTime, addUTCTime, nominalDay)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
-import Data.Time.TZInfo (TZInfo(..), TZLabel(..))
-import Data.Time.TZInfo qualified as TZI
+import Data.Time.TZInfo as TZI
+import Data.Time.TZTime (TZTime, toUTC, tzTimeTZInfo)
 import Data.Time.Zones (TZ)
 import Data.Time.Zones.Internal (utcTimeToInt64)
 import Data.Time.Zones.Types (TZ(..))
 import Data.Vector qualified as VB
 import Data.Vector.Unboxed qualified as VU
 
-import Data.List (nub)
 import TzBot.TimeReference (DateReference(..), TimeRefSuccess(..), TimeReference(..))
 import TzBot.Util (NamedOffset, Offset(..))
 
@@ -70,6 +71,26 @@ checkForTimeshifts TimeReference{trDateRef} TimeRefSuccess{trsUtcResult, trsTzIn
       nub [trsTzInfo, TZI.fromLabel receiverTzLabel]
         & concatMap \tz -> checkForTimeshifts' tz lowerBound upperBound
 
+-- | Find last timeshift for given `TZTime`.
+-- Note that it should exist, otherwise the function will
+-- throw an error. Use this function on times
+-- contained inside `TZError`, next to the timeshift:
+-- * second occurrence of amgiguous time inside `TZOverlap` constructor;
+-- * invalid time adjusted forward by the length of the gap for `TZGap` constructor.
+findLastTimeshift :: TZTime -> TimeShift
+findLastTimeshift tzt = do
+  let tsTzInfo = tzTimeTZInfo tzt
+      after = utcTimeToInt64 $ toUTC tzt
+  let tz@(TZ trans _ _) = tziRules tsTzInfo
+      ixb = binarySearch trans after
+  if ixb == 0
+  then error "no timeshift found"
+  else do
+    let tsShiftUtc = int64ToUtcTime $ trans VU.! ixb
+        tsBefore = Offset $ timeZoneMinutes $ timeZoneForIx tz (ixb - 1)
+        tsAfter = Offset $ timeZoneMinutes $ timeZoneForIx tz ixb
+    TimeShift {..}
+
 checkForTimeshifts' :: TZInfo -> UTCTime -> UTCTime -> [TimeShift]
 checkForTimeshifts' tzInfo (utcTimeToInt64 -> before) (utcTimeToInt64 -> after)
   | before > after = []
@@ -80,10 +101,10 @@ checkForTimeshifts' tzInfo (utcTimeToInt64 -> before) (utcTimeToInt64 -> after)
       desiredTimeshifts = zip [ixb..] $
         takeWhile (<= after) $ VU.toList startingFromIxb
       timeZones =
-        flip map desiredTimeshifts (\(ix, int64utc) ->
+        map (\(ix, int64utc) ->
           ( int64ToUtcTime int64utc
           , Offset $ timeZoneMinutes $ timeZoneForIx tz ix)
-          )
+          ) desiredTimeshifts
       timeShifts = zip timeZones $ Data.List.tail timeZones
   map (\((_ub, b), (ua, a)) -> TimeShift ua b a tzInfo) timeShifts
 
@@ -108,7 +129,7 @@ binarySearch v t | n == 1    = 0
                  | otherwise = t `seq` go 1 n
   where
     n = VU.length v
-    go !l !u | l >= u = (l - 1)
+    go !l !u | l >= u = l - 1
              | VU.unsafeIndex v k <= t  = go (k+1) u
              | otherwise  = go l k
       where
