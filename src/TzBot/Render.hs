@@ -172,6 +172,9 @@ getOriginalTimeRef :: User -> TimeReference -> Day -> Text
 getOriginalTimeRef sender timeRef originalDay = do
   let mbSenderTimeZone :: Maybe Builder
       mbSenderTimeZone = case trLocationRef timeRef of
+        Just (TimeZoneAbbreviationRef TimeZoneAbbreviationInfo {..}) -> do
+          guard $ not $ tzaiAbbreviation `elem` ["UTC", "GMT"]
+          Just [int||, #{tzaiFullName} (#{tzaiOffsetMinutes}) |]
         Just _ -> Nothing
         Nothing -> Just [int|| in #{uTz sender}|]
       mbShownOriginalDate = case trDateRef timeRef of
