@@ -4,7 +4,7 @@
 
 module TzBot.Render
   ( -- * Types
-    TranslationPair
+    TranslationPair (..)
   , TranslationPairs
   , Template
 
@@ -35,8 +35,7 @@ import Data.Aeson (ToJSON)
 import Data.List.NonEmpty qualified as NE
 import Data.Text.Lazy qualified as T
 import Data.Text.Lazy.Builder (Builder, fromText, singleton, toLazyText)
-import Data.Time.Compat
-  (LocalTime(localDay), UTCTime, defaultTimeLocale, formatTime, pattern YearMonthDay)
+import Data.Time.Compat (Day, UTCTime, defaultTimeLocale, formatTime)
 import Data.Time.TZInfo qualified as TZI
 import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
@@ -133,35 +132,46 @@ renderSlackBlocks forSender =
 
 renderTemplate :: UTCTime -> User -> NE.NonEmpty TimeReference -> Template
 renderTemplate now sender timeRefs =
-  Template $ NE.map (renderEphemeralMessageTranslationPair now sender)
+  Template $ NE.map (renderEphemeralMessageTranslationPair sender)
     $ attach (timeReferenceToUTC (uTz sender) now) timeRefs
+
+renderOnSuccess :: User -> TimeReference -> TimeRefSuccess -> User -> TranslationPair
+renderOnSuccess sender timeRef TimeRefSuccess {..} user = do
+  let userTzLabel = uTz user
+      renderedUserTime = renderUserTime userTzLabel trsUtcResult
+  TranslationPair
+    (getOriginalTimeRef sender timeRef trsOriginalDate)
+    [int||#{renderedUserTime} in #{userTzLabel}|]
+    Nothing
+    Nothing
+
+getOriginalTimeRef :: User -> TimeReference -> Day -> Text
+getOriginalTimeRef sender timeRef originalDay = do
+  let mbSenderTimeZone :: Maybe Builder
+      mbSenderTimeZone = case trLocationRef timeRef of
+        Just _ -> Nothing
+        Nothing -> Just [int|| in #{uTz sender}|]
+      mbShownOriginalDate = case trDateRef timeRef of
+        Just (DayOfMonthRef _ (Just _)) -> Nothing
+        _ -> do
+          let format = ", %d %B %Y"
+          Just $ formatTime defaultTimeLocale format originalDay
+  [int||"#{trText timeRef}"#{mbShownOriginalDate}#{mbSenderTimeZone}|]
 
 -- Under `Left` we collect errors, that should be shown to all users (including sender),
 -- and under `Right` we collect valid time references that should be rendered differently
 -- for each user.
 renderEphemeralMessageTranslationPair
-  :: UTCTime
-  -> User
+  :: User
   -> (TimeReference, TimeReferenceToUTCResult)
   -> EitherTemplateUnit
-renderEphemeralMessageTranslationPair now sender (timeRef, result) = case result of
-  TRTUSuccess (TimeRefSuccess utcTime _offsetInfo) -> do
-    let mbSenderTimeZone =
-          guard (isNothing $ trLocationRef timeRef)
-            $> (uTz sender) :: Maybe TZLabel
-        mbSenderTimeZoneAux = mbSenderTimeZone $> " in " :: Maybe Text
-    Right $ \user -> do
-      let userTzLabel = uTz user
-          renderedUserTime = renderUserTime userTzLabel now utcTime
-      TranslationPair
-        [int||"#{trText timeRef}"#{mbSenderTimeZoneAux}#{mbSenderTimeZone}|]
-        [int||#{renderedUserTime} in #{userTzLabel}|]
-        Nothing
-        Nothing
-  TRTUAmbiguous (TimeShiftErrorInfo implicitSenderTimezone tzLabel) -> do
-    let shownTZ = shownTimezone implicitSenderTimezone tzLabel
+renderEphemeralMessageTranslationPair sender (timeRef, result) = case result of
+  TRTUSuccess timeRefSuc ->
+    Right $ renderOnSuccess sender timeRef timeRefSuc
+  TRTUAmbiguous TimeShiftErrorInfo {..} -> do
+    let shownTZ = shownTimezone tseiIsImplicitSenderTimezone tseiRefTimeZone
     Left $ TranslationPair
-      { tuTimeRef = trText timeRef
+      { tuTimeRef = getOriginalTimeRef sender timeRef tseiOriginalDate
       , tuTranslation = "ambiguous because of the time shift"
       , tuNoteForSender =
         Just [int||_There is a timeshift in #{shownTZ True} around the specified \
@@ -172,10 +182,10 @@ renderEphemeralMessageTranslationPair now sender (timeRef, result) = case result
              time, and this particular timestamp can be possible with \
              different offsets._|]
       }
-  TRTUInvalid (TimeShiftErrorInfo implicitSenderTimezone tzLabel) -> do
-    let shownTZ = shownTimezone implicitSenderTimezone tzLabel
+  TRTUInvalid TimeShiftErrorInfo {..} -> do
+    let shownTZ = shownTimezone tseiIsImplicitSenderTimezone tseiRefTimeZone
     Left $ TranslationPair
-      { tuTimeRef = trText timeRef
+      { tuTimeRef = getOriginalTimeRef sender timeRef tseiOriginalDate
       , tuTranslation = "invalid because of the time shift"
       , tuNoteForSender =
         Just [int||_There is a timeshift in #{shownTZ True} around the specified \
@@ -202,20 +212,11 @@ renderEphemeralMessageTranslationPair now sender (timeRef, result) = case result
           else [int||the sender's timezone (#{tzLabel})|]
       | otherwise = [int||#{tzLabel}|]
 
-renderUserTime :: TZLabel -> UTCTime -> UTCTime -> String
-renderUserTime tzLabel now refTime = do
+renderUserTime :: TZLabel -> UTCTime -> String
+renderUserTime tzLabel refTime = do
   let tzInfo = TZI.fromLabel tzLabel
-      currentUserLocalTime = TZT.tzTimeLocalTime $ TZT.fromUTC tzInfo now
       refUserLocalTime = TZT.tzTimeLocalTime $ TZT.fromUTC tzInfo refTime
-      sameYear = theYearIsTheSame currentUserLocalTime refUserLocalTime
-      yearFormat = if sameYear then "" else ", %Y"
       -- example:
-      -- 18:23, Monday, December 26, 2016
-      format = "%H:%M, %A, %B %d" <> yearFormat
+      -- 18:23, Monday, 26 December 2016
+      format = "%H:%M, %A, %d %B %Y"
   formatTime defaultTimeLocale format refUserLocalTime
-
-theYearIsTheSame :: LocalTime -> LocalTime -> Bool
-theYearIsTheSame t1 t2 = do
-  let YearMonthDay y1 _ _ = localDay t1
-  let YearMonthDay y2 _ _ = localDay t2
-  y1 == y2

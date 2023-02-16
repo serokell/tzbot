@@ -173,7 +173,7 @@ instance (KnownSymbol key, FromJSON a) => FromJSON (SlackContents key a) where
 
 newtype UserId = UserId { unUserId :: Text }
   deriving stock (Eq, Ord, Show)
-  deriving newtype (ToHttpApiData, FromJSON, ToJSON, Hashable, Buildable)
+  deriving newtype (ToHttpApiData, FromJSON, ToJSON, Hashable, Buildable, IsString)
 
 newtype ChannelId = ChannelId { unChannelId :: Text }
   deriving stock (Eq, Show)
