@@ -11,3 +11,6 @@ stack-hie.yaml*
 .vscode/
 result
 *.txt
+stack-hie.yaml
+stack-hie.yaml.lock
+feedback.log

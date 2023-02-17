@@ -19,8 +19,8 @@ import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Text.Interpolation.Nyan
 
 import TzBot.Parser (parseTimeRefs)
-import TzBot.TZ (TimeShift(..), checkForTimeshifts, checkForTimeshifts')
 import TzBot.TimeReference (TimeReferenceToUTCResult(..), timeReferenceToUTC)
+import TzBot.TZ (TimeShift(..), checkForTimeshifts, checkForTimeshifts')
 import TzBot.Util
 
 springHavana2022utc, autumnHavana2022utc, springHavana2023utc :: UTCTime

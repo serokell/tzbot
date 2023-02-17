@@ -25,7 +25,7 @@ import TzBot.Slack
 import TzBot.Slack.API
 import TzBot.Slack.Events
 import TzBot.Slack.Fixtures qualified as Fixtures
-import TzBot.TimeReference (TimeReference(..))
+import TzBot.TimeReference (TimeReference)
 import TzBot.Util (whenT, withMaybe)
 
 data MessageEventType = METMessage | METMessageEdited
