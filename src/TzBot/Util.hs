@@ -165,3 +165,10 @@ postfixFields = lensRules & lensField .~ mappingNamer (\n -> [n ++ "L"])
 
 whenT :: (Applicative m) => Bool -> m Bool -> m Bool
 whenT cond_ action_ = if cond_ then action_ else pure False
+
+whenJustFunc :: Maybe b -> (b -> a -> a) -> a -> a
+whenJustFunc Nothing _f = id
+whenJustFunc (Just b) f = f b
+
+whenFunc :: Bool -> (a -> a) -> a -> a
+whenFunc b f = if b then f else id
