@@ -33,14 +33,44 @@ We use this type alias to make this distinction a bit more clear.
 -}
 type TimeReferenceText = Text
 
+-- | Datatype for keeping value together with its parsed text (as a sequence of tokens)
+data Matched a = Matched
+  { mtText :: Text
+    -- ^ Consumed text
+  , mtValue :: a
+    -- ^ Parsed value
+  } deriving stock (Show, Eq, Generic, Functor, Foldable, Traversable)
+
+-- TODO: use lenses
+modifyText :: (Text -> Text) -> Matched a -> Matched a
+modifyText f Matched {..} = Matched {mtText = f mtText, ..}
+
+type family WhetherMatched f x where
+  WhetherMatched Identity x = x
+  WhetherMatched Matched  x = Matched x
+
 -- | A reference to a point in time, e.g. "tuesday at 10am", "3pm CST on July 7th"
-data TimeReference = TimeReference
+data TimeReferenceGeneric f = TimeReference
   { trText :: TimeReferenceText -- ^ The original section of the text from where this `TimeReference` was parsed.
   , trTimeOfDay :: TimeOfDay
-  , trDateRef :: Maybe DateReference
-  , trLocationRef :: Maybe LocationReference
+  , trDateRef :: Maybe (WhetherMatched f DateReference)
+  , trLocationRef :: Maybe (WhetherMatched f LocationReference)
   }
-  deriving stock (Eq, Show)
+
+deriving stock instance Show TimeReference
+deriving stock instance Eq TimeReference
+deriving stock instance Show TimeReferenceMatched
+deriving stock instance Eq TimeReferenceMatched
+
+type TimeReference = TimeReferenceGeneric Identity
+type TimeReferenceMatched = TimeReferenceGeneric Matched
+
+matchedToPlain :: TimeReferenceMatched -> TimeReference
+matchedToPlain TimeReference {..} = TimeReference
+  { trDateRef = fmap mtValue trDateRef
+  , trLocationRef = fmap mtValue trLocationRef
+  , ..
+  }
 
 getTzLabelMaybe :: TZLabel -> TimeReference -> Maybe TZLabel
 getTzLabelMaybe senderTz timeRef = case trLocationRef timeRef of

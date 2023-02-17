@@ -213,3 +213,10 @@ secondsPerMinute = 60
 
 tztimeOffset :: TZTime -> Offset
 tztimeOffset = Offset . timeZoneMinutes . tzTimeOffset
+
+whenJustFunc :: Maybe b -> (b -> a -> a) -> a -> a
+whenJustFunc Nothing _f = id
+whenJustFunc (Just b) f = f b
+
+whenFunc :: Bool -> (a -> a) -> a -> a
+whenFunc b f = if b then f else id
