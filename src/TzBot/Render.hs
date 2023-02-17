@@ -152,9 +152,9 @@ renderOnSuccess (ModalFlag forModal) sender timeRef TimeRefSuccess {..} user = d
       renderedUserTime = do
         let q = renderUserTime userTzLabel trsUtcResult
         [int||#{q} in #{userTzLabel}|] :: Text
-      mbRenderedUserTime = case trsEithTzOffset of
-        Right _ -> Just renderedUserTime
-        Left refTzLabel ->
+      mbRenderedUserTime = case getTzLabelMaybe (uTz sender) timeRef of
+        Nothing -> Just renderedUserTime
+        Just refTzLabel ->
           if refTzLabel /= userTzLabel
           then Just renderedUserTime
           else do
@@ -196,7 +196,7 @@ renderEphemeralMessageTranslationPair modalFlag sender (timeRef, result) = case 
   TRTUSuccess timeRefSuc ->
     Right $ renderOnSuccess modalFlag sender timeRef timeRefSuc
   TRTUAmbiguous TimeShiftErrorInfo {..} -> do
-    let shownTZ = shownTimezone tseiIsImplicitSenderTimezone tseiRefTimeZone
+    let shownTZ = shownTimezone tseiRefTimeZone
     Left $ TranslationPair
       { tuTimeRef = getOriginalTimeRef sender timeRef tseiOriginalDate
       , tuTranslation = "Ambiguous because of the time shift"
@@ -210,7 +210,7 @@ renderEphemeralMessageTranslationPair modalFlag sender (timeRef, result) = case 
              different offsets._|]
       }
   TRTUInvalid TimeShiftErrorInfo {..} -> do
-    let shownTZ = shownTimezone tseiIsImplicitSenderTimezone tseiRefTimeZone
+    let shownTZ = shownTimezone tseiRefTimeZone
     Left $ TranslationPair
       { tuTimeRef = getOriginalTimeRef sender timeRef tseiOriginalDate
       , tuTranslation = "Invalid because of the time shift"
@@ -236,13 +236,15 @@ renderEphemeralMessageTranslationPair modalFlag sender (timeRef, result) = case 
       mbCandidatesNoteForSender
       Nothing
   where
-    shownTimezone :: Bool -> TZLabel -> Bool -> Builder
-    shownTimezone implicitSenderTimezone tzLabel forSender
+    shownTimezone :: TZLabel -> Bool -> Builder
+    shownTimezone tzLabel forSender
       | implicitSenderTimezone =
           if forSender
           then [int||your timezone (#{tzLabel})|]
           else [int||the sender's timezone (#{tzLabel})|]
       | otherwise = [int||#{tzLabel}|]
+      where
+        implicitSenderTimezone = isNothing $ trLocationRef timeRef
 
 renderUserTime :: TZLabel -> UTCTime -> String
 renderUserTime tzLabel refTime = do
