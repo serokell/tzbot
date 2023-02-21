@@ -5,8 +5,8 @@
 # snapshot used for ./scripts/generate-cabal-files.sh script
 name: stack2cabal-snapshot
 
-resolver: lts-18.23
+resolver: lts-19.23
 packages:
   # the versions must be the same that ci uses, to make sure `stack2cabal` output is identical
-  - hpack-0.34.4
-  - stack2cabal-1.0.12
+  - hpack-0.34.7
+  - stack2cabal-1.0.14

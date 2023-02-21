@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.34.7.
 --
 -- see: https://github.com/sol/hpack
 
@@ -111,7 +111,7 @@ library
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
-  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -Wunused-packages
   build-depends:
       aeson
     , aeson-casing
@@ -220,7 +220,7 @@ executable tzbot-exe
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
-  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -Wunused-packages -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , tzbot
@@ -283,7 +283,7 @@ test-suite doctests
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
-  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -Wunused-packages -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , doctest-parallel
@@ -354,7 +354,7 @@ test-suite tzbot-test
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
-  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-export-lists -Wno-missing-import-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -Wunused-packages -threaded -rtsopts -with-rtsopts=-N
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:
