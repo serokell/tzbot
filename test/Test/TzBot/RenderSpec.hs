@@ -36,7 +36,7 @@ userHavana = User {uId="hav", uIsBot=False, uTz=America__Havana}
 
 test_renderSpec :: TestTree
 test_renderSpec = TestGroup "Render"
-  [ TestGroup "RenderChar"
+  [ TestGroup "RenderChat"
     [ testCase "Implicit sender's timezone" $
       mkChatCase arbitraryTime1 "10am" userMoscow userHavana
       [ translWithoutNotes
@@ -103,6 +103,12 @@ test_renderSpec = TestGroup "Render"
         "Contains unrecognized timezone abbreviation: WETS"
         (Just "_Maybe you meant: WET, WEST_")
         Nothing
+      ]
+    , testCase "Known timezone abbreviation" $
+      mkChatCase arbitraryTime1 "10am MSK" userMoscow userHavana
+      [ translWithoutNotes
+          "\"10am MSK\", 30 January 2023, Moscow Time (UTC+03:00) "
+          "02:00, Monday, 30 January 2023 in America/Havana"
       ]
     ]
   , TestGroup "Modal"

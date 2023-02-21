@@ -16,6 +16,8 @@ import Data.Time.TZInfo qualified as TZI
 import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
 import Formatting (Buildable)
+import Formatting.Buildable (Buildable(..))
+import Text.Printf (printf)
 
 {- | An offset from UTC (e.g. @UTC+01:00@) with an optional timezone abbreviation (e.g. @BST@).
 
@@ -81,6 +83,16 @@ data UnknownTimeZoneAbbrev = UnknownTimeZoneAbbrev
 newtype Offset = Offset { unOffset :: Int }
   deriving newtype (Eq, Show, Num)
 
+instance Buildable Offset where
+  build = fromString . renderOffset
+
+renderOffset :: Offset -> String
+renderOffset (Offset minutesOffset) = do
+  let sign = if minutesOffset >= 0 then "+" else "-" :: String
+      minutesPerHour = 60
+      (hours, mins) = abs minutesOffset `divMod` minutesPerHour
+  printf ("UTC" <> sign <> "%02d:%02d") hours mins
+
 secondsPerMinute :: Int
 secondsPerMinute = 60
 
@@ -119,7 +131,7 @@ timeReferenceToUTC
 timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
   case mbEitherTzOrOffset of
     Left abbrev -> TRTUInvalidTimeZoneAbbrev abbrev
-    Right (Right (offset, _mbTimeZoneAbbrevInfo)) -> do
+    Right (Right offset) -> do
       -- In the case of rigid offset we don't need the `modifyLocal` from
       -- from the `tztime` package because there are no timeshifts that
       -- we should take into account. So we just use plain LocalTime.
@@ -172,12 +184,12 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
   -- and the inner `Either` carries one of the possible equitable results, so
   -- for it we use `Right` or `Left`.
   mbEitherTzOrOffset
-    :: Either UnknownTimeZoneAbbrev (Either (TZLabel, Bool) (Offset, Maybe TimeZoneAbbreviationInfo))
+    :: Either UnknownTimeZoneAbbrev (Either (TZLabel, Bool) Offset)
   mbEitherTzOrOffset = case trLocationRef of
     Nothing -> pure $ Left (sendersTZLabel, True)
     Just (TimeZoneRef tzLabel) -> pure $ Left (tzLabel, False)
-    Just (OffsetRef offset) -> pure $ Right (offset, Nothing)
-    Just (TimeZoneAbbreviationRef abbrev) -> pure $ Right (tzaiOffsetMinutes abbrev, Just abbrev)
+    Just (OffsetRef offset) -> pure $ Right offset
+    Just (TimeZoneAbbreviationRef abbrev) -> pure $ Right $ tzaiOffsetMinutes abbrev
     Just (UnknownTimeZoneAbbreviationRef unknownAbbrev) -> Left unknownAbbrev
 
 -- | Given a day of month and current time, try to figure out what day was really meant.
