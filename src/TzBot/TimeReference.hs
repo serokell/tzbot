@@ -17,8 +17,6 @@ import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
 import Formatting (Buildable)
 
-import TzBot.Util qualified as CI
-
 {- | An offset from UTC (e.g. @UTC+01:00@) with an optional timezone abbreviation (e.g. @BST@).
 
 Note: The `TimeZone` data type from the @time@ package is a misnomer, it doesn't actually represent a timezone.
@@ -57,8 +55,11 @@ data LocationReference
   -- ^ A timezone name, e.g. @Europe/London@.
   | OffsetRef Offset
   -- ^ An offset from UTC, e.g. @UTC+03:00@
-  | TimeZoneAbbreviationRef TimeZoneAbbreviation
+  | TimeZoneAbbreviationRef TimeZoneAbbreviationInfo
   -- ^ A timezone abbreviation, e.g. @GMT@.
+  | UnknownTimeZoneAbbreviationRef UnknownTimeZoneAbbrev
+  -- ^ An unknown timezone abbreviation, not listed in the
+  -- `TzBot.Parser.knownTimeZoneAbbreviations` storage
   deriving stock (Eq, Show)
 
 -- | A timezone abbreviation such as @GMT@ or @EST@.
@@ -66,6 +67,15 @@ data LocationReference
 -- See: https://en.wikipedia.org/wiki/List_of_time_zone_abbreviations
 newtype TimeZoneAbbreviation = TimeZoneAbbreviation { unTimeZoneAbbreviation :: Text }
   deriving newtype (Eq, Show, IsString, Buildable)
+
+-- | A timezone abbreviation that we do not recognize.
+data UnknownTimeZoneAbbrev = UnknownTimeZoneAbbrev
+  { utzaAbbrev :: TimeZoneAbbreviation
+    -- ^ The unrecognized abbreviation, possibly but not necessarily due to a typo, e.g. @GTM@.
+  , utzaCandidates :: [TimeZoneAbbreviation]
+    -- ^ Assuming the user made a typo, this is a list of supported
+    -- abbreviations that are similar enough to what they wrote, e.g. @GMT@.
+  } deriving stock (Eq, Show)
 
 -- | An offset from UTC measured in minutes.
 newtype Offset = Offset { unOffset :: Int }
@@ -109,7 +119,7 @@ timeReferenceToUTC
 timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
   case mbEitherTzOrOffset of
     Left abbrev -> TRTUInvalidTimeZoneAbbrev abbrev
-    Right (Right offset) -> do
+    Right (Right (offset, _mbTimeZoneAbbrevInfo)) -> do
       -- In the case of rigid offset we don't need the `modifyLocal` from
       -- from the `tztime` package because there are no timeshifts that
       -- we should take into account. So we just use plain LocalTime.
@@ -161,15 +171,14 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
   -- The outer `Either` acts like an error carrier, so for it we use `pure` and `<$>`,
   -- and the inner `Either` carries one of the possible equitable results, so
   -- for it we use `Right` or `Left`.
-  mbEitherTzOrOffset :: Either TimeZoneAbbreviation (Either (TZLabel, Bool) Offset)
+  mbEitherTzOrOffset
+    :: Either UnknownTimeZoneAbbrev (Either (TZLabel, Bool) (Offset, Maybe TimeZoneAbbreviationInfo))
   mbEitherTzOrOffset = case trLocationRef of
     Nothing -> pure $ Left (sendersTZLabel, True)
     Just (TimeZoneRef tzLabel) -> pure $ Left (tzLabel, False)
-    Just (OffsetRef offset) -> pure $ Right offset
-    Just (TimeZoneAbbreviationRef abbrev) ->
-      Right . tzaiOffsetMinutes <$>
-          maybe (Left abbrev) pure
-            (CI.lookup (unTimeZoneAbbreviation abbrev) knownTimeZoneAbbreviations)
+    Just (OffsetRef offset) -> pure $ Right (offset, Nothing)
+    Just (TimeZoneAbbreviationRef abbrev) -> pure $ Right (tzaiOffsetMinutes abbrev, Just abbrev)
+    Just (UnknownTimeZoneAbbreviationRef unknownAbbrev) -> Left unknownAbbrev
 
 -- | Given a day of month and current time, try to figure out what day was really meant.
 -- Algorithm:
@@ -253,7 +262,7 @@ data TimeReferenceToUTCResult
   | TRTUInvalid TimeShiftErrorInfo
   -- ^ The time reference was invalid (e.g. due to a time being skipped in a timezone during DST changes).
   -- See [Edge cases & pitfalls](https://github.com/serokell/tzbot/blob/main/docs/pitfalls.md#invalid-times).
-  | TRTUInvalidTimeZoneAbbrev TimeZoneAbbreviation
+  | TRTUInvalidTimeZoneAbbrev UnknownTimeZoneAbbrev
   -- ^ The timezone abbreviation used is not supported / does not exist.
   deriving stock (Eq, Show)
 ----------------------------------------------------------------------------
@@ -264,67 +273,4 @@ data TimeZoneAbbreviationInfo = TimeZoneAbbreviationInfo
   { tzaiAbbreviation :: TimeZoneAbbreviation
   , tzaiOffsetMinutes :: Offset -- ^ Offset from UTC in minutes.
   , tzaiFullName :: Text
-  }
-
-knownTimeZoneAbbreviations :: CI.CIStorage TimeZoneAbbreviationInfo
-knownTimeZoneAbbreviations =
-  CI.fromList . map (\tzAbbr ->
-    (unTimeZoneAbbreviation $ tzaiAbbreviation tzAbbr, tzAbbr)) $
-      knownTimeZoneAbbreviations'
-
--- | A subset of https://en.wikipedia.org/wiki/List_of_time_zone_abbreviations
-knownTimeZoneAbbreviations' :: [TimeZoneAbbreviationInfo]
-knownTimeZoneAbbreviations' =
-  -- TODO: add more tz abbreviations.
-  --
-  -- NOTE: Remember to update `docs/timezone_abbreviations.md` when making changes to this list.
-  [ TimeZoneAbbreviationInfo "UTC" 0 "UTC"
-  , TimeZoneAbbreviationInfo "GMT" 0 "GMT"
-  , TimeZoneAbbreviationInfo "HST"   (hours -10)       "Hawaii-Aleutian Standard Time"
-  , TimeZoneAbbreviationInfo "HDT"   (hours -09)       "Hawaii-Aleutian Daylight Time"
-  , TimeZoneAbbreviationInfo "PST"   (hours -08)       "Pacific Standard Time (North America)"
-  , TimeZoneAbbreviationInfo "PDT"   (hours -07)       "Pacific Daylight Time (North America)"
-  , TimeZoneAbbreviationInfo "MST"   (hours -07)       "Mountain Standard Time (North America)"
-  , TimeZoneAbbreviationInfo "MDT"   (hours -06)       "Mountain Daylight Time (North America)"
-  , TimeZoneAbbreviationInfo "CST"   (hours -06)       "Central Standard Time (North America)"
-  , TimeZoneAbbreviationInfo "CDT"   (hours -05)       "Central Daylight Time (North America)"
-  , TimeZoneAbbreviationInfo "EST"   (hours -05)       "Eastern Standard Time (North America)"
-  , TimeZoneAbbreviationInfo "EDT"   (hours -04)       "Eastern Daylight Time (North America)"
-  , TimeZoneAbbreviationInfo "AST"   (hours -04)       "Atlantic Standard Time"
-  , TimeZoneAbbreviationInfo "ADT"   (hours -03)       "Atlantic Daylight Time"
-  , TimeZoneAbbreviationInfo "AMT"   (hours -04)       "Amazon Time"
-  , TimeZoneAbbreviationInfo "AMST"  (hours -03)       "Amazon Summer Time"
-  , TimeZoneAbbreviationInfo "CLT"   (hours -04)       "Chile Standard Time"
-  , TimeZoneAbbreviationInfo "CLST"  (hours -03)       "Chile Summer Time"
-  , TimeZoneAbbreviationInfo "BRT"   (hours -03)       "Brasilia Time"
-  , TimeZoneAbbreviationInfo "BRST"  (hours -02)       "Brasilia Summer Time"
-  , TimeZoneAbbreviationInfo "WET"   (hours  00)       "Western European Time"
-  , TimeZoneAbbreviationInfo "WEST"  (hours  01)       "Western European Summer Time"
-  , TimeZoneAbbreviationInfo "BST"   (hours  01)       "British Summer Time"
-  , TimeZoneAbbreviationInfo "CET"   (hours  01)       "Central European Time"
-  , TimeZoneAbbreviationInfo "CEST"  (hours  02)       "Central European Summer Time"
-  , TimeZoneAbbreviationInfo "WAT"   (hours  01)       "West Africa Time"
-  , TimeZoneAbbreviationInfo "WAST"  (hours  02)       "West Africa Summer Time"
-  , TimeZoneAbbreviationInfo "CAT"   (hours  02)       "Central Africa Time"
-  , TimeZoneAbbreviationInfo "SAST"  (hours  02)       "South African Standard Time"
-  , TimeZoneAbbreviationInfo "EET"   (hours  02)       "Eastern European Time"
-  , TimeZoneAbbreviationInfo "EEST"  (hours  03)       "Eastern European Summer Time"
-  , TimeZoneAbbreviationInfo "MSK"   (hours  03)       "Moscow Time"
-  , TimeZoneAbbreviationInfo "TRT"   (hours  03)       "Turkey Time"
-  , TimeZoneAbbreviationInfo "GET"   (hours  04)       "Georgia Standard Time"
-  , TimeZoneAbbreviationInfo "IST"   (hours  05 + 30)  "India Standard Time"
-  , TimeZoneAbbreviationInfo "AWST"  (hours  08)       "Australian Western Standard Time"
-  , TimeZoneAbbreviationInfo "AWDT"  (hours  09)       "Australian Western Daylight Time"
-  , TimeZoneAbbreviationInfo "ACWST" (hours  08 + 45)  "Australian Central Western Standard Time"
-  , TimeZoneAbbreviationInfo "JST"   (hours  09)       "Japan Standard Time"
-  , TimeZoneAbbreviationInfo "KST"   (hours  09)       "Korea Standard Time"
-  , TimeZoneAbbreviationInfo "ACST"  (hours  09 + 30)  "Australian Central Standard Time"
-  , TimeZoneAbbreviationInfo "ACDT"  (hours  10 + 30)  "Australian Central Daylight Time"
-  , TimeZoneAbbreviationInfo "AEST"  (hours  10)       "Australian Eastern Standard Time"
-  , TimeZoneAbbreviationInfo "AEDT"  (hours  11)       "Australian Eastern Daylight Time"
-  , TimeZoneAbbreviationInfo "NZST"  (hours  12)       "New Zealand Standard Time"
-  , TimeZoneAbbreviationInfo "NZDT"  (hours  13)       "New Zealand Daylight Time"
-  ]
-  where
-    hours :: Int -> Offset
-    hours h = Offset $ h * 60
+  } deriving stock (Eq, Show)

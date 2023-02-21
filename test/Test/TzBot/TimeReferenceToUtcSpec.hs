@@ -245,7 +245,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
   , testCase "Valid timezone abbreviation" $
       mkTestCase $ TestEntry
         { teTimeRef = TimeReference "" (TimeOfDay 8 0 0) (Just $ DaysFromToday 2)
-                      (Just $ TimeZoneAbbreviationRef $ TimeZoneAbbreviation "MSK")
+                      (Just $ OffsetRef (Offset $ 3 * 60))
         , teUserLabel = label1
         , teCurrentTime = time1
         , teResult =
@@ -257,10 +257,10 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
       mkTestCase $ TestEntry
         { teTimeRef =
             TimeReference "" (TimeOfDay 8 0 0) (Just $ DaysFromToday 2)
-              (Just $ TimeZoneAbbreviationRef $ TimeZoneAbbreviation "MKS")
+              (Just $ UnknownTimeZoneAbbreviationRef $ UnknownTimeZoneAbbrev "MKS" ["MSK"])
         , teUserLabel = label1
         , teCurrentTime = time1
-        , teResult = TRTUInvalidTimeZoneAbbrev "MKS"
+        , teResult = TRTUInvalidTimeZoneAbbrev $ UnknownTimeZoneAbbrev "MKS" ["MSK"]
         }
   , testGroup "Timeshift subtleties" $
     [ testCase "Turn on DST, explicit time zone, Havana, Cuba" $
@@ -289,7 +289,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
         mkTestCase $ TestEntry
           { teTimeRef =
               TimeReference "" (TimeOfDay 0 30 0) (Just $ DaysFromToday 2)
-                (Just $ TimeZoneAbbreviationRef $ TimeZoneAbbreviation "CDT")
+                (Just $ OffsetRef (Offset ((-5) * 60)))
           , teUserLabel = labelHavana
           , teCurrentTime = time2
           , teResult = TRTUSuccess $ mkSuccessSameDate
@@ -322,7 +322,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
         mkTestCase $ TestEntry
           { teTimeRef =
               TimeReference "" (TimeOfDay 0 30 0) (Just $ DaysFromToday 2)
-                (Just $ TimeZoneAbbreviationRef $ TimeZoneAbbreviation "CDT")
+                (Just $ OffsetRef (Offset ((-5) * 60)))
           , teUserLabel = labelHavana
           , teCurrentTime = time3
           , teResult = TRTUSuccess $ mkSuccessSameDate

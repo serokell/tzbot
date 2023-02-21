@@ -8,9 +8,11 @@ module TzBot.Parser
 
 import Universum hiding (many, toList, try)
 
+import Data.Char (isUpper)
 import Data.Map qualified as M
 import Data.String.Conversions (cs)
 import Data.Text qualified as T
+import Data.Text.Metrics (damerauLevenshteinNorm)
 import Data.Time (DayOfWeek(..))
 import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
 import Data.Time.LocalTime (TimeOfDay(..))
@@ -30,7 +32,7 @@ type TzParser = Parsec Void [Token]
 [TimeReference {trText = "tuesday at 10am", trTimeOfDay = 10:00:00, trDateRef = Just (DayOfWeekRef Tuesday), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "i can do it at 3pm MDT"
-[TimeReference {trText = "at 3pm MDT", trTimeOfDay = 15:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef "MDT")}]
+[TimeReference {trText = "at 3pm MDT", trTimeOfDay = 15:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "MDT", tzaiOffsetMinutes = -360, tzaiFullName = "Mountain Daylight Time (North America)"}))}]
 
 >>> parseTimeRefs "how about between 2pm and 3pm?"
 [TimeReference {trText = "2pm", trTimeOfDay = 14:00:00, trDateRef = Nothing, trLocationRef = Nothing},TimeReference {trText = "3pm", trTimeOfDay = 15:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
@@ -75,7 +77,7 @@ type TzParser = Parsec Void [Token]
 [TimeReference {trText = "9am in europe/london", trTimeOfDay = 09:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneRef Europe__London)}]
 
 >>> parseTimeRefs "2pm CST"
-[TimeReference {trText = "2pm CST", trTimeOfDay = 14:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef "CST")}]
+[TimeReference {trText = "2pm CST", trTimeOfDay = 14:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "CST", tzaiOffsetMinutes = -360, tzaiFullName = "Central Standard Time (North America)"}))}]
 
 >>> parseTimeRefs "10am UTC+03:00"
 [TimeReference {trText = "10am UTC+03:00", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef 180)}]
@@ -146,9 +148,6 @@ type TzParser = Parsec Void [Token]
 >>> parseTimeRefs "today ,10am"
 [TimeReference {trText = "today ,10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 0), trLocationRef = Nothing}]
 
->>> parseTimeRefs "10am MSKC"
-[TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
-
 >>> parseTimeRefs "10am aMeRiCa/Argentina/Buenos_Aires"
 [TimeReference {trText = "10am aMeRiCa/Argentina/Buenos_Aires", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneRef America__Argentina__Buenos_Aires)}]
 
@@ -157,6 +156,21 @@ type TzParser = Parsec Void [Token]
 
 >>> parseTimeRefs "10am America/port-au-Prince"
 [TimeReference {trText = "10am America/port-au-Prince", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneRef America__Port_au_Prince)}]
+
+>>> parseTimeRefs "10am MSKC"
+[TimeReference {trText = "10am MSKC", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (UnknownTimeZoneAbbreviationRef (UnknownTimeZoneAbbrev {utzaAbbrev = "MSKC", utzaCandidates = ["MSK"]}))}]
+
+>>> parseTimeRefs "10am KSMC"
+[TimeReference {trText = "10am KSMC", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (UnknownTimeZoneAbbreviationRef (UnknownTimeZoneAbbrev {utzaAbbrev = "KSMC", utzaCandidates = []}))}]
+
+>>> parseTimeRefs "10am KSMc"
+[TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
+
+>>> parseTimeRefs "10am K"
+[TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
+
+>>> parseTimeRefs "10am KAMAZN"
+[TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
 -}
 parseTimeRefs :: Text -> [TimeReference]
@@ -325,15 +339,42 @@ offsetRefParser = do
   hours <- hourParser
   maybeMins <- optional' minuteParser
   let minutesTotal = 60 * hours + fromMaybe 0 maybeMins
-  pure . OffsetRef $ Offset $ sign * minutesTotal
+  pure $ OffsetRef (Offset $ sign * minutesTotal)
 
 tzAbbrRefParser :: TzParser LocationReference
 tzAbbrRefParser = do
   abbr <- anyWord
-  res <- TimeZoneAbbreviationRef . tzaiAbbreviation <$>
-    withStorage knownTimeZoneAbbreviations abbr
+  let similarityThreshold = 0.65 :: Ratio Int
+  -- Check if this word is a recognized timezone abbreviation.
+  --
+  -- If it isn't, check whether the user likely meant to refer to some
+  -- timezone abbreviation, but possibly made a typo or used an abbreviation we don't support.
+  -- If so, and assuming it was a typo, suggest abbreviations similar enough to what the user entered.
+  -- E.g., if they entered "WETS", they likely meant either "WET" or "WEST".
+  res <- choice'
+    [ do info <- withStorage knownTimeZoneAbbreviations abbr
+         pure $ TimeZoneAbbreviationRef info
+    , UnknownTimeZoneAbbreviationRef <$> do
+        guard $ isPossibleTimezoneAbbrev abbr
+        let predicate cand = do
+              let norm = damerauLevenshteinNorm abbr $
+                    unTimeZoneAbbreviation cand
+              norm > similarityThreshold
+        let candidates =
+              filter predicate . map tzaiAbbreviation $ knownTimeZoneAbbreviations'
+        pure $ UnknownTimeZoneAbbrev (TimeZoneAbbreviation abbr) candidates
+    ]
+  -- That's added to avoid interference with UTC+... and GMT+... syntax.
   notFollowedBy $ choice' $ map punct ['+', '-']
   pure res
+
+isPossibleTimezoneAbbrev :: Text -> Bool
+isPossibleTimezoneAbbrev w =
+  T.all isUpper w
+    && T.length w >= 2
+    && T.length w <= 5
+    && w /= "AM"
+    && w /= "PM"
 
 --------------------------------------------------------------------------------
 -- Storages
@@ -371,6 +412,69 @@ monthStorage = CI.fromList $ concatMap addCut3Option
 
 tzNameLabelStorage :: CI.CIStorage TZLabel
 tzNameLabelStorage = CI.fromList . map (first cs) . M.toList $ tzNameLabelMap
+
+knownTimeZoneAbbreviations :: CI.CIStorage TimeZoneAbbreviationInfo
+knownTimeZoneAbbreviations =
+  CI.fromList . map (\tzAbbr ->
+    (unTimeZoneAbbreviation $ tzaiAbbreviation tzAbbr, tzAbbr)) $
+      knownTimeZoneAbbreviations'
+
+-- | A subset of https://en.wikipedia.org/wiki/List_of_time_zone_abbreviations
+knownTimeZoneAbbreviations' :: [TimeZoneAbbreviationInfo]
+knownTimeZoneAbbreviations' =
+  -- TODO: add more tz abbreviations.
+  --
+  -- NOTE: Remember to update `docs/timezone_abbreviations.md` when making changes to this list.
+  [ TimeZoneAbbreviationInfo "UTC" 0 "UTC"
+  , TimeZoneAbbreviationInfo "GMT" 0 "GMT"
+  , TimeZoneAbbreviationInfo "HST"   (hours -10)       "Hawaii-Aleutian Standard Time"
+  , TimeZoneAbbreviationInfo "HDT"   (hours -09)       "Hawaii-Aleutian Daylight Time"
+  , TimeZoneAbbreviationInfo "PST"   (hours -08)       "Pacific Standard Time (North America)"
+  , TimeZoneAbbreviationInfo "PDT"   (hours -07)       "Pacific Daylight Time (North America)"
+  , TimeZoneAbbreviationInfo "MST"   (hours -07)       "Mountain Standard Time (North America)"
+  , TimeZoneAbbreviationInfo "MDT"   (hours -06)       "Mountain Daylight Time (North America)"
+  , TimeZoneAbbreviationInfo "CST"   (hours -06)       "Central Standard Time (North America)"
+  , TimeZoneAbbreviationInfo "CDT"   (hours -05)       "Central Daylight Time (North America)"
+  , TimeZoneAbbreviationInfo "EST"   (hours -05)       "Eastern Standard Time (North America)"
+  , TimeZoneAbbreviationInfo "EDT"   (hours -04)       "Eastern Daylight Time (North America)"
+  , TimeZoneAbbreviationInfo "AST"   (hours -04)       "Atlantic Standard Time"
+  , TimeZoneAbbreviationInfo "ADT"   (hours -03)       "Atlantic Daylight Time"
+  , TimeZoneAbbreviationInfo "AMT"   (hours -04)       "Amazon Time"
+  , TimeZoneAbbreviationInfo "AMST"  (hours -03)       "Amazon Summer Time"
+  , TimeZoneAbbreviationInfo "CLT"   (hours -04)       "Chile Standard Time"
+  , TimeZoneAbbreviationInfo "CLST"  (hours -03)       "Chile Summer Time"
+  , TimeZoneAbbreviationInfo "BRT"   (hours -03)       "Brasilia Time"
+  , TimeZoneAbbreviationInfo "BRST"  (hours -02)       "Brasilia Summer Time"
+  , TimeZoneAbbreviationInfo "WET"   (hours  00)       "Western European Time"
+  , TimeZoneAbbreviationInfo "WEST"  (hours  01)       "Western European Summer Time"
+  , TimeZoneAbbreviationInfo "BST"   (hours  01)       "British Summer Time"
+  , TimeZoneAbbreviationInfo "CET"   (hours  01)       "Central European Time"
+  , TimeZoneAbbreviationInfo "CEST"  (hours  02)       "Central European Summer Time"
+  , TimeZoneAbbreviationInfo "WAT"   (hours  01)       "West Africa Time"
+  , TimeZoneAbbreviationInfo "WAST"  (hours  02)       "West Africa Summer Time"
+  , TimeZoneAbbreviationInfo "CAT"   (hours  02)       "Central Africa Time"
+  , TimeZoneAbbreviationInfo "SAST"  (hours  02)       "South African Standard Time"
+  , TimeZoneAbbreviationInfo "EET"   (hours  02)       "Eastern European Time"
+  , TimeZoneAbbreviationInfo "EEST"  (hours  03)       "Eastern European Summer Time"
+  , TimeZoneAbbreviationInfo "MSK"   (hours  03)       "Moscow Time"
+  , TimeZoneAbbreviationInfo "TRT"   (hours  03)       "Turkey Time"
+  , TimeZoneAbbreviationInfo "GET"   (hours  04)       "Georgia Standard Time"
+  , TimeZoneAbbreviationInfo "IST"   (hours  05 + 30)  "India Standard Time"
+  , TimeZoneAbbreviationInfo "AWST"  (hours  08)       "Australian Western Standard Time"
+  , TimeZoneAbbreviationInfo "AWDT"  (hours  09)       "Australian Western Daylight Time"
+  , TimeZoneAbbreviationInfo "ACWST" (hours  08 + 45)  "Australian Central Western Standard Time"
+  , TimeZoneAbbreviationInfo "JST"   (hours  09)       "Japan Standard Time"
+  , TimeZoneAbbreviationInfo "KST"   (hours  09)       "Korea Standard Time"
+  , TimeZoneAbbreviationInfo "ACST"  (hours  09 + 30)  "Australian Central Standard Time"
+  , TimeZoneAbbreviationInfo "ACDT"  (hours  10 + 30)  "Australian Central Daylight Time"
+  , TimeZoneAbbreviationInfo "AEST"  (hours  10)       "Australian Eastern Standard Time"
+  , TimeZoneAbbreviationInfo "AEDT"  (hours  11)       "Australian Eastern Daylight Time"
+  , TimeZoneAbbreviationInfo "NZST"  (hours  12)       "New Zealand Standard Time"
+  , TimeZoneAbbreviationInfo "NZDT"  (hours  13)       "New Zealand Daylight Time"
+  ]
+  where
+    hours :: Int -> Offset
+    hours h = Offset $ h * 60
 
 --------------------------------------------------------------------------------
 -- Common

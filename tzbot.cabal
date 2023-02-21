@@ -150,6 +150,7 @@ library
     , string-conversions
     , template-haskell
     , text
+    , text-metrics
     , time
     , time-compat
     , transformers
