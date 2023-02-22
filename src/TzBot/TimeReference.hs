@@ -9,14 +9,18 @@ import Universum
 import Control.Arrow ((>>>))
 import Data.List.NonEmpty qualified as NE
 import Data.Time
-  (Day, DayOfWeek, LocalTime(localDay), NominalDiffTime, TimeOfDay, TimeZone, UTCTime, addLocalTime,
-  diffLocalTime, localTimeToUTC, nominalDay, toGregorian, utc, utcToLocalTime)
+  (Day, DayOfWeek, LocalTime(localDay), TimeOfDay, TimeZone, UTCTime, diffLocalTime, nominalDay,
+  toGregorian)
 import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
 import Data.Time.TZInfo qualified as TZI
 import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)
+import Data.Time.Zones.Types (TZ(..))
+import Data.Vector qualified as V
+import Data.Vector.Unboxed qualified as VU
 import Formatting (Buildable)
 import Formatting.Buildable (Buildable(..))
+import Text.Interpolation.Nyan (int, rmode')
 import Text.Printf (printf)
 
 {- | An offset from UTC (e.g. @UTC+01:00@) with an optional timezone abbreviation (e.g. @BST@).
@@ -45,6 +49,12 @@ data TimeReference = TimeReference
   , trLocationRef :: Maybe LocationReference
   }
   deriving stock (Eq, Show)
+
+getTzLabelMaybe :: TZLabel -> TimeReference -> Maybe TZLabel
+getTzLabelMaybe senderTz timeRef = case trLocationRef timeRef of
+  Just (TimeZoneRef refTzLabel) -> Just refTzLabel
+  Nothing -> Just senderTz
+  _ -> Nothing
 
 data DateReference
   = DaysFromToday Int
@@ -96,24 +106,6 @@ renderOffset (Offset minutesOffset) = do
 secondsPerMinute :: Int
 secondsPerMinute = 60
 
-offsetToNominalDiffTime :: Offset -> NominalDiffTime
-offsetToNominalDiffTime (Offset minutes) =
-  fromIntegral @Int @NominalDiffTime (minutes * secondsPerMinute)
-
-utcToUtcLocalTime :: UTCTime -> LocalTime
-utcToUtcLocalTime = utcToLocalTime utc
-
-utcLocalTimeToUTC :: LocalTime -> UTCTime
-utcLocalTimeToUTC = localTimeToUTC utc
-
-convertUtcToOffsetTime :: Offset -> UTCTime -> LocalTime
-convertUtcToOffsetTime offset utcTime =
-  addLocalTime (offsetToNominalDiffTime offset) (utcToUtcLocalTime utcTime)
-
-convertOffsetTimeToUtc :: Offset -> LocalTime -> UTCTime
-convertOffsetTimeToUtc offset localTime =
-  utcLocalTimeToUTC $ addLocalTime (negate $ offsetToNominalDiffTime offset) localTime
-
 {- | Converts a time reference to a moment in time (expressed in UTC).
 
   If the time reference contains a timezone abbreviation, and if that abbreviation\
@@ -128,41 +120,30 @@ timeReferenceToUTC
   -> UTCTime -- ^ The time at which the message was sent.
   -> TimeReference -- ^ A time reference to translate to UTC.
   -> TimeReferenceToUTCResult
-timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
-  case mbEitherTzOrOffset of
+timeReferenceToUTC sendersTZLabel eventTimestamp timeRef@TimeReference {..} =
+  case eithTzInfo of
     Left abbrev -> TRTUInvalidTimeZoneAbbrev abbrev
-    Right (Right offset) -> do
-      -- In the case of rigid offset we don't need the `modifyLocal` from
-      -- from the `tztime` package because there are no timeshifts that
-      -- we should take into account. So we just use plain LocalTime.
-      let refTime = eventTimestamp & (
-            convertUtcToOffsetTime offset
-            >>> dayTransition
-            >>> TZT.atTimeOfDay trTimeOfDay
-            )
-      TRTUSuccess $ TimeRefSuccess
-        (convertOffsetTimeToUtc offset refTime)
-        (Right offset)
-        (localDay refTime)
-    Right (Left (tzLabel, implicitSenderTimezone)) -> do
-      let eventLocalTime = TZT.fromUTC (TZI.fromLabel tzLabel) eventTimestamp
+    Right tzInfo -> do
+      let eventLocalTime = TZT.fromUTC tzInfo eventTimestamp
       let eithRefTime = eventLocalTime & TZT.modifyLocalStrict (
             dayTransition >>> TZT.atTimeOfDay trTimeOfDay
             )
       case eithRefTime of
-        Left err -> tzErrorToResult implicitSenderTimezone tzLabel err
+        Left err -> do
+          case getTzLabelMaybe sendersTZLabel timeRef of
+            Nothing -> error "impossible happened: got TZError for a static offset"
+            Just refTzLabel -> tzErrorToResult refTzLabel err
         Right refTime -> TRTUSuccess $ TimeRefSuccess
           (TZT.toUTC refTime)
-          (Left tzLabel)
           (localDay $ TZT.tzTimeLocalTime refTime)
 
   where
-  tzErrorToResult :: Bool -> TZLabel -> TZT.TZError -> TimeReferenceToUTCResult
-  tzErrorToResult implicitSenderTimezone tzLabel = \case
+  tzErrorToResult :: TZLabel -> TZT.TZError -> TimeReferenceToUTCResult
+  tzErrorToResult tzLabel = \case
     TZT.TZOverlap invalidTime _ _ -> TRTUAmbiguous $
-      TimeShiftErrorInfo implicitSenderTimezone tzLabel (localDay invalidTime)
+      TimeShiftErrorInfo tzLabel (localDay invalidTime)
     TZT.TZGap invalidTime _ _ -> TRTUInvalid $
-      TimeShiftErrorInfo implicitSenderTimezone tzLabel (localDay invalidTime)
+      TimeShiftErrorInfo tzLabel (localDay invalidTime)
 
   -- This doesn't include setting time, only date changes
   dayTransition :: LocalTime -> LocalTime
@@ -180,17 +161,22 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
       Nothing -> chooseBestMonth dayOfMonth eventLocalTime
       Just monthOfYear -> chooseBestYear dayOfMonth monthOfYear eventLocalTime
 
-  -- The outer `Either` acts like an error carrier, so for it we use `pure` and `<$>`,
-  -- and the inner `Either` carries one of the possible equitable results, so
-  -- for it we use `Right` or `Left`.
-  mbEitherTzOrOffset
-    :: Either UnknownTimeZoneAbbrev (Either (TZLabel, Bool) Offset)
-  mbEitherTzOrOffset = case trLocationRef of
-    Nothing -> pure $ Left (sendersTZLabel, True)
-    Just (TimeZoneRef tzLabel) -> pure $ Left (tzLabel, False)
-    Just (OffsetRef offset) -> pure $ Right offset
-    Just (TimeZoneAbbreviationRef abbrev) -> pure $ Right $ tzaiOffsetMinutes abbrev
+  eithTzInfo :: Either UnknownTimeZoneAbbrev TZI.TZInfo
+  eithTzInfo = case trLocationRef of
+    Nothing -> pure $ TZI.fromLabel sendersTZLabel
+    Just (TimeZoneRef tzLabel) -> pure $ TZI.fromLabel tzLabel
+    Just (OffsetRef offset) -> pure $ tzInfoFromOffset offset
+    Just (TimeZoneAbbreviationRef abbrev) -> pure $ tzInfoFromOffset $ tzaiOffsetMinutes abbrev
     Just (UnknownTimeZoneAbbreviationRef unknownAbbrev) -> Left unknownAbbrev
+
+  tzInfoFromOffset :: Offset -> TZI.TZInfo
+  tzInfoFromOffset (Offset offsetMinutes) =
+    TZI.TZInfo shownOffset $ TZ
+        (VU.singleton minBound)
+        (VU.singleton $ secondsPerMinute * offsetMinutes)
+        (V.singleton (False, toString shownOffset))
+    where
+      shownOffset = [int||#{offsetMinutes}|] :: Text
 
 -- | Given a day of month and current time, try to figure out what day was really meant.
 -- Algorithm:
@@ -246,19 +232,13 @@ chooseBestYear dayOfMonth monthOfYear now = do
 data TimeRefSuccess = TimeRefSuccess
   { trsUtcResult      :: UTCTime
     -- ^ The result of the conversion.
-  , trsEithTzOffset   :: Either TZLabel Offset
-    -- ^ The timezone or offset that this TimeReference is related to.
-    -- When the `TimeReference` does not explicitly mention a timezone/offset,
-    -- we assume it's related to the sender's timezone.
   , trsOriginalDate :: Day
     -- ^ The day that was originally mentioned by the sender
     -- in specified or implicit sender's timezone.
   } deriving stock (Eq, Show)
 
 data TimeShiftErrorInfo = TimeShiftErrorInfo
-  { tseiIsImplicitSenderTimezone :: Bool
-    -- ^ Whether the sender's timezone was taken implicitly.
-  , tseiRefTimeZone :: TZLabel
+  { tseiRefTimeZone :: TZLabel
     -- ^ Timezone label associated with original time reference.
   , tseiOriginalDate :: Day
     -- ^ The day that was originally mentioned by the sender

@@ -68,6 +68,7 @@ library:
   - unordered-containers
   - utf8-string
   - validation
+  - vector
   - yaml
   - utf8-string
 
