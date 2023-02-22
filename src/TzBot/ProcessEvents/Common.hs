@@ -4,7 +4,7 @@
 
 module TzBot.ProcessEvents.Common
   ( openModalCommon
-  , getTimeReferencesFromMessage
+  , getTimeReferencesAndNewStateFromMessage
 
     -- * exported for tests
   , ignoreCodeBlocksManually
@@ -18,15 +18,17 @@ import Data.Text qualified as T
 import Fmt (listF)
 import Text.Interpolation.Nyan (int, rmode')
 
+import TzBot.Cache qualified as Cache
 import TzBot.Feedback.Dialog (insertDialogEntry)
 import TzBot.Feedback.Dialog.Types
 import TzBot.Logger
 import TzBot.Parser (parseTimeRefs)
 import TzBot.Render (TranslationPairs, asForModalM, renderAllTP, renderTemplate)
-import TzBot.Slack (BotM, getUserCached, startModal)
+import TzBot.Slack (BotM, BotState(bsMessageCache), getUserCached, startModal)
 import TzBot.Slack.API
 import TzBot.Slack.API.MessageBlock
   (UnknownBlockElementLevel2Error(ubeType), extractPieces, splitExtractErrors)
+import TzBot.TimeContext
 import TzBot.TimeReference (TimeReference)
 import TzBot.Util (WithUnknown(unUnknown))
 
@@ -45,7 +47,9 @@ openModalCommon
 openModalCommon message channelId whoTriggeredId triggerId mkModalFunc = do
   let msgText = mText message
       msgTimestamp = mTs message
-  mbTimeRefs <- nonEmpty <$> getTimeReferencesFromMessage message
+  mbTimeRefs <- fmap (nonEmpty . fst) $
+    asks bsMessageCache >>= Cache.fetchWithCache msgId \_ ->
+      getTimeReferencesAndNewStateFromMessage emptyTimeContext message
   sender <- getUserCached $ mUser message
   translationPairs <- fmap join $ forM mbTimeRefs $ \neTimeRefs -> do
       whoTriggered <- getUserCached whoTriggeredId
@@ -66,14 +70,22 @@ openModalCommon message channelId whoTriggeredId triggerId mkModalFunc = do
   insertDialogEntry guid metadata
   let modal = mkModalFunc msgText translationPairs guid
   startModal $ OpenViewReq modal triggerId
+  where
+    msgId = mMessageId message
 
 -- | Extract separate text pieces from the Slack message that can contain
 -- the whole time reference and try to find time references inside them.
-getTimeReferencesFromMessage
-  :: Message
-  -> BotM [TimeReference]
-getTimeReferencesFromMessage message =
-  concatMap parseTimeRefs <$> getTextPiecesFromMessage message
+-- Old context (date, timezone, offset, etc.) is used for processing
+-- and new one is produced.
+getTimeReferencesAndNewStateFromMessage
+  :: TimeContext
+  -> Message
+  -> BotM ([TimeReference], TimeContext)
+getTimeReferencesAndNewStateFromMessage oldState message = do
+  pieces <- getTextPiecesFromMessage message
+  pure $
+    first concat $
+      runState (mapM parseTimeRefs pieces) oldState
 
 -- | Extract separate text pieces from the Slack message that can contain
 -- the whole time reference. The main way is analyzing the message's block

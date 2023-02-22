@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.7.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -54,6 +54,7 @@ library
       TzBot.Slack.Events.ViewPayload
       TzBot.Slack.Fixtures
       TzBot.Slack.Modal
+      TzBot.TimeContext
       TzBot.TimeReference
       TzBot.Util
   other-modules:
