@@ -92,8 +92,12 @@ run opts = do
       managed $ withTzCacheDefault defaultMessageInfoCachingTime
     bsReportEntries <-
       managed $ withTzCacheDefault cCacheReportDialog
-    -- auto-acknowledge received messages
+
+    let defaultConversationStateCachingTime = hour 12
+    bsConversationStateCache <-
+      managed $ withTzCacheDefault defaultConversationStateCachingTime
     (bsLogNamespace, bsLogContext, bsLogEnv) <- managed $ withLogger cLogLevel
+    -- auto-acknowledge received messages
     liftIO $ runSocketMode sCfg $ handler gracefulShutdownContainer BotState {..}
 
 withFeedbackConfig :: BotConfig -> (FeedbackConfig -> IO a) -> IO a

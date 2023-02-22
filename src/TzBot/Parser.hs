@@ -4,10 +4,12 @@
 
 module TzBot.Parser
   ( parseTimeRefs
+  , parseWithEmptyContext
   ) where
 
 import Universum hiding (many, toList, try)
 
+import Control.Lens.Operators
 import Data.Char (isUpper)
 import Data.List qualified as L
 import Data.Map qualified as M
@@ -20,255 +22,313 @@ import Data.Time.LocalTime (TimeOfDay(..))
 import Data.Time.Zones.All (TZLabel, tzNameLabelMap)
 import Glider.NLP.Tokenizer (Token(..), tokenize)
 import Text.Interpolation.Nyan (int, rmode')
-import Text.Megaparsec hiding (Token)
+import Text.Megaparsec hiding (State, Token)
 
 import TzBot.Instances ()
+import TzBot.TimeContext (TimeContext(..), emptyTimeContext, tcCurrentDateRefL, tcCurrentLocRefL)
 import TzBot.TimeReference
 import TzBot.Util
 import TzBot.Util qualified as CI
 
 type TzParser = Parsec Void [Token]
 
-{- | Parses time references from an input string.
+{- | Parses time references from an input string using provided time context
+ - and produces a new time context.
 
->>> parseTimeRefs "let's meet tuesday at 10am"
+>>> parseWithEmptyContext "let's meet tuesday at 10am"
 [TimeReference {trText = "tuesday at 10am", trTimeOfDay = 10:00:00, trDateRef = Just (DayOfWeekRef Tuesday), trLocationRef = Nothing}]
 
->>> parseTimeRefs "i can do it at 3pm MDT"
+>>> parseWithEmptyContext "i can do it at 3pm MDT"
 [TimeReference {trText = "at 3pm MDT", trTimeOfDay = 15:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "MDT", tzaiOffsetMinutes = -360, tzaiFullName = "Mountain Daylight Time (North America)"}))}]
 
->>> parseTimeRefs "how about between 2pm and 3pm?"
+>>> parseWithEmptyContext "how about between 2pm and 3pm?"
 [TimeReference {trText = "2pm", trTimeOfDay = 14:00:00, trDateRef = Nothing, trLocationRef = Nothing},TimeReference {trText = "3pm", trTimeOfDay = 15:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "Does 10am work for you?"
+>>> parseWithEmptyContext "Does 10am work for you?"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "That doesn't work for me, what about 10:30 AM?"
+>>> parseWithEmptyContext "That doesn't work for me, what about 10:30 AM?"
 [TimeReference {trText = "10:30 AM", trTimeOfDay = 10:30:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "I can only be there at 16:00"
+>>> parseWithEmptyContext "I can only be there at 16:00"
 [TimeReference {trText = "at 16:00", trTimeOfDay = 16:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "10am tomorrow"
+>>> parseWithEmptyContext "10am tomorrow"
 [TimeReference {trText = "10am tomorrow", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
 
->>> parseTimeRefs "today at 3pm"
+>>> parseWithEmptyContext "today at 3pm"
 [TimeReference {trText = "today at 3pm", trTimeOfDay = 15:00:00, trDateRef = Just (DaysFromToday 0), trLocationRef = Nothing}]
 
->>> parseTimeRefs "10am in 2 days"
+>>> parseWithEmptyContext "10am in 2 days"
 [TimeReference {trText = "10am in 2 days", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 2), trLocationRef = Nothing}]
 
->>> parseTimeRefs "tuesday at 3pm"
+>>> parseWithEmptyContext "tuesday at 3pm"
 [TimeReference {trText = "tuesday at 3pm", trTimeOfDay = 15:00:00, trDateRef = Just (DayOfWeekRef Tuesday), trLocationRef = Nothing}]
 
->>> parseTimeRefs "at 3pm on tuesday"
+>>> parseWithEmptyContext "at 3pm on tuesday"
 [TimeReference {trText = "at 3pm on tuesday", trTimeOfDay = 15:00:00, trDateRef = Just (DayOfWeekRef Tuesday), trLocationRef = Nothing}]
 
->>> parseTimeRefs "at 11am on the 4th "
+>>> parseWithEmptyContext "at 11am on the 4th "
 [TimeReference {trText = "at 11am on the 4th", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 Nothing), trLocationRef = Nothing}]
 
->>> parseTimeRefs "at 11am on the 4th of April"
+>>> parseWithEmptyContext "at 11am on the 4th of April"
 [TimeReference {trText = "at 11am on the 4th of April", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 (Just (4,Nothing))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "at 11am on April 4"
+>>> parseWithEmptyContext "at 11am on April 4"
 [TimeReference {trText = "at 11am on April 4", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 (Just (4,Nothing))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "at 11am on 4 April"
+>>> parseWithEmptyContext "at 11am on 4 April"
 [TimeReference {trText = "at 11am on 4 April", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 (Just (4,Nothing))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "9am in europe/london"
+>>> parseWithEmptyContext "9am in europe/london"
 [TimeReference {trText = "9am in europe/london", trTimeOfDay = 09:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneRef Europe__London)}]
 
->>> parseTimeRefs "2pm CST"
+>>> parseWithEmptyContext "2pm CST"
 [TimeReference {trText = "2pm CST", trTimeOfDay = 14:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "CST", tzaiOffsetMinutes = -360, tzaiFullName = "Central Standard Time (North America)"}))}]
 
->>> parseTimeRefs "10am UTC+03:00"
+>>> parseWithEmptyContext "10am UTC+03:00"
 [TimeReference {trText = "10am UTC+03:00", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef 180)}]
 
->>> parseTimeRefs "10am UTC+3"
+>>> parseWithEmptyContext "10am UTC+3"
 [TimeReference {trText = "10am UTC+3", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef 180)}]
 
->>> parseTimeRefs "10am UTC +3"
+>>> parseWithEmptyContext "10am UTC +3"
 [TimeReference {trText = "10am UTC +3", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef 180)}]
 
->>> parseTimeRefs "10am UTC-3"
+>>> parseWithEmptyContext "10am UTC-3"
 [TimeReference {trText = "10am UTC-3", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef (-180))}]
 
->>> parseTimeRefs "10am UTC -3"
+>>> parseWithEmptyContext "10am UTC -3"
 [TimeReference {trText = "10am UTC -3", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef (-180))}]
 
->>> parseTimeRefs "10am UTC-blabla"
+>>> parseWithEmptyContext "10am UTC-blabla"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "Let's meet between 10am and 11:30am"
+>>> parseWithEmptyContext "Let's meet between 10am and 11:30am"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing},TimeReference {trText = "11:30am", trTimeOfDay = 11:30:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "35pm"
+>>> parseWithEmptyContext "35pm"
 []
 
->>> parseTimeRefs "35pmkek"
+>>> parseWithEmptyContext "35pmkek"
 []
 
->>> parseTimeRefs "15:00pm"
+>>> parseWithEmptyContext "15:00pm"
 [TimeReference {trText = "15:00pm", trTimeOfDay = 15:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "13:00 Nov 06"
+>>> parseWithEmptyContext "13:00 Nov 06"
 [TimeReference {trText = "13:00 Nov 06", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "11:12:13 nOv 1"
+>>> parseWithEmptyContext "11:12:13 nOv 1"
 [TimeReference {trText = "11:12:13 nOv 1", trTimeOfDay = 11:12:00, trDateRef = Just (DayOfMonthRef 1 (Just (11,Nothing))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "13:00 06 Nov"
+>>> parseWithEmptyContext "13:00 06 Nov"
 [TimeReference {trText = "13:00 06 Nov", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "10am 11am"
+>>> parseWithEmptyContext "10am 11am"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing},TimeReference {trText = "11am", trTimeOfDay = 11:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "1:12:23pm"
+>>> parseWithEmptyContext "1:12:23pm"
 [TimeReference {trText = "1:12:23pm", trTimeOfDay = 13:12:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "12am the day after tomorrow"
+>>> parseWithEmptyContext "12am the day after tomorrow"
 [TimeReference {trText = "12am the day after tomorrow", trTimeOfDay = 12:00:00, trDateRef = Just (DaysFromToday 2), trLocationRef = Nothing}]
 
->>> parseTimeRefs "12am day after tomorrow"
+>>> parseWithEmptyContext "12am day after tomorrow"
 [TimeReference {trText = "12am day after tomorrow", trTimeOfDay = 12:00:00, trDateRef = Just (DaysFromToday 2), trLocationRef = Nothing}]
 
->>> parseTimeRefs "12am 3 days ahead"
+>>> parseWithEmptyContext "12am 3 days ahead"
 [TimeReference {trText = "12am 3 days ahead", trTimeOfDay = 12:00:00, trDateRef = Just (DaysFromToday 3), trLocationRef = Nothing}]
 
->>> parseTimeRefs "9:3am"
+>>> parseWithEmptyContext "9:3am"
 []
 
->>> parseTimeRefs "13:00 06 nov"
+>>> parseWithEmptyContext "13:00 06 nov"
 [TimeReference {trText = "13:00 06 nov", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "13:00 nov 06"
+>>> parseWithEmptyContext "13:00 nov 06"
 [TimeReference {trText = "13:00 nov 06", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "today,10am"
+>>> parseWithEmptyContext "today,10am"
 [TimeReference {trText = "today,10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 0), trLocationRef = Nothing}]
 
->>> parseTimeRefs "today ,   10am"
+>>> parseWithEmptyContext "today ,   10am"
 [TimeReference {trText = "today , 10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 0), trLocationRef = Nothing}]
 
->>> parseTimeRefs "today,   10am"
+>>> parseWithEmptyContext "today,   10am"
 [TimeReference {trText = "today, 10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 0), trLocationRef = Nothing}]
 
->>> parseTimeRefs "today ,10am"
+>>> parseWithEmptyContext "today ,10am"
 [TimeReference {trText = "today ,10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 0), trLocationRef = Nothing}]
 
->>> parseTimeRefs "10am aMeRiCa/Argentina/Buenos_Aires"
+>>> parseWithEmptyContext "10am aMeRiCa/Argentina/Buenos_Aires"
 [TimeReference {trText = "10am aMeRiCa/Argentina/Buenos_Aires", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneRef America__Argentina__Buenos_Aires)}]
 
->>> parseTimeRefs "10am America/North_Dakota/New_Salem"
+>>> parseWithEmptyContext "10am America/North_Dakota/New_Salem"
 [TimeReference {trText = "10am America/North_Dakota/New_Salem", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneRef America__North_Dakota__New_Salem)}]
 
->>> parseTimeRefs "10am America/port-au-Prince"
+>>> parseWithEmptyContext "10am America/port-au-Prince"
 [TimeReference {trText = "10am America/port-au-Prince", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneRef America__Port_au_Prince)}]
 
->>> parseTimeRefs "10am MSKC"
+>>> parseWithEmptyContext "10am MSKC"
 [TimeReference {trText = "10am MSKC", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (UnknownTimeZoneAbbreviationRef (UnknownTimeZoneAbbrev {utzaAbbrev = "MSKC", utzaCandidates = ["MSK"]}))}]
 
->>> parseTimeRefs "10am KSMC"
+>>> parseWithEmptyContext "10am KSMC"
 [TimeReference {trText = "10am KSMC", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (UnknownTimeZoneAbbreviationRef (UnknownTimeZoneAbbrev {utzaAbbrev = "KSMC", utzaCandidates = []}))}]
 
->>> parseTimeRefs "10am KSMc"
+>>> parseWithEmptyContext "10am KSMc"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "10am K"
+>>> parseWithEmptyContext "10am K"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "10am KAMAZN"
+>>> parseWithEmptyContext "10am KAMAZN"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "01:03 6 November America/Winnipeg"
+>>> parseWithEmptyContext "01:03 6 November America/Winnipeg"
 [TimeReference {trText = "01:03 6 November America/Winnipeg", trTimeOfDay = 01:03:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Just (TimeZoneRef America__Winnipeg)}]
 
->>> parseTimeRefs "01:03 6 November 2022 America/Winnipeg"
+>>> parseWithEmptyContext "01:03 6 November 2022 America/Winnipeg"
 [TimeReference {trText = "01:03 6 November 2022 America/Winnipeg", trTimeOfDay = 01:03:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Just 2022))), trLocationRef = Just (TimeZoneRef America__Winnipeg)}]
 
->>> parseTimeRefs "01:03 2022 6 November America/Winnipeg"
+>>> parseWithEmptyContext "01:03 2022 6 November America/Winnipeg"
 [TimeReference {trText = "01:03 2022 6 November America/Winnipeg", trTimeOfDay = 01:03:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Just 2022))), trLocationRef = Just (TimeZoneRef America__Winnipeg)}]
 
->>> parseTimeRefs "7.30 pm "
+>>> parseWithEmptyContext "7.30 pm "
 [TimeReference {trText = "7.30 pm", trTimeOfDay = 19:30:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "7.30"
+>>> parseWithEmptyContext "7.30"
 []
 
->>> parseTimeRefs "19h "
+>>> parseWithEmptyContext "19h "
 [TimeReference {trText = "19h", trTimeOfDay = 19:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "19h01 "
+>>> parseWithEmptyContext "19h01 "
 [TimeReference {trText = "19h01", trTimeOfDay = 19:01:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "7:30pm 03/08/2022"
+>>> parseWithEmptyContext "7:30pm 03/08/2022"
 [TimeReference {trText = "7:30pm 03/08/2022", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "7:30pm 3-08-2022"
+>>> parseWithEmptyContext "7:30pm 3-08-2022"
 [TimeReference {trText = "7:30pm 3-08-2022", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "7:30pm 3.08.2022"
+>>> parseWithEmptyContext "7:30pm 3.08.2022"
 [TimeReference {trText = "7:30pm 3.08.2022", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "7:30pm 2022/08/3"
+>>> parseWithEmptyContext "7:30pm 2022/08/3"
 [TimeReference {trText = "7:30pm 2022/08/3", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "2022.8.03 7:30 pm  "
+>>> parseWithEmptyContext "2022.8.03 7:30 pm  "
 [TimeReference {trText = "2022.8.03 7:30 pm", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "7:30pm 2022.8.03 America/Havana"
+>>> parseWithEmptyContext "7:30pm 2022.8.03 America/Havana"
 [TimeReference {trText = "7:30pm 2022.8.03 America/Havana", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Just (TimeZoneRef America__Havana)}]
 
->>> parseTimeRefs "tomorrow 10am -11 am"
+>>> parseWithEmptyContext "tomorrow 10am -11 am"
 [TimeReference {trText = "tomorrow 10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "tomorrow 11 am", trTimeOfDay = 11:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
 
->>> parseTimeRefs "tomorrow 10am /  11 am"
+>>> parseWithEmptyContext "tomorrow 10am /  11 am"
 [TimeReference {trText = "tomorrow 10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "tomorrow 11 am", trTimeOfDay = 11:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
 
->>> parseTimeRefs "between 10am and 11:30am UTC"
+>>> parseWithEmptyContext "between 10am and 11:30am UTC"
 [TimeReference {trText = "10am UTC", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"}))},TimeReference {trText = "11:30am UTC", trTimeOfDay = 11:30:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"}))}]
 
->>> parseTimeRefs "Let's go on Wednesday at 10:00 or 11:00."
+>>> parseWithEmptyContext "Let's go on Wednesday at 10:00 or 11:00."
 [TimeReference {trText = "on Wednesday at 10:00", trTimeOfDay = 10:00:00, trDateRef = Just (DayOfWeekRef Wednesday), trLocationRef = Nothing},TimeReference {trText = "on Wednesday 11:00", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfWeekRef Wednesday), trLocationRef = Nothing}]
 
->>> parseTimeRefs "10-11pm tomorrow works for me"
+>>> parseWithEmptyContext "10-11pm tomorrow works for me"
 [TimeReference {trText = "10pm tomorrow", trTimeOfDay = 22:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "11pm tomorrow", trTimeOfDay = 23:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
 
->>> parseTimeRefs "How about 10:00 or 11:00 pm tomorrow?"
+>>> parseWithEmptyContext "How about 10:00 or 11:00 pm tomorrow?"
 [TimeReference {trText = "10:00 pm tomorrow", trTimeOfDay = 22:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "11:00 pm tomorrow", trTimeOfDay = 23:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
 
->>> parseTimeRefs "7.30-8.30pm"
+>>> parseWithEmptyContext "7.30-8.30pm"
 [TimeReference {trText = "7.30pm", trTimeOfDay = 19:30:00, trDateRef = Nothing, trLocationRef = Nothing},TimeReference {trText = "8.30pm", trTimeOfDay = 20:30:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
->>> parseTimeRefs "7.30am-8.30pm tomorrow"
+>>> parseWithEmptyContext "7.30am-8.30pm tomorrow"
 [TimeReference {trText = "7.30am tomorrow", trTimeOfDay = 07:30:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "8.30pm tomorrow", trTimeOfDay = 20:30:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
 
->>> parseTimeRefs "7.30-8.30"
+>>> parseWithEmptyContext "7.30-8.30"
 []
 
 -}
-parseTimeRefs :: Text -> [TimeReference]
+parseTimeRefs :: Text -> State TimeContext [TimeReference]
 parseTimeRefs =
   -- TODO use better error handling
-  map matchedToPlain
+  fmap (map matchedToPlain)
+    . applyContexts
     . fromMaybe []
     . parseMaybe timeRefsParser
     -- time reference can be either at the beginning or after a space
     . (Whitespace :)
     . tokenize
 
--- | Parser for multiple 'TimeReference' s.
---
--- This looks for all of them in the input and ignores everything surrounding.
-timeRefsParser :: TzParser [TimeReferenceMatched]
+-- | Parse given text using provided time context and produce new time context.
+parseWithEmptyContext :: Text -> [TimeReference]
+parseWithEmptyContext = flip evalState emptyTimeContext . parseTimeRefs
+
+applyContexts :: [ApplyContextToken] -> State TimeContext [TimeReferenceMatched]
+applyContexts lst = mapMaybe getTimeRef <$> mapM processACTToken lst
+  where
+  getTimeRef (ACTTimeReference t) = Just t
+  getTimeRef _ = Nothing
+
+  processACTToken :: ApplyContextToken -> State TimeContext ApplyContextToken
+  processACTToken = \case
+    d@(ACTDateReference ma) -> do
+      setCurrentDate ma
+      pure d
+    ACTTimeReference tr -> do
+      tr' <- useCurrentDate tr >>= useCurrentLoc
+      pure $ ACTTimeReference tr'
+    where
+      setCurrentDate :: Matched DateReference -> State TimeContext ()
+      setCurrentDate ref = tcCurrentDateRefL .= Just ref
+
+      useCurrentDate :: TimeReferenceMatched -> State TimeContext TimeReferenceMatched
+      useCurrentDate tr = case trDateRef tr of
+        Nothing -> do
+          mbDefaultCurDate <- tcCurrentDateRef <$> get
+          pure $ flip (whenJustFunc mbDefaultCurDate) tr \defaultCurDate t ->
+            addDateIfMissing defaultCurDate t
+        Just dr -> do
+          setCurrentDate dr
+          pure tr
+
+      setCurrentLoc :: Matched LocationReference -> State TimeContext ()
+      setCurrentLoc ref = tcCurrentLocRefL .= Just ref
+
+      useCurrentLoc :: TimeReferenceMatched -> State TimeContext TimeReferenceMatched
+      useCurrentLoc tr = case trLocationRef tr of
+        Nothing -> do
+          mbDefaultCurLoc <- tcCurrentLocRef <$> get
+          pure $ flip (whenJustFunc mbDefaultCurLoc) tr \defaultCurLoc t ->
+            addLocationIfMissing defaultCurLoc t
+        Just lr -> do
+          setCurrentLoc lr
+          pure tr
+
+-- | Parser for a list whose element is either a full time reference or a date reference.
+timeRefsParser :: TzParser [ApplyContextToken]
 timeRefsParser = choice'
   [ do
-      tr <- try timeRefConjugParser
+      tr <- try applyContextTokenParser
       trs <- timeRefsParser
       return $ tr <> trs
   , anySingle >> timeRefsParser
   , takeRest >> pure []
+  ]
+
+data ApplyContextToken
+  = ACTTimeReference TimeReferenceMatched
+  | ACTDateReference (Matched DateReference)
+  deriving stock (Show, Eq, Generic)
+
+-- | Either time reference or date reference
+applyContextTokenParser :: TzParser [ApplyContextToken]
+applyContextTokenParser = choice'
+  [ map ACTTimeReference <$> timeRefConjugParser
+  , L.singleton . ACTDateReference . matched <$> match dateRefParser
   ]
 
 -- | Parses entries like @between 10am and 11am@ or
@@ -417,8 +477,10 @@ timeEntryParser = do
             applyIsAm isAm ref = do
               let shouldAppend = isNothing $ getIsAm ref
               whenFunc shouldAppend (modifyText (<> mtText isAm)) $ fmap (($ mtValue isAm) . snd) ref
+
             extractDefaultResult :: Matched (Maybe (TimeOfDay, a), b) -> Maybe (Matched TimeOfDay)
             extractDefaultResult ref = traverse (fmap fst . fst) ref
+
         case isAmOptions of
           [isAm] -> pure $ (TEPair `on` applyIsAm isAm) firstRef secondRef
           _ -> maybe empty pure $ TEPair <$> extractDefaultResult firstRef <*> extractDefaultResult secondRef
@@ -542,7 +604,7 @@ dateParserFormat = do
         y <- yearParser
         m <- delim >> monthOfYearNumberParser
         (d, _) <- delim >> dayOfMonthParser
-        pure $ DayOfMonthRef d $ Just (m, (Just y))
+        pure $ DayOfMonthRef d $ Just (m, Just y)
 
       format2 :: TzParser a -> TzParser DateReference
       format2 delim = do
@@ -557,7 +619,7 @@ dateParserVerbose :: TzParser DateReference
 dateParserVerbose = do
   precYear <- optional' ( do y <- yearParser; spacedComma; pure y )
   _ <- optional' (relationPreposition >> space)
-  (dayOfMonth, monthOfYear) <- choice' $
+  (dayOfMonth, monthOfYear) <- choice'
     [ do
         _ <- optional' (word' "the" >> space)
         (dayOfMonth, hasSuffix) <- dayOfMonthParser
@@ -664,7 +726,7 @@ isPossibleTimezoneAbbrev w =
   T.all isUpper w
     && T.length w >= 2
     && T.length w <= 5
-    && not (w `elem` ["AM", "PM", "OR", "AND"])
+    && notElem w ["AM", "PM", "OR", "AND"]
 
 --------------------------------------------------------------------------------
 -- Storages
