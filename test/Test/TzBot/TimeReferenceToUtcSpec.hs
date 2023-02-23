@@ -162,7 +162,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
     , testCase "Day of month and month of year, 1" $
         mkTestCase $ TestEntry
           { teTimeRef =
-              TimeReference "" (TimeOfDay 8 0 0) (Just $ DayOfMonthRef 14 (Just 1)) Nothing
+              TimeReference "" (TimeOfDay 8 0 0) (Just $ DayOfMonthRef 14 $ Just (1, Nothing)) Nothing
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =
@@ -172,7 +172,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
     , testCase "Day of month and month of year, prefer future day if it's further" $
         mkTestCase $ TestEntry
           { teTimeRef =
-              TimeReference "" (TimeOfDay 0 30 0) (Just $ DayOfMonthRef 10 (Just 2)) Nothing
+              TimeReference "" (TimeOfDay 0 30 0) (Just $ DayOfMonthRef 10 $ Just (2, Nothing)) Nothing
           , teUserLabel = label1
           , teCurrentTime = toUTC [tz|2022-06-15 10:00:00 [Europe/Helsinki]|]
           , teResult =
@@ -183,7 +183,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
     , testCase "Day of month and month of year, prefer past day if it's much closer" $
         mkTestCase $ TestEntry
           { teTimeRef =
-              TimeReference "" (TimeOfDay 8 0 0) (Just $ DayOfMonthRef 10 (Just 4)) Nothing
+              TimeReference "" (TimeOfDay 8 0 0) (Just $ DayOfMonthRef 10 $ Just (4, Nothing)) Nothing
           , teUserLabel = label1
           , teCurrentTime = toUTC [tz|2022-06-15 10:00:00 [Europe/Helsinki]|]
           , teResult =
@@ -195,7 +195,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                             \ day of month and month of year, same day" $
         mkTestCase $ TestEntry
           { teTimeRef =
-              TimeReference "" (TimeOfDay 8 0 0) (Just $ DayOfMonthRef 14 (Just 12)) Nothing
+              TimeReference "" (TimeOfDay 8 0 0) (Just $ DayOfMonthRef 14 $ Just (12, Nothing)) Nothing
           , teUserLabel = label1
           , teCurrentTime = time1
           , teResult =

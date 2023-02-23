@@ -14,7 +14,7 @@ import Data.String.Conversions (cs)
 import Data.Text qualified as T
 import Data.Text.Metrics (damerauLevenshteinNorm)
 import Data.Time (DayOfWeek(..))
-import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear)
+import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear, Year)
 import Data.Time.LocalTime (TimeOfDay(..))
 import Data.Time.Zones.All (TZLabel, tzNameLabelMap)
 import Glider.NLP.Tokenizer (Token(..), tokenize)
@@ -22,6 +22,7 @@ import Text.Megaparsec hiding (Token)
 
 import TzBot.Instances ()
 import TzBot.TimeReference
+import TzBot.Util
 import TzBot.Util qualified as CI
 
 type TzParser = Parsec Void [Token]
@@ -65,13 +66,13 @@ type TzParser = Parsec Void [Token]
 [TimeReference {trText = "at 11am on the 4th", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 Nothing), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "at 11am on the 4th of April"
-[TimeReference {trText = "at 11am on the 4th of April", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 (Just 4)), trLocationRef = Nothing}]
+[TimeReference {trText = "at 11am on the 4th of April", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 (Just (4,Nothing))), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "at 11am on April 4"
-[TimeReference {trText = "at 11am on April 4", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 (Just 4)), trLocationRef = Nothing}]
+[TimeReference {trText = "at 11am on April 4", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 (Just (4,Nothing))), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "at 11am on 4 April"
-[TimeReference {trText = "at 11am on 4 April", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 (Just 4)), trLocationRef = Nothing}]
+[TimeReference {trText = "at 11am on 4 April", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfMonthRef 4 (Just (4,Nothing))), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "9am in europe/london"
 [TimeReference {trText = "9am in europe/london", trTimeOfDay = 09:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneRef Europe__London)}]
@@ -85,8 +86,14 @@ type TzParser = Parsec Void [Token]
 >>> parseTimeRefs "10am UTC+3"
 [TimeReference {trText = "10am UTC+3", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef 180)}]
 
+>>> parseTimeRefs "10am UTC +3"
+[TimeReference {trText = "10am UTC +3", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef 180)}]
+
 >>> parseTimeRefs "10am UTC-3"
 [TimeReference {trText = "10am UTC-3", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef (-180))}]
+
+>>> parseTimeRefs "10am UTC -3"
+[TimeReference {trText = "10am UTC -3", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (OffsetRef (-180))}]
 
 >>> parseTimeRefs "10am UTC-blabla"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
@@ -104,13 +111,13 @@ type TzParser = Parsec Void [Token]
 [TimeReference {trText = "15:00pm", trTimeOfDay = 15:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
 >>> parseTimeRefs "13:00 Nov 06"
-[TimeReference {trText = "13:00 Nov 06", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just 11)), trLocationRef = Nothing}]
+[TimeReference {trText = "13:00 Nov 06", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "11:12:13 nOv 1"
-[TimeReference {trText = "11:12:13 nOv 1", trTimeOfDay = 11:12:00, trDateRef = Just (DayOfMonthRef 1 (Just 11)), trLocationRef = Nothing}]
+[TimeReference {trText = "11:12:13 nOv 1", trTimeOfDay = 11:12:00, trDateRef = Just (DayOfMonthRef 1 (Just (11,Nothing))), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "13:00 06 Nov"
-[TimeReference {trText = "13:00 06 Nov", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just 11)), trLocationRef = Nothing}]
+[TimeReference {trText = "13:00 06 Nov", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "10am 11am"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing},TimeReference {trText = "11am", trTimeOfDay = 11:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
@@ -131,10 +138,10 @@ type TzParser = Parsec Void [Token]
 []
 
 >>> parseTimeRefs "13:00 06 nov"
-[TimeReference {trText = "13:00 06 nov", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just 11)), trLocationRef = Nothing}]
+[TimeReference {trText = "13:00 06 nov", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "13:00 nov 06"
-[TimeReference {trText = "13:00 nov 06", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just 11)), trLocationRef = Nothing}]
+[TimeReference {trText = "13:00 nov 06", trTimeOfDay = 13:00:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "today,10am"
 [TimeReference {trText = "today,10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 0), trLocationRef = Nothing}]
@@ -172,13 +179,52 @@ type TzParser = Parsec Void [Token]
 >>> parseTimeRefs "10am KAMAZN"
 [TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
 
+>>> parseTimeRefs "01:03 6 November America/Winnipeg"
+[TimeReference {trText = "01:03 6 November America/Winnipeg", trTimeOfDay = 01:03:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Nothing))), trLocationRef = Just (TimeZoneRef America__Winnipeg)}]
+
+>>> parseTimeRefs "01:03 6 November 2022 America/Winnipeg"
+[TimeReference {trText = "01:03 6 November 2022 America/Winnipeg", trTimeOfDay = 01:03:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Just 2022))), trLocationRef = Just (TimeZoneRef America__Winnipeg)}]
+
+>>> parseTimeRefs "01:03 2022 6 November America/Winnipeg"
+[TimeReference {trText = "01:03 2022 6 November America/Winnipeg", trTimeOfDay = 01:03:00, trDateRef = Just (DayOfMonthRef 6 (Just (11,Just 2022))), trLocationRef = Just (TimeZoneRef America__Winnipeg)}]
+
+>>> parseTimeRefs "7.30 pm "
+[TimeReference {trText = "7.30 pm", trTimeOfDay = 19:30:00, trDateRef = Nothing, trLocationRef = Nothing}]
+
+>>> parseTimeRefs "7.30"
+[]
+
+>>> parseTimeRefs "19h "
+[TimeReference {trText = "19h", trTimeOfDay = 19:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
+
+>>> parseTimeRefs "19h01 "
+[TimeReference {trText = "19h01", trTimeOfDay = 19:01:00, trDateRef = Nothing, trLocationRef = Nothing}]
+
+>>> parseTimeRefs "7:30pm 03/08/2022"
+[TimeReference {trText = "7:30pm 03/08/2022", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "7:30pm 3-08-2022"
+[TimeReference {trText = "7:30pm 3-08-2022", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "7:30pm 3.08.2022"
+[TimeReference {trText = "7:30pm 3.08.2022", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "7:30pm 2022/08/3"
+[TimeReference {trText = "7:30pm 2022/08/3", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "2022.8.03 7:30 pm "
+[TimeReference {trText = "2022.8.03 7:30 pm", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "7:30pm 2022.8.03 America/Havana"
+[TimeReference {trText = "7:30pm 2022.8.03 America/Havana", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Just (TimeZoneRef America__Havana)}]
+
 -}
 parseTimeRefs :: Text -> [TimeReference]
 parseTimeRefs =
   -- TODO use better error handling
   fromMaybe []
     . parseMaybe timeRefsParser
-    -- time reference can be either at the beginning or after the space
+    -- time reference can be either at the beginning or after a space
     . (Whitespace :)
     . tokenize
 
@@ -206,12 +252,49 @@ timeRefParser = do
 timeRefParser' :: TzParser TimeReference
 timeRefParser' = do
   let trText = ""
-  precDateRef <- optional' (do dr <- dateRefParser; spacedComma; return dr)
+  precBuilder <- fromMaybe builderInit <$> do
+    res <- optional' (builderParser False builderInit)
+    optional' spacedComma
+    pure res
   trTimeOfDay <- timeOfDayParser
-  trLocationRef <- optional' $ spacedComma >> locRefParser
-  trDateRef <- maybe (optional' $ spacedComma >> dateRefParser) (pure . Just) precDateRef
+  builder <- fromMaybe builderInit <$> optional' (builderParser True precBuilder)
+  let trLocationRef = trbLocRef builder
+      trDateRef = trbDateRef builder
   pure TimeReference {..}
 
+----------------------------------------------------------------------------
+---- Collecting of optional time contexts
+----------------------------------------------------------------------------
+data ContextBuilder = ContextBuilder
+  { trbDateRef :: Maybe DateReference
+  , trbLocRef  :: Maybe LocationReference
+  } deriving stock (Show, Eq)
+
+builderInit :: ContextBuilder
+builderInit = ContextBuilder Nothing Nothing
+
+data SumContextBuilder
+  = SCBDate DateReference
+  | SCBLocRef LocationReference
+
+sumBuilderParser :: TzParser SumContextBuilder
+sumBuilderParser =
+  choice' [SCBDate <$> dateRefParser, SCBLocRef <$> locRefParser]
+
+builderParser :: Bool -> ContextBuilder -> TzParser ContextBuilder
+builderParser allowSpace b = do
+  sumB <- optional'
+    (when allowSpace (void $ optional' spacedComma) >> sumBuilderParser)
+  case sumB of
+    Just (SCBDate dr) -> do
+      when (isJust $ trbDateRef b) empty
+      builderParser True b { trbDateRef = Just dr }
+    Just (SCBLocRef lr) -> do
+      when (isJust $ trbLocRef b) empty
+      builderParser True b { trbLocRef = Just lr }
+    Nothing -> pure b
+
+----------------------------------------------------------------------------
 -- | Parses a 'TimeOfDay'.
 --
 -- This is permissive in the space, as it allows none to be between the time and
@@ -220,13 +303,34 @@ timeOfDayParser :: TzParser TimeOfDay
 timeOfDayParser = do
   _ <- optional' (relationPreposition >> space)
   hour <- hourParser
-  maybeMin <- optional' minuteParser
-  let secondParser = minuteParser
-  _ <- optional' secondParser
 
-  isAm <- if isJust maybeMin
-          then fromMaybe True <$> optional' isAmParser
-          else isAmParser
+  (maybeMin, isAmRequired) <- choice'
+    [ do  tryHour <- anyWord
+          case T.uncons tryHour of
+            Nothing -> empty
+            Just (h, after)
+              | h `elem` ['h', 'H'] -> case after of
+                "" -> pure (Nothing, False)
+                nstr -> pure (readMinutes nstr, False)
+              | otherwise -> empty
+
+    , do  isPoint <- token' $ \case
+            Punctuation '.' -> Just True
+            Punctuation ':' -> Just False
+            _ -> Nothing
+          mins <- minuteParser
+          if isPoint
+          then pure (Just mins, True)
+          else do
+            let secondParser = minuteParser
+            _ <- optional' $ punct ':' >> secondParser
+            pure (Just mins, False)
+    , pure (Nothing, True)
+    ]
+
+  isAm <- if isAmRequired
+          then isAmParser
+          else fromMaybe True <$> optional' isAmParser
 
   let todSec = 0
       todHour
@@ -236,7 +340,7 @@ timeOfDayParser = do
         -- ignore pm if hour > 12
         | otherwise = hour
       todMin = fromMaybe 0 maybeMin
-  pure $ TimeOfDay {..}
+  pure TimeOfDay {..}
 
 isAmParser :: TzParser Bool
 isAmParser = optional' space >>
@@ -250,7 +354,7 @@ dateRefParser :: TzParser DateReference
 dateRefParser = choice'
   [ daysFromTodayParser
   , dayOfWeekRefParser
-  , dayOfMonthRefParser
+  , dateParser
   ]
 
 daysFromTodayParser :: TzParser DateReference
@@ -280,10 +384,33 @@ dayOfWeekRefParser = do
   dayName <- anyWord
   DayOfWeekRef <$> withStorage daysOfWeekStorage dayName
 
-dayOfMonthRefParser :: TzParser DateReference
-dayOfMonthRefParser = do
+dateParser :: TzParser DateReference
+dateParser = choice' [dateParserVerbose, dateParserFormat]
+
+-- TODO: maybe this should be configurable by user
+dateParserFormat :: TzParser DateReference
+dateParserFormat = do
+  let format1 :: TzParser a -> TzParser DateReference
+      format1 delim = do
+        y <- yearParser
+        m <- delim >> monthOfYearNumberParser
+        (d, _) <- delim >> dayOfMonthParser
+        pure $ DayOfMonthRef d $ Just (m, (Just y))
+
+      format2 :: TzParser a -> TzParser DateReference
+      format2 delim = do
+        (d, _) <- dayOfMonthParser
+        m <- delim >> monthOfYearNumberParser
+        y <- delim >> yearParser
+        pure $ DayOfMonthRef d $ Just (m, Just y)
+
+  choice' [f (punct delim) | f <- [format1, format2], delim <- ['/', '-', '.']]
+
+dateParserVerbose :: TzParser DateReference
+dateParserVerbose = do
+  precYear <- optional' ( do y <- yearParser; spacedComma; pure y )
   _ <- optional' (relationPreposition >> space)
-  choice' $
+  (dayOfMonth, monthOfYear) <- choice' $
     [ do
         _ <- optional' (word' "the" >> space)
         (dayOfMonth, hasSuffix) <- dayOfMonthParser
@@ -292,14 +419,18 @@ dayOfMonthRefParser = do
         -- otherwise we can consider an unrelated number
         -- as a valid day of month
         guard $ hasSuffix || isJust monthOfYear
-        pure $ DayOfMonthRef dayOfMonth monthOfYear
+        pure (dayOfMonth, monthOfYear)
     , do
         monthOfYear <- Just <$> monthOfYearParser
         spacedComma
         optional' (word' "the" >> space)
         dayOfMonth <- fst <$> dayOfMonthParser
-        pure $ DayOfMonthRef dayOfMonth monthOfYear
+        pure (dayOfMonth, monthOfYear)
     ]
+  year <- withMaybe precYear
+    (optional' (optional' spacedComma >> yearParser))
+    (pure . Just)
+  pure $ DayOfMonthRef dayOfMonth $ fmap (, year) monthOfYear
 
 dayOfMonthParser :: TzParser (DayOfMonth, Bool)
 dayOfMonthParser = do
@@ -309,10 +440,22 @@ dayOfMonthParser = do
     optional' (word' "st" <|> word' "nd" <|> word' "rd" <|> word' "th")
   pure (n, hasSuffix)
 
+monthOfYearNumberParser :: TzParser MonthOfYear
+monthOfYearNumberParser = do
+  n <- number
+  guard (n <= 12)
+  pure n
+
 monthOfYearParser :: TzParser MonthOfYear
 monthOfYearParser = do
   monName <- anyWord
   withStorage monthStorage monName
+
+yearParser :: TzParser Year
+yearParser = do
+  year <- number
+  guard $ year < 2100 && year > 1900
+  pure $ fromIntegral @Int @Integer year
 
 --------------------------------------------------------------------------------
 -- LocationReference
@@ -332,12 +475,13 @@ tzRefParser = do
 offsetRefParser :: TzParser LocationReference
 offsetRefParser = do
   oneOf $ map Word ["UTC", "GMT"]
+  optional' space
   (sign :: Int) <- choice
     [ punct '+' >> pure 1
     , punct '-' >> pure (-1)
     ]
   hours <- hourParser
-  maybeMins <- optional' minuteParser
+  maybeMins <- optional' minuteColonParser
   let minutesTotal = 60 * hours + fromMaybe 0 maybeMins
   pure $ OffsetRef (Offset $ sign * minutesTotal)
 
@@ -514,11 +658,19 @@ hourParser = do
   guard (hour < 24 && len `elem` [1,2])
   pure hour
 
+minuteColonParser :: TzParser Int
+minuteColonParser = punct ':' >> minuteParser
+
 minuteParser :: TzParser Int
 minuteParser = do
-  punct ':'
   (min, len) <- numberWithLength
   guard (len == 2 && min < 60)
+  pure min
+
+readMinutes :: Text -> Maybe Int
+readMinutes nstr = do
+  min <- readMaybe $ cs nstr
+  guard (T.length nstr == 2 && min < 60)
   pure min
 
 number :: TzParser Int
