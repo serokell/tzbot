@@ -19,12 +19,13 @@ import UnliftIO qualified
 import TzBot.Cache qualified as Cache
 import TzBot.Config (Config(..))
 import TzBot.Logger
-import TzBot.ProcessEvents.Common (getTimeReferencesFromMessage)
+import TzBot.ProcessEvents.Common
 import TzBot.Render
 import TzBot.Slack
 import TzBot.Slack.API
 import TzBot.Slack.Events
 import TzBot.Slack.Fixtures qualified as Fixtures
+import TzBot.TimeContext (emptyTimeContext)
 import TzBot.TimeReference (TimeReference)
 import TzBot.Util (whenT, withMaybe)
 
@@ -80,19 +81,16 @@ processMessageEvent evt =
   katipAddContext (MessageContext msgId) $
   whenJustM (filterMessageTypeWithLog evt) $ \mEventType ->
   whenJustM (withSenderNotBot evt) $ \sender -> do
-    timeRefs <- getTimeReferencesFromMessage msg
-    processMessageEvent' evt mEventType sender timeRefs
+    processMessageEvent' evt mEventType sender
   where
-  msg = meMessage evt
   msgId = mMessageId $ meMessage evt
 
 processMessageEvent'
   :: MessageEvent
   -> MessageEventType
   -> User
-  -> [TimeReference]
   -> BotM ()
-processMessageEvent' evt mEventType sender timeRefs =
+processMessageEvent' evt mEventType sender =
   case meChannelType evt of
     Just CTDirectChannel -> handleDirectMessage
     _ -> case mEventType of
@@ -155,25 +153,52 @@ processMessageEvent' evt mEventType sender timeRefs =
           }
     sendEphemeralMessage req
 
+  -- threadId is the same as its parent's messageId,
+  -- so use messageId if there's no thread yet
+  getMessageThreadId :: ThreadId
+  getMessageThreadId = fromMaybe (ThreadId $ unMessageId msgId) mbThreadId
+
   handleMessageChanged :: BotM ()
   handleMessageChanged = katipAddNamespaceText "edit" do
     messageRefsCache <- asks bsMessageCache
-    mbMessageRefs <- Cache.lookup msgId messageRefsCache
+    convStateCache <- asks bsConversationStateCache
+    mbMessageRefsAndState <- Cache.lookup msgId messageRefsCache
     -- if not found or expired, just ignore this message
     -- it's too old or just didn't contain any time refs
-    whenJust mbMessageRefs $ \oldRefs -> do
-      let newRefsFound = not $ all (`elem` oldRefs) timeRefs
+    whenJust mbMessageRefsAndState $ \(oldRefs, stateBefore) -> do
+      (newRefs, stateAfter) <-
+        getTimeReferencesAndNewStateFromMessage stateBefore msg
+      mbConversationState <- Cache.lookup getMessageThreadId convStateCache
+      -- If the conversation state was defined after processing this
+      -- message, we should update it.
+      whenJust mbConversationState \(lastMsgId, _conversationState) ->
+        when (lastMsgId == msgId) $
+          Cache.insert getMessageThreadId (msgId, stateAfter) convStateCache
+
+      let newRefsFound = not $ all (`elem` oldRefs) newRefs
       -- no new references found, ignoring
-      when newRefsFound $ withNonEmptyTimeRefs timeRefs \neTimeRefs -> do
-        Cache.insert msgId timeRefs messageRefsCache
+      when newRefsFound $ withNonEmptyTimeRefs newRefs \neTimeRefs -> do
+        -- This cache always keeps only "before" state in order to correctly
+        -- translate further edits.
+        Cache.insert msgId (newRefs, stateBefore) messageRefsCache
         permalink <- getMessagePermalinkCached channelId msgId
         handleChannelMessageCommon (Just permalink) neTimeRefs
 
   handleNewMessage :: BotM ()
   handleNewMessage = do
-    withNonEmptyTimeRefs timeRefs $ \neTimeRefs -> do
+    convStateCache <- asks bsConversationStateCache
+    conversationState <-
+      fmap (fromMaybe emptyTimeContext . fmap snd . join) $
+        traverse (\t -> Cache.lookup t convStateCache) mbThreadId
+    (timeRefs, newState) <-
+      getTimeReferencesAndNewStateFromMessage conversationState msg
+    when (not $ null timeRefs) $
       -- save message only if time references are present
-      asks bsMessageCache >>= Cache.insert msgId timeRefs
+      asks bsMessageCache >>= Cache.insert msgId (timeRefs, newState)
+    Cache.insert getMessageThreadId (msgId, newState) convStateCache
+    asks bsMessageCache >>= Cache.insert msgId (timeRefs, conversationState)
+
+    withNonEmptyTimeRefs timeRefs $ \neTimeRefs -> do
       handleChannelMessageCommon Nothing neTimeRefs
 
   handleChannelMessageCommon :: Maybe Text -> NonEmpty TimeReference -> BotM ()
@@ -195,8 +220,9 @@ processMessageEvent' evt mEventType sender timeRefs =
     ephemeralsMailing channelId sendActionLocal
 
   handleDirectMessage :: BotM ()
-  handleDirectMessage =
-    when (mEventType /= METMessageEdited) $
+  handleDirectMessage = when (mEventType /= METMessageEdited) $ do
+    (timeRefs, _stateAfter) <-
+      getTimeReferencesAndNewStateFromMessage emptyTimeContext msg
     withNonEmptyTimeRefs timeRefs $ \neTimeRefs -> do
     -- According to
     -- https://forums.slackcommunity.com/s/question/0D53a00008vsItQCAU

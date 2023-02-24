@@ -17,6 +17,7 @@ import TzBot.Cache (TzCache)
 import TzBot.Config.Types (BotConfig)
 import TzBot.Feedback.Dialog.Types (ReportDialogEntry, ReportDialogId)
 import TzBot.Slack.API
+import TzBot.TimeContext (TimeContext)
 import TzBot.TimeReference
 import TzBot.Util (postfixFields)
 
@@ -32,8 +33,13 @@ data BotState = BotState
   , bsUserInfoCache  :: TzCache UserId User
   , bsConversationMembersCache :: TzCache ChannelId (S.Set UserId)
   , bsReportEntries  :: TzCache ReportDialogId ReportDialogEntry
-  , bsMessageCache   :: TzCache MessageId [TimeReference]
+  , bsMessageCache   :: TzCache MessageId ([TimeReference], TimeContext)
+    -- ^ Used for keeping relevant time references and conversation state
+    -- that was _before_ this message, i.e. applied to time refs of this message.
   , bsMessageLinkCache :: TzCache MessageId Text
+  , bsConversationStateCache :: TzCache ThreadId (MessageId, TimeContext)
+    -- ^ State of a thread: current state and ID of a message which is origin
+    -- of that state
   , bsLogNamespace   :: K.Namespace
   , bsLogContext     :: K.LogContexts
   , bsLogEnv         :: K.LogEnv

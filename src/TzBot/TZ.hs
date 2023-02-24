@@ -24,7 +24,8 @@ import Data.Time.Zones.Types (TZ(..))
 import Data.Vector qualified as VB
 import Data.Vector.Unboxed qualified as VU
 
-import TzBot.TimeReference (DateReference(..), TimeRefSuccess(..), TimeReference(..))
+import TzBot.TimeReference
+  (DateReference(..), TimeRefSuccess(..), TimeReference, TimeReferenceGeneric(..))
 import TzBot.Util (NamedOffset, Offset(..))
 
 -- | Represents a specific change in offset.

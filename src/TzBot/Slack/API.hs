@@ -194,7 +194,7 @@ instance FromJSON ChannelType where
 
 newtype ThreadId = ThreadId { unThreadId :: Text }
   deriving stock (Eq, Show)
-  deriving newtype (ToHttpApiData, FromJSON, ToJSON, Buildable)
+  deriving newtype (ToHttpApiData, FromJSON, ToJSON, Buildable, Hashable)
 
 newtype MessageId = MessageId { unMessageId :: Text }
   deriving stock (Eq, Show, Ord)

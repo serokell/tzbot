@@ -18,7 +18,7 @@ import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
 import Test.Tasty.Runners (TestTree(..))
 
-import TzBot.Parser (parseTimeRefs)
+import TzBot.Parser (parseWithEmptyContext)
 import TzBot.Render
 import TzBot.Slack.API
 
@@ -246,7 +246,7 @@ translWithCommonNote q w e = TranslationPair q w (Just e) (Just e)
 
 mkTestCase :: ModalFlag -> UTCTime -> Text -> User -> User -> [TranslationPair] -> Assertion
 mkTestCase modalFlag eventTimestamp refText sender otherUser expectedOtherUserTransl = do
-  let [timeRef] = parseTimeRefs refText
+  let [timeRef] = parseWithEmptyContext refText
       ephemeralTemplate =
         renderTemplate modalFlag eventTimestamp sender $
           NE.singleton timeRef

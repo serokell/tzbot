@@ -15,7 +15,7 @@ import Test.Tasty.HUnit (Assertion, assertFailure, testCase)
 import Test.Tasty.Runners (TestTree(TestGroup))
 import Text.Interpolation.Nyan (int, rmode', rmode's)
 
-import TzBot.Parser (parseTimeRefs)
+import TzBot.Parser (parseWithEmptyContext)
 import TzBot.TimeReference
   (DateReference(..), LocationReference(..), TimeReference, TimeReferenceGeneric(..),
   TimeZoneAbbreviationInfo(..))
@@ -73,35 +73,68 @@ test_parserSpec = TestGroup "ParserBig"
           (Just (DayOfWeekRef Thursday))
           (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
       ]
-  , testCase "Some hyphenated intervals" $
+  , testCase "Some hyphenated intervals, separate date reference" $
     mkTestCase
       "Hi guys! Let’s have a sync call tomorrow? Almost every time from 7am-2pm UTC works (except 10:30am - 12pm UTC)"
       [ TimeReference
-          "7am UTC"
+          "7am UTC (tomorrow)"
           (TimeOfDay 07 00 00)
-          (Nothing)
+          (Just (DaysFromToday 1))
           (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
       , TimeReference
-          "2pm UTC"
+          "2pm UTC (tomorrow)"
           (TimeOfDay 14 00 00)
-          (Nothing)
+          (Just (DaysFromToday 1))
           (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
       , TimeReference
-          "10:30am UTC"
+          "10:30am UTC (tomorrow)"
           (TimeOfDay 10 30 00)
-          (Nothing)
+          (Just (DaysFromToday 1))
           (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
       , TimeReference
-          "12pm UTC"
+          "12pm UTC (tomorrow)"
           (TimeOfDay 12 00 00)
-          (Nothing)
+          (Just (DaysFromToday 1))
+          (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
+      ]
+  , testCase "Pick last date reference" $
+    mkTestCase
+      "I wanted to meet tomorrow, but seems it's not possible... maybe 3rd march? Let's try something between 10am and 11am UTC"
+      [ TimeReference
+          "10am UTC (3rd march)"
+          (TimeOfDay 10 00 00)
+          (Just (DayOfMonthRef 3 (Just (3,Nothing))))
+          (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
+      , TimeReference
+          "11am UTC (3rd march)"
+          (TimeOfDay 11 00 00)
+          (Just (DayOfMonthRef 3 (Just (3,Nothing))))
+          (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
+      ]
+  , testCase "Using location reference from previous full time reference" $
+    mkTestCase
+      "How about tomorrow 8am-12am UTC? For me 9am is the most perfect time"
+      [ TimeReference
+          "tomorrow 8am UTC"
+          (TimeOfDay 08 00 00)
+          (Just (DaysFromToday 1))
+          (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
+      , TimeReference
+          "tomorrow 12am UTC"
+          (TimeOfDay 12 00 00)
+          (Just (DaysFromToday 1))
+          (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
+      , TimeReference
+          "9am (tomorrow) (UTC)"
+          (TimeOfDay 09 00 00)
+          (Just (DaysFromToday 1))
           (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
       ]
   ]
 
 mkTestCase :: HasCallStack => Text -> [TimeReference] -> Assertion
 mkTestCase input expectedRefs = do
-  let outputRefs = parseTimeRefs input
+  let outputRefs = parseWithEmptyContext input
   assertRefPairs expectedRefs outputRefs
 
 assertRefPairs :: HasCallStack => [TimeReference] -> [TimeReference] -> Assertion

@@ -18,7 +18,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Text.Interpolation.Nyan
 
-import TzBot.Parser (parseTimeRefs)
+import TzBot.Parser (parseWithEmptyContext)
 import TzBot.TZ (TimeShift(..), checkForTimeshifts, checkForTimeshifts')
 import TzBot.TimeReference (TimeReferenceToUTCResult(..), timeReferenceToUTC)
 import TzBot.Util
@@ -120,7 +120,7 @@ test_checkForTimeshifts =
   where
     check :: UTCTime -> Text -> TZLabel -> TZLabel -> [TimeShift] -> Assertion
     check now input senderTimeZone receiverTimeZone expectedTimeShifts = do
-      case parseTimeRefs input of
+      case parseWithEmptyContext input of
         [timeRef] ->
           case timeReferenceToUTC senderTimeZone now timeRef of
             TRTUSuccess timeRefSuccess ->
