@@ -17,8 +17,9 @@ import Data.Char (isLower)
 import Data.HashMap.Strict qualified as H
 import Data.List (stripPrefix)
 import Data.String.Conversions (cs)
-import Data.Time (TimeZone, UTCTime, defaultTimeLocale, parseTimeM)
+import Data.Time (TimeZone(..), UTCTime, defaultTimeLocale, parseTimeM)
 import Data.Time.TZInfo qualified as TZI
+import Data.Time.TZTime (TZTime, tzTimeOffset)
 import Data.Time.Zones.Types (TZ(..))
 import Data.Vector qualified as V
 import Data.Vector.Unboxed qualified as VU
@@ -209,3 +210,6 @@ tzInfoFromOffset offset@(Offset offsetMinutes) =
 
 secondsPerMinute :: Int
 secondsPerMinute = 60
+
+tztimeOffset :: TZTime -> Offset
+tztimeOffset = Offset . timeZoneMinutes . tzTimeOffset

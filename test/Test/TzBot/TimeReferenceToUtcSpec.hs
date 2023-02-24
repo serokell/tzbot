@@ -12,7 +12,7 @@ import Universum
 import Data.Time
 import Data.Time.TZInfo (TZLabel(America__Havana, Asia__Tashkent, Europe__Helsinki))
 import Data.Time.TZInfo qualified as TZI
-import Data.Time.TZTime (toUTC)
+import Data.Time.TZTime (TZTime, toUTC)
 import Data.Time.TZTime.QQ (tz)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
@@ -31,6 +31,9 @@ time2 = toUTC [tz|2022-03-11 10:30:00 [America/Havana]|]
 
 time3 :: UTCTime
 time3 = toUTC [tz|2022-11-04 10:30:00 [America/Havana]|]
+
+arbitraryTime :: TZTime
+arbitraryTime = [tz|2022-02-02 10:00:00 [UTC]|]
 
 labelHavana :: TZLabel
 labelHavana = America__Havana
@@ -57,9 +60,12 @@ comparePartlyTimeRefSuccess t1 t2 =
   && trsOriginalDate t1 == trsOriginalDate t2
 
 instance Eq TranslateWrapper where
-  (TranslateWrapper (TRTUSuccess s1)) == (TranslateWrapper (TRTUSuccess s2)) =
-    comparePartlyTimeRefSuccess s1 s2
-  TranslateWrapper q1 == TranslateWrapper q2 = q1 == q2
+  (TranslateWrapper v1) == (TranslateWrapper v2) = case (v1, v2) of
+    (TRTUSuccess s1, TRTUSuccess s2) -> comparePartlyTimeRefSuccess s1 s2
+    (TRTUInvalid g1, TRTUInvalid g2) -> ((==) `on` giErrorInfo) g1 g2
+    (TRTUAmbiguous o1, TRTUAmbiguous o2) -> ((==) `on` oiErrorInfo) o1 o2
+    (TRTUInvalidTimeZoneAbbrev a1, TRTUInvalidTimeZoneAbbrev a2) -> a1 == a2
+    (_, _) -> False
 
 mkTestCase :: TestEntry -> Assertion
 mkTestCase TestEntry {..} = do
@@ -276,7 +282,8 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ DaysFromToday 2) (Just $ TimeZoneRef labelHavana)
           , teUserLabel = labelHavana
           , teCurrentTime = time2
-          , teResult = TRTUInvalid $ TimeShiftErrorInfo labelHavana (fromGregorian 2022 3 13)
+          , teResult = TRTUInvalid $ GapInfo arbitraryTime arbitraryTime $
+            TimeShiftErrorInfo (fromGregorian 2022 3 13)
           }
     , testCase "Turn on DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
@@ -306,7 +313,8 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
                 (Just $ DaysFromToday 2) (Just $ TimeZoneRef labelHavana)
           , teUserLabel = labelHavana
           , teCurrentTime = time3
-          , teResult = TRTUAmbiguous $ TimeShiftErrorInfo labelHavana (fromGregorian 2022 11 6)
+          , teResult = TRTUAmbiguous $ OverlapInfo arbitraryTime arbitraryTime $
+            TimeShiftErrorInfo (fromGregorian 2022 11 6)
           }
     , testCase "Turn off DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
