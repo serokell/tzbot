@@ -55,6 +55,7 @@ library
       TzBot.Slack.Fixtures
       TzBot.Slack.Modal
       TzBot.TimeReference
+      TzBot.TZ
       TzBot.Util
   other-modules:
       Paths_tzbot
@@ -297,6 +298,7 @@ test-suite tzbot-test
   main-is: Main.hs
   other-modules:
       Test.TzBot.ConfigSpec
+      Test.TzBot.GetTimeshiftsSpec
       Test.TzBot.HandleTooManyRequests
       Test.TzBot.MessageBlocksSpec
       Test.TzBot.RenderSpec

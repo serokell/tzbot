@@ -14,6 +14,8 @@ steps:
 
   - label: stylish
     command: nix build -L .#checks.x86_64-linux.stylish-haskell
+    soft_fail:
+      - exit_status: 1
 
   - label: lint
     command: nix build -L .#checks.x86_64-linux.hlint

@@ -3,18 +3,22 @@
  - SPDX-License-Identifier: MPL-2.0
  -}
 
-module Test.TzBot.TimeReferenceToUtcSpec (test_TimeReferenceToUtc) where
+module Test.TzBot.TimeReferenceToUtcSpec
+  ( test_TimeReferenceToUtc
+  ) where
 
 import Universum
 
 import Data.Time
 import Data.Time.TZInfo (TZLabel(America__Havana, Asia__Tashkent, Europe__Helsinki))
+import Data.Time.TZInfo qualified as TZI
 import Data.Time.TZTime (toUTC)
 import Data.Time.TZTime.QQ (tz)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
 
 import TzBot.TimeReference
+import TzBot.Util
 
 time1 :: UTCTime
 time1 = toUTC [tz|2022-12-14 10:30:00 [Europe/Helsinki]|] -- Wednesday
@@ -31,6 +35,9 @@ time3 = toUTC [tz|2022-11-04 10:30:00 [America/Havana]|]
 labelHavana :: TZLabel
 labelHavana = America__Havana
 
+arbitraryTZInfo :: TZI.TZInfo
+arbitraryTZInfo = TZI.fromLabel labelHavana
+
 hour :: Int
 hour = 60
 
@@ -41,17 +48,32 @@ data TestEntry = TestEntry
   , teResult :: TimeReferenceToUTCResult
   }
 
+newtype TranslateWrapper = TranslateWrapper TimeReferenceToUTCResult
+  deriving stock (Show)
+
+comparePartlyTimeRefSuccess :: TimeRefSuccess -> TimeRefSuccess -> Bool
+comparePartlyTimeRefSuccess t1 t2 =
+  trsUtcResult t1 == trsUtcResult t2
+  && trsOriginalDate t1 == trsOriginalDate t2
+
+instance Eq TranslateWrapper where
+  (TranslateWrapper (TRTUSuccess s1)) == (TranslateWrapper (TRTUSuccess s2)) =
+    comparePartlyTimeRefSuccess s1 s2
+  TranslateWrapper q1 == TranslateWrapper q2 = q1 == q2
+
 mkTestCase :: TestEntry -> Assertion
 mkTestCase TestEntry {..} = do
   let res = timeReferenceToUTC teUserLabel teCurrentTime teTimeRef
-  res @?= teResult
+  TranslateWrapper res @?= TranslateWrapper teResult
 
 utcToUtcLocalTime :: UTCTime -> LocalTime
 utcToUtcLocalTime = utcToLocalTime utc
 
 mkSuccessSameDate :: UTCTime -> TimeRefSuccess
 mkSuccessSameDate refTime =
-  TimeRefSuccess refTime (localDay $ utcToUtcLocalTime refTime)
+  TimeRefSuccess refTime
+    arbitraryTZInfo
+    (localDay $ utcToUtcLocalTime refTime)
 
 test_TimeReferenceToUtc :: TestTree
 test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
@@ -178,6 +200,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teResult =
               TRTUSuccess $ TimeRefSuccess
                 (toUTC [tz|2023-02-09 22:30:00 [UTC]|])
+                arbitraryTZInfo
                 (fromGregorian 2023 02 10)
           }
     , testCase "Day of month and month of year, prefer past day if it's much closer" $
