@@ -37,3 +37,10 @@ steps:
 
   - label: REUSE lint
     command: nix build -L .#checks.x86_64-linux.reuse-lint
+
+  # wait for all checks to finish
+  - wait
+
+  - label : deploy staging
+    command: nix develop .#ci -c deploy .#staging --ssh-user deploy --skip-checks
+    branches: staging
