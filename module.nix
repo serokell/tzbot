@@ -44,6 +44,7 @@ in
     systemd.services.tzbot = {
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
+      unitConfig.ConditionPathExists = [ cfg.package ];
       script = ''
         export SLACK_TZ_APP_TOKEN="${cfg.slackAppToken}"
         export SLACK_TZ_BOT_TOKEN="${cfg.slackBotToken}"

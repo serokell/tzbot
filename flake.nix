@@ -23,9 +23,22 @@
     };
   };
 
-  outputs = { self, nixpkgs, haskell-nix, hackage, stackage, serokell-nix, flake-compat, flake-utils, ... }@inputs:
+  outputs = { self, nixpkgs, haskell-nix, hackage, stackage, serokell-nix, flake-compat, flake-utils, deploy-rs, ... }@inputs:
   {
     nixosModules.default = import ./module.nix inputs;
+
+    deploy.nodes = {
+      staging = {
+        hostname = "tejat-prior.gemini.serokell.team";
+        user = "deploy";
+        sshOpts = [ "-p 17788" ];
+        profiles = {
+          tzbot.path = deploy-rs.lib.x86_64-linux.activate.custom
+            self.packages.x86_64-linux.tzbot
+            "/run/current-system/sw/bin/systemctl restart tzbot";
+        };
+      };
+    };
   } // (flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
     let
       haskellPkgs = haskell-nix.legacyPackages."${system}";
@@ -100,11 +113,12 @@
 
         hlint = pkgs.build.haskell.hlint ./.;
         stylish-haskell = pkgs.build.haskell.stylish-haskell ./.;
-      };
+      } // deploy-rs.lib.${system}.deployChecks self.deploy;
       devShells = {
         ci = pkgs.mkShell {
           buildInputs = [
             stack2cabal
+            deploy-rs.defaultPackage.${system}
           ];
         };
         doctest = hs-pkgs.shellFor {
