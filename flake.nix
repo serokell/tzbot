@@ -35,7 +35,7 @@
         profiles = {
           tzbot.path = deploy-rs.lib.x86_64-linux.activate.custom
             self.packages.x86_64-linux.tzbot
-            "/run/current-system/sw/bin/systemctl restart tzbot";
+            "sudo /run/current-system/sw/bin/systemctl restart tzbot";
         };
       };
     };
