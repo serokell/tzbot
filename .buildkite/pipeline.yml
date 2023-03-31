@@ -32,8 +32,6 @@ steps:
 
   - label: xrefcheck
     command: nix run github:serokell/xrefcheck
-    soft_fail:
-      - exit_status: 1
 
   - label: REUSE lint
     command: nix build -L .#checks.x86_64-linux.reuse-lint
