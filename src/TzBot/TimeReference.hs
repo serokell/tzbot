@@ -33,18 +33,6 @@ We use this type alias to make this distinction a bit more clear.
 -}
 type TimeReferenceText = Text
 
--- | Datatype for keeping value together with its parsed text (as a sequence of tokens)
-data Matched a = Matched
-  { mtText :: Text
-    -- ^ Consumed text
-  , mtValue :: a
-    -- ^ Parsed value
-  } deriving stock (Show, Eq, Generic, Functor, Foldable, Traversable)
-
--- TODO: use lenses
-modifyText :: (Text -> Text) -> Matched a -> Matched a
-modifyText f Matched {..} = Matched {mtText = f mtText, ..}
-
 -- | A reference to a point in time, e.g. "tuesday at 10am", "3pm CST on July 7th"
 data TimeReference = TimeReference
   { trText :: TimeReferenceText -- ^ The original section of the text from where this `TimeReference` was parsed.
@@ -53,22 +41,6 @@ data TimeReference = TimeReference
   , trLocationRef :: Maybe LocationReference
   }
   deriving stock (Eq, Show)
-
-data TimeReferenceMatched = TimeReferenceMatched
-  { trmText :: TimeReferenceText
-  , trmTimeOfDay :: TimeOfDay
-  , trmDateRef :: Maybe (Matched DateReference)
-  , trmLocationRef :: Maybe (Matched LocationReference)
-  }
-  deriving stock (Eq, Show)
-
-matchedToPlain :: TimeReferenceMatched -> TimeReference
-matchedToPlain TimeReferenceMatched {..} = TimeReference
-  { trDateRef = fmap mtValue trmDateRef
-  , trLocationRef = fmap mtValue trmLocationRef
-  , trText = trmText
-  , trTimeOfDay = trmTimeOfDay
-  }
 
 getTzLabelMaybe :: TZLabel -> TimeReference -> Maybe TZLabel
 getTzLabelMaybe senderTz timeRef = case trLocationRef timeRef of

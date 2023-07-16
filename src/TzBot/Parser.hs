@@ -366,14 +366,14 @@ data SumContextBuilder
 sumBuilderParser :: TzParser SumContextBuilder
 sumBuilderParser =
   choice'
-    [ SCBDate . matched <$> match dateRefParser
-    , SCBLocRef . matched <$> match locRefParser
+    [ SCBDate <$> matched dateRefParser
+    , SCBLocRef <$> matched locRefParser
     ]
 
 builderParser :: Bool -> ContextBuilder -> TzParser ContextBuilder
 builderParser allowSpace b = do
   sumB <- optional'
-    (when allowSpace (void $ optional' spacedComma) >> matched <$> match sumBuilderParser)
+    (when allowSpace (void $ optional' spacedComma) >> matched sumBuilderParser)
   case fmap mtValue sumB of
     Just (SCBDate dr) -> do
       when (isJust $ trbDateRef b) empty
@@ -384,20 +384,19 @@ builderParser allowSpace b = do
     Nothing -> pure b
 
 ----------------------------------------------------------------------------
-matched :: ([Token], a) -> Matched a
-matched (ts, val) = Matched (concatTokens ts) val
 
 data TimeEntry
   = TESingle (Matched TimeOfDay)
   -- ^ E.g. @10am@
   | TEPair (Matched TimeOfDay) (Matched TimeOfDay)
   -- ^ E.g. @10am-11am@
+  deriving stock (Show, Eq)
 
 -- | Parses either a single time of day or a pair with shared
 -- date, location and am/pm contexts.
 timeEntryParser :: TzParser TimeEntry
 timeEntryParser = do
-  let todWithTextParser = matched <$> match timeOfDayParser
+  let todWithTextParser = matched timeOfDayParser
   firstRef <- todWithTextParser
   let delimitedPair :: TzParser a -> TzParser TimeEntry
       delimitedPair delim = do
@@ -451,21 +450,21 @@ timeOfDayParser = do
           case T.uncons tryHour of
             Nothing -> empty
             Just (h, after)
-              | h `elem` ['h', 'H'] -> case after of
-                "" -> pure (Nothing, False)
-                nstr -> pure (readMinutes nstr, False)
+              | h `elem` ['h', 'H'] ->
+                  case after of
+                    "" -> pure (Nothing, False)
+                    nstr -> pure (readMinutes nstr, False)
               | otherwise -> empty
 
-    , do  isPoint <- token' $ \case
+    , do  isPeriod <- token' $ \case
             Punctuation '.' -> Just True
             Punctuation ':' -> Just False
             _ -> Nothing
           mins <- minuteParser
-          if isPoint
+          if isPeriod
           then pure (Just mins, True)
           else do
-            let secondParser = minuteParser
-            _ <- optional' $ punct ':' >> secondParser
+            _ <- optional' $ punct ':' >> secondsParser
             pure (Just mins, False)
     , pure (Nothing, True)
     ]
@@ -481,7 +480,7 @@ timeOfDayParser = do
             todMin = fromMaybe 0 maybeMin
         TimeOfDay {..}
 
-  mbIsAm <- optional' $ matched <$> match isAmParser
+  mbIsAm <- optional' $ matched isAmParser
   pure . (,mkTime) $ case mbIsAm of
     Just isAm -> Just (mkTime $ mtValue isAm, Just isAm)
     Nothing ->
@@ -813,6 +812,9 @@ minuteParser = do
   guard (len == 2 && min < 60)
   pure min
 
+secondsParser :: TzParser Int
+secondsParser = minuteParser
+
 readMinutes :: Text -> Maybe Int
 readMinutes nstr = do
   min <- readMaybe $ cs nstr
@@ -826,7 +828,7 @@ number = token' $ \case
 
 numberWithLength :: TzParser (Int, Int)
 numberWithLength = token' $ \case
-  Number nstr -> (,T.length nstr) <$> readMaybe (cs nstr)
+  Number nstr -> (,T.length nstr) <$> readMaybe @Int (cs nstr)
   _ -> empty
 
 anyWord :: TzParser Text
@@ -878,3 +880,36 @@ optional' = optional . try
 -- IOW in case any of the given parsers fails, no input is consumed.
 choice' :: [TzParser a] -> TzParser a
 choice' = choice . map try
+
+-- | Datatype for keeping value together with its parsed text (as a sequence of tokens)
+data Matched a = Matched
+  { mtText :: Text
+    -- ^ Consumed text
+  , mtValue :: a
+    -- ^ Parsed value
+  } deriving stock (Show, Eq, Generic, Functor, Foldable, Traversable)
+
+matched :: TzParser a -> TzParser (Matched a)
+matched parser = do
+  (tokens, a) <- match parser
+  pure $ Matched (concatTokens tokens) a
+
+-- TODO: use lenses
+modifyText :: (Text -> Text) -> Matched a -> Matched a
+modifyText f Matched {..} = Matched {mtText = f mtText, ..}
+
+data TimeReferenceMatched = TimeReferenceMatched
+  { trmText :: TimeReferenceText
+  , trmTimeOfDay :: TimeOfDay
+  , trmDateRef :: Maybe (Matched DateReference)
+  , trmLocationRef :: Maybe (Matched LocationReference)
+  }
+  deriving stock (Eq, Show)
+
+matchedToPlain :: TimeReferenceMatched -> TimeReference
+matchedToPlain TimeReferenceMatched {..} = TimeReference
+  { trDateRef = fmap mtValue trmDateRef
+  , trLocationRef = fmap mtValue trmLocationRef
+  , trText = trmText
+  , trTimeOfDay = trmTimeOfDay
+  }
