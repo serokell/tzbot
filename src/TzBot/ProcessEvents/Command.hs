@@ -4,7 +4,7 @@
 
 module TzBot.ProcessEvents.Command where
 
-import Universum
+import TzPrelude
 
 import Slacker (SlashCommand(..), scChannelId)
 import Text.Interpolation.Nyan (int, rmode')

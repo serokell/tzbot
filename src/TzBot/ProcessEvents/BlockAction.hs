@@ -7,7 +7,7 @@ module TzBot.ProcessEvents.BlockAction
     processReportButtonToggled
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (Value)
 import Text.Interpolation.Nyan (int, rmode')

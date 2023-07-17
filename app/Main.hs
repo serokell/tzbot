@@ -4,7 +4,7 @@
 
 module Main where
 
-import Universum
+import TzPrelude
 
 import TzBot.BotMain qualified as BotMain
 

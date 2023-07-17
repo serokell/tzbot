@@ -21,7 +21,7 @@ module TzBot.Cache
   , update
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Cache (Cache)
 import Data.Cache qualified as Cache
@@ -65,7 +65,7 @@ defaultTzCacheSettings = TzCacheSettings
 -- | `withTzCache` with `defaultTzCacheSettings`.
 withTzCacheDefault
   :: ( KnownDivRat u Nanosecond
-     , Eq k, Hashable k
+     , Hashable k
      )
   => Time u -- ^ Expiration time
   -> (TzCache k v -> IO a) -- ^ Action that uses the cache
@@ -77,7 +77,7 @@ withTzCacheDefault = withTzCache defaultTzCacheSettings
 -- constraints on its fields.
 withTzCache
   :: ( KnownDivRat u Nanosecond
-     , Eq k, Hashable k
+     , Hashable k
      , HasCallStack
      )
   => TzCacheSettings -- ^ Settings
@@ -99,7 +99,7 @@ withTzCache
     (cleaningThread (toUnit tcsCleaningPeriod) rcCache)
     (\_ -> action TzCache {..})
 
-cleaningThread :: (Eq k, Hashable k) => Time Hour -> Cache k v -> IO ()
+cleaningThread :: (Hashable k) => Time Hour -> Cache k v -> IO ()
 cleaningThread cleaningPeriod cache = forever $ do
   Time.threadDelay cleaningPeriod
   Cache.purgeExpired cache
@@ -107,7 +107,7 @@ cleaningThread cleaningPeriod cache = forever $ do
 -- | Generate a random expiry time and insert a key/value pair into
 -- the cache with that expiry time.
 insert
-  :: (Eq k, Hashable k, MonadIO m)
+  :: (Hashable k, MonadIO m)
   => k
   -> v
   -> TzCache k v
@@ -125,7 +125,7 @@ insert key val TzCache {..} = do
 -- and insert the obtained value with configured expiration parameters
 -- into the cache.
 fetchWithCache
-  :: (Eq k, Hashable k, MonadIO m, KatipContext m, Buildable k)
+  :: (Hashable k, KatipContext m, Buildable k)
   => k
   -> (k -> m v)
   -> TzCache k v
@@ -146,7 +146,7 @@ fetchWithCache key fetchAction cache =
       pure v
 
 lookup
-  :: (Eq k, Hashable k, MonadIO m)
+  :: (Hashable k, MonadIO m)
   => k
   -> TzCache k v
   -> m (Maybe v)
@@ -154,7 +154,7 @@ lookup key TzCache {..} = liftIO $ Cache.lookup rcCache key
 
 -- | Update the value by the key, expiration is not taken into account.
 update
-  :: forall k v m. (Eq k, Hashable k, MonadIO m)
+  :: forall k v m. (Hashable k, MonadIO m)
   => k
   -> (v -> v)
   -> TzCache k v

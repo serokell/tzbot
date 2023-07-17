@@ -4,12 +4,11 @@
 
 module TzBot.TimeReference where
 
-import Universum
+import TzPrelude
 
 import Control.Arrow ((>>>))
 import Data.List.NonEmpty qualified as NE
 import Data.Time
-import Data.Time.Calendar.Compat
 import Data.Time.TZInfo qualified as TZI
 import Data.Time.TZTime qualified as TZT
 import Data.Time.Zones.All (TZLabel)

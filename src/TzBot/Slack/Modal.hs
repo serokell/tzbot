@@ -4,7 +4,7 @@
 
 module TzBot.Slack.Modal where
 
-import Universum
+import TzPrelude
 
 import Data.List (singleton)
 

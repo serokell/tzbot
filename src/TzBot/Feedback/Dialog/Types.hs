@@ -7,7 +7,7 @@ module TzBot.Feedback.Dialog.Types
   , ReportDialogEntry (..)
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Time (UTCTime)

@@ -7,7 +7,7 @@ module Test.TzBot.TimeReferenceToUtcSpec
   ( test_TimeReferenceToUtc
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Time
 import Data.Time.TZInfo (TZLabel(America__Havana, Asia__Tashkent, Europe__Helsinki))

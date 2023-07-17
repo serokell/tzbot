@@ -4,7 +4,7 @@
 
 module TzBot.ProcessEvents.ChannelEvent where
 
-import Universum
+import TzPrelude
 
 import Data.Set qualified as S
 import Text.Interpolation.Nyan (int, rmode')

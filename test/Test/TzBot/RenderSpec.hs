@@ -7,7 +7,7 @@ module Test.TzBot.RenderSpec
   ( test_renderSpec
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.List.NonEmpty qualified as NE
 import Data.Time (UTCTime)

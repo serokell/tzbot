@@ -11,7 +11,7 @@ module TzBot.Feedback.Dialog
   , lookupDialogEntry
   ) where
 
-import Universum
+import TzPrelude
 
 import TzBot.Cache qualified as Cache
 import TzBot.Feedback.Dialog.Types (ReportDialogEntry, ReportDialogId)

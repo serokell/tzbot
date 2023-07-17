@@ -6,7 +6,7 @@ module TzBot.Parser
   ( parseTimeRefs
   ) where
 
-import Universum hiding (many, toList, try)
+import TzPrelude hiding (many, toList, try)
 
 import Data.Char (isUpper)
 import Data.List qualified as L
@@ -15,7 +15,7 @@ import Data.String.Conversions (cs)
 import Data.Text qualified as T
 import Data.Text.Metrics (damerauLevenshteinNorm)
 import Data.Time (DayOfWeek(..))
-import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear, Year)
+import Data.Time.Calendar (DayOfMonth, MonthOfYear, Year)
 import Data.Time.LocalTime (TimeOfDay(..))
 import Data.Time.Zones.All (TZLabel, tzNameLabelMap)
 import Glider.NLP.Tokenizer (Token(..), tokenize)
@@ -817,18 +817,18 @@ secondsParser = minuteParser
 
 readMinutes :: Text -> Maybe Int
 readMinutes nstr = do
-  min <- readMaybe $ cs nstr
+  min <- readMaybe nstr
   guard (T.length nstr == 2 && min < 60)
   pure min
 
 number :: TzParser Int
 number = token' $ \case
-  Number nstr -> readMaybe $ cs nstr
+  Number nstr -> readMaybe nstr
   _ -> empty
 
 numberWithLength :: TzParser (Int, Int)
 numberWithLength = token' $ \case
-  Number nstr -> (,T.length nstr) <$> readMaybe @Int (cs nstr)
+  Number nstr -> (,T.length nstr) <$> readMaybe @Int nstr
   _ -> empty
 
 anyWord :: TzParser Text

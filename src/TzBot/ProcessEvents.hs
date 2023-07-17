@@ -6,7 +6,7 @@ module TzBot.ProcessEvents
   ( handler
   ) where
 
-import Universum
+import TzPrelude
 
 import Control.Exception (AsyncException(UserInterrupt))
 import Data.Aeson (FromJSON(..), Value)

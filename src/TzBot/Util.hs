@@ -4,9 +4,9 @@
 
 module TzBot.Util where
 
-import Universum hiding (last, try)
+import TzPrelude hiding (last, try)
 
-import Control.Lens (LensRules, lensField, lensRules, mappingNamer)
+import Control.Lens
 import Data.Aeson
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Casing

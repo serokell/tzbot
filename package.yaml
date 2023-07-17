@@ -60,7 +60,6 @@ library:
   - text
   - text-metrics
   - time
-  - time-compat
   - transformers
   - tz
   - tztime
@@ -82,7 +81,6 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - base >= 4.7 && < 5
-    - universum
     - tzbot
 
 tests:
@@ -96,7 +94,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - base >= 4.7 && < 5
-    - universum
     - tzbot
     - aeson
     - containers
@@ -124,8 +121,8 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - base >= 4.7 && < 5
-    - universum
     - doctest-parallel
+    - universum
 
 ghc-options:
   - -Weverything
@@ -141,6 +138,7 @@ ghc-options:
   - -Wno-missed-specialisations
   - -Wno-all-missed-specialisations
   - -Wunused-packages
+  - -Wno-missing-kind-signatures
 
 default-extensions:
   - AllowAmbiguousTypes

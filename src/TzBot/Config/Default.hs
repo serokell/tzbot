@@ -7,7 +7,7 @@ module TzBot.Config.Default
   , defaultConfigText
   ) where
 
-import Universum
+import TzPrelude
 
 import Text.Interpolation.Nyan (int, rmode')
 

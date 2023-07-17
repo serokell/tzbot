@@ -25,7 +25,7 @@ module TzBot.Slack.Fixtures
   , helpUsage
   ) where
 
-import Universum
+import TzPrelude
 
 import GHC.TypeLits (symbolVal)
 

@@ -7,7 +7,7 @@ module Test.TzBot.MessageBlocksSpec
   , test_ignoreManuallySpec
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (decode)
 import Data.Maybe (fromJust)

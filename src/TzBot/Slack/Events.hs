@@ -4,7 +4,7 @@
 
 module TzBot.Slack.Events where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (FromJSON(parseJSON), ToJSON, withObject, withText, (.:), (.:?))
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeM)
