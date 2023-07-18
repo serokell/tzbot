@@ -172,6 +172,7 @@ default-extensions:
   - NumDecimals
   - NumericUnderscores
   - OverloadedLabels
+  - OverloadedRecordDot
   - OverloadedStrings
   - PatternSynonyms
   - PolyKinds

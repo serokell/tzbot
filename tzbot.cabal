@@ -94,6 +94,7 @@ library
       NumDecimals
       NumericUnderscores
       OverloadedLabels
+      OverloadedRecordDot
       OverloadedStrings
       PatternSynonyms
       PolyKinds
@@ -204,6 +205,7 @@ executable tzbot-exe
       NumDecimals
       NumericUnderscores
       OverloadedLabels
+      OverloadedRecordDot
       OverloadedStrings
       PatternSynonyms
       PolyKinds
@@ -266,6 +268,7 @@ test-suite doctests
       NumDecimals
       NumericUnderscores
       OverloadedLabels
+      OverloadedRecordDot
       OverloadedStrings
       PatternSynonyms
       PolyKinds
@@ -339,6 +342,7 @@ test-suite tzbot-test
       NumDecimals
       NumericUnderscores
       OverloadedLabels
+      OverloadedRecordDot
       OverloadedStrings
       PatternSynonyms
       PolyKinds
