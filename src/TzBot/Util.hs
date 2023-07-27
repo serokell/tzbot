@@ -31,7 +31,9 @@ import Language.Haskell.TH
 import System.Clock (TimeSpec, fromNanoSecs, toNanoSecs)
 import System.Random (randomRIO)
 import Text.Interpolation.Nyan (int, rmode')
+import Text.Pretty.Simple (pShowNoColor)
 import Text.Printf (printf)
+import Text.Show qualified (show)
 import Time (KnownDivRat, Nanosecond, Time, floorRat, ns, toUnit)
 
 attach :: (Functor f) => (a -> b) -> f a -> f (a, b)
@@ -220,3 +222,29 @@ whenJustFunc (Just b) f = f b
 
 whenFunc :: Bool -> (a -> a) -> a -> a
 whenFunc b f = if b then f else id
+
+{- A pretty printer to be used in doctests.
+
+Unlike @doctest@, HLS's @eval@ plugin does not capture stdout.
+This means using `print` or `Text.Pretty.Simple.pPrint` won't work;
+the `eval` plugin will not display the printed text.
+
+The workaround mentioned in the docs (see below) is
+not compatible with doctest: https://github.com/haskell/haskell-language-server/issues/1977#issuecomment-1635508324
+
+This function works around the issue by overloading `show` such that the string is not wrapped in quotes
+and newlines (and other characters) are not escaped.
+
+In other words, whereas a `String` will be displayed with quotes/escape characters in GHCI,
+a `PrettyString` will be rendered verbatim.
+
+See:
+  * Suggested workaround: https://github.com/haskell/haskell-language-server/blob/fb5e5c998c7d4f13546ae015191a7983aedf3345/plugins/hls-eval-plugin/README.md#multiline-output
+-}
+prettyPrint :: Show a => a -> PrettyString
+prettyPrint a = PrettyString $ pShowNoColor a
+
+newtype PrettyString = PrettyString LText
+
+instance Show PrettyString where
+  show (PrettyString text) = toString $ text

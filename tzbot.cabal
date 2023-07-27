@@ -143,6 +143,7 @@ library
     , nyan-interpolation
     , o-clock
     , optparse-applicative
+    , pretty-simple
     , random
     , servant-auth
     , servant-auth-client

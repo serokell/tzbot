@@ -49,6 +49,7 @@ library:
   - o-clock
   - random
   - optparse-applicative
+  - pretty-simple
   - servant-auth
   - servant-auth-client
   - servant-client
