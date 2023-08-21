@@ -31,14 +31,14 @@ module TzBot.Render
   , asForMessageM
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (ToJSON)
 import Data.List.NonEmpty qualified as NE
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Builder (Builder, fromText, singleton, toLazyText)
-import Data.Time.Compat
+import Data.Time
   (Day, LocalTime, UTCTime, ZonedTime(zonedTimeToLocalTime), defaultTimeLocale, formatTime,
   minutesToTimeZone, utcToZonedTime)
 import Data.Time.TZInfo (TZInfo(tziIdentifier))

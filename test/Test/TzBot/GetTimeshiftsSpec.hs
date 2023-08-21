@@ -7,7 +7,7 @@ module Test.TzBot.GetTimeshiftsSpec
   , test_checkForTimeshifts
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Time (UTCTime)
 import Data.Time.TZInfo

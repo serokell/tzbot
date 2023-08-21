@@ -6,7 +6,7 @@ module Main
   ( main
   ) where
 
-import Universum
+import TzPrelude
 
 import Test.Tasty
 import Tree (tests)

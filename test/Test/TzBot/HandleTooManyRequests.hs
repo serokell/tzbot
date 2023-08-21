@@ -4,7 +4,7 @@
 
 module Test.TzBot.HandleTooManyRequests (test_HandleTooManyRequests) where
 
-import Universum
+import TzPrelude
 
 import Data.Fixed (Fixed(MkFixed))
 import Data.Sequence qualified as Seq
@@ -68,7 +68,7 @@ handleTooManyRequestsProperty attempts = monadicIO $ do
   end <- run getCurrentTime
   delay' <- delay <$> readIORef stateRef
   let realDelay = nominalDiffTimeToSeconds $ diffUTCTime end start
-      expectedDelay = MkFixed ((ceiling (delay' * 10^(12 :: Int))))
+      expectedDelay = MkFixed ((ceiling (delay' * 10 ^ (12 :: Int))))
   assert (realDelay >= expectedDelay)
 
 -- | Mock for slack API request.

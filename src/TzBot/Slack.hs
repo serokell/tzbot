@@ -21,7 +21,7 @@ module TzBot.Slack
   , getMessagePermalinkCached
   ) where
 
-import Universum hiding (toString)
+import TzPrelude hiding (toString)
 
 import Data.Aeson (Value)
 import Data.ByteString.UTF8 (toString)

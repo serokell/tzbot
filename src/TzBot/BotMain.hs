@@ -4,7 +4,7 @@
 
 module TzBot.BotMain where
 
-import Universum
+import TzPrelude
 
 import Control.Monad.Managed (managed, runManaged)
 import Data.ByteString qualified as BS

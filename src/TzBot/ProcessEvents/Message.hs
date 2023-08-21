@@ -6,7 +6,7 @@ module TzBot.ProcessEvents.Message
   ( processMessageEvent
   ) where
 
-import Universum hiding (try)
+import TzPrelude hiding (try)
 
 import Data.List (singleton)
 import Data.List.NonEmpty qualified as NE

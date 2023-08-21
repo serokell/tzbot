@@ -4,7 +4,7 @@
 
 module TzBot.Slack.API.Common where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson
 

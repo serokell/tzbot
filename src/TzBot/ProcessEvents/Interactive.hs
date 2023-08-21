@@ -8,7 +8,7 @@ module TzBot.ProcessEvents.Interactive
   , processViewSubmission
   ) where
 
-import Universum
+import TzPrelude
 
 import Text.Interpolation.Nyan (int, rmode', rmode's)
 

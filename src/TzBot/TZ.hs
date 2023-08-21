@@ -9,7 +9,7 @@ module TzBot.TZ
   , findLastTimeshift
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Bits (shiftR)
 import Data.List (nub)
@@ -130,7 +130,7 @@ binarySearch v t | n == 1    = 0
   where
     n = VU.length v
     go !l !u | l >= u = l - 1
-             | VU.unsafeIndex v k <= t  = go (k+1) u
+             | VU.unsafeIndex v k <= t  = go (k + 1) u
              | otherwise  = go l k
       where
         k = (l + u) `shiftR` 1

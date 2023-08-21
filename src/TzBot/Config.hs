@@ -11,7 +11,7 @@ module TzBot.Config
   , LoadConfigError (..)
   ) where
 
-import Universum hiding (lift)
+import TzPrelude hiding (lift)
 
 import Control.Exception (evaluate, handle)
 import Data.List (singleton)

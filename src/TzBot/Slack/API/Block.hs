@@ -19,7 +19,7 @@ module TzBot.Slack.API.Block
   , Header(..)
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (FromJSON, ToJSON)
 import Data.List.NonEmpty qualified as NE

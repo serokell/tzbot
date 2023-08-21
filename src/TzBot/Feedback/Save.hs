@@ -7,7 +7,7 @@ module TzBot.Feedback.Save
   , saveFeedback
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (ToJSON, encode)
 import Data.List.NonEmpty qualified as NE

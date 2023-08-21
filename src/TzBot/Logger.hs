@@ -10,7 +10,7 @@ module TzBot.Logger
   , katipAddContext
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (KeyValue((.=)), ToJSON(..), object)
 import Katip

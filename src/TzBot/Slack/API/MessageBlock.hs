@@ -24,13 +24,14 @@ module TzBot.Slack.API.MessageBlock
   , splitExtractErrors
   ) where
 
-import Universum
+import TzPrelude
 
+import Control.Lens
 import Control.Monad.Trans.Writer.CPS (Writer, runWriter, tell)
 import Data.Aeson
   (FromJSON(..), Options(..), SumEncoding(..), ToJSON(toJSON), Value, camelTo2, defaultOptions,
   genericParseJSON, genericToJSON)
-import Data.Aeson.Lens (AsPrimitive(_String), key)
+import Data.Aeson.Lens (_String, key)
 import Data.Char (isLower)
 import Data.String.Conversions (cs)
 import Data.Text.Internal.Builder (Builder, fromText, toLazyText)

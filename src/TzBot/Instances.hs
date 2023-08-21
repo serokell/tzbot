@@ -7,7 +7,7 @@
 -- | A module with orphan instances.
 module TzBot.Instances () where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (FromJSON(parseJSON), ToJSON(toJSON), Value(String), withText)
 import Data.Text qualified as T

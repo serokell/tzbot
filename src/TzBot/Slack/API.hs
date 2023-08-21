@@ -28,7 +28,7 @@ module TzBot.Slack.API
   , module TzBot.Slack.API.Common
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.Types

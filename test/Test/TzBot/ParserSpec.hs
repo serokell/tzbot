@@ -6,7 +6,7 @@ module Test.TzBot.ParserSpec
   ( test_parserSpec
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Text qualified as T
 import Data.Time (DayOfWeek(..), TimeOfDay(..), defaultTimeLocale, formatTime)

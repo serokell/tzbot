@@ -6,7 +6,7 @@
 
 module TzBot.Config.Types where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson (FromJSON(parseJSON), ToJSON(toJSON), genericParseJSON, genericToJSON)
 import Data.Data (Data)

@@ -19,9 +19,11 @@ module TzBot.Slack.Events.ViewPayload
   , ViewPayload (..)
   ) where
 
-import Universum
+import TzPrelude
 
+import Control.Lens hiding (to)
 import Data.Aeson (FromJSON(parseJSON), Value)
+import Data.Aeson.Key qualified as Key
 import Data.Aeson.Lens (key)
 import Data.Aeson.Types (Parser)
 import GHC.Generics
@@ -79,6 +81,6 @@ instance (FromJSON a, KnownSymbol blockIdT, KnownSymbol actionIdT)
 getViewPayloadItem :: BlockId -> ActionId -> Value -> Maybe Value
 getViewPayloadItem blockId actionId val =
   val ^? key "values"
-    . key (unBlockId blockId)
-    . key (unActionId actionId)
+    . key (Key.fromText $ unBlockId blockId)
+    . key (Key.fromText $ unActionId actionId)
     . key "value"

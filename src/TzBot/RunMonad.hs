@@ -4,9 +4,9 @@
 
 module TzBot.RunMonad where
 
-import Universum
+import TzPrelude
 
-import Control.Lens (makeLensesWith)
+import Control.Lens
 import Data.Set qualified as S
 import Katip qualified as K
 import Network.HTTP.Client (Manager)

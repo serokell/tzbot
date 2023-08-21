@@ -4,7 +4,7 @@
 
 module TzBot.Options where
 
-import Universum
+import TzPrelude hiding (asum)
 
 import Options.Applicative
 

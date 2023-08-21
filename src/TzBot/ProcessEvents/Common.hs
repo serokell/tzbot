@@ -10,7 +10,7 @@ module TzBot.ProcessEvents.Common
   , ignoreCodeBlocksManually
   ) where
 
-import Universum
+import TzPrelude
 
 import Data.Aeson.Encode.Pretty (encodePrettyToTextBuilder)
 import Data.GUID (genText)
@@ -80,7 +80,7 @@ getTimeReferencesFromMessage message =
 -- structure, but since it's not documented it can not work sometimes,
 -- `ignoreCodeBlocksManually` is used a reserve function.
 getTextPiecesFromMessage
-  :: (Monad m, KatipContext m)
+  :: (KatipContext m)
   => Message
   -> m [Text]
 getTextPiecesFromMessage message = do
