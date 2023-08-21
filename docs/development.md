@@ -88,5 +88,5 @@ do not require setting up a Slack workspace. They can be worked on in isolation.
       "Open channel details" > "Integrations" > "Add apps" > "tzbot"
 1. Run the bot with `make run` (or `cabal run tzbot-exe` / `stack run`).
 
- [time-zones-offsets]: https://spin.atomicobject.com/2016/07/06/time-zones-offsets
+ [time-zones-offsets]: https://spin.atomicobject.com/2016/07/06/time-zones-offsets/
  [tzlabel]: https://hackage.haskell.org/package/tz-0.1.3.6/docs/Data-Time-Zones-All.html#t:TZLabel

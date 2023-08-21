@@ -50,8 +50,8 @@ import Text.Interpolation.Nyan (int, rmode')
 import TzBot.Instances ()
 import TzBot.Slack.API (Mrkdwn(Mrkdwn), User(..))
 import TzBot.Slack.API.Block
-import TzBot.TZ (TimeShift(..), checkForTimeshifts, findLastTimeshift)
 import TzBot.TimeReference
+import TzBot.TZ (TimeShift(..), checkForTimeshifts, findLastTimeshift)
 import TzBot.Util
 
 -- Types

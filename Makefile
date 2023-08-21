@@ -27,7 +27,7 @@ run:
 	$(MAKEU) PACKAGE=tzbot-exe run
 
 stylish:
-	find . -name '.stack-work' -prune -o -name '.dist-newstyle' -prune -o -name '*.hs' -exec stylish-haskell -i '{}' \;
+	find . -name '.stack-work' -prune -o -name 'dist-newstyle' -prune -o -name '*.hs' -exec stylish-haskell -i '{}' \;
 
 lint:
 	hlint .

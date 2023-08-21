@@ -9,6 +9,7 @@ module TzBot.Parser
 import Universum hiding (many, toList, try)
 
 import Data.Char (isUpper)
+import Data.List qualified as L
 import Data.Map qualified as M
 import Data.String.Conversions (cs)
 import Data.Text qualified as T
@@ -18,6 +19,7 @@ import Data.Time.Calendar.Compat (DayOfMonth, MonthOfYear, Year)
 import Data.Time.LocalTime (TimeOfDay(..))
 import Data.Time.Zones.All (TZLabel, tzNameLabelMap)
 import Glider.NLP.Tokenizer (Token(..), tokenize)
+import Text.Interpolation.Nyan (int, rmode')
 import Text.Megaparsec hiding (Token)
 
 import TzBot.Instances ()
@@ -212,17 +214,45 @@ type TzParser = Parsec Void [Token]
 >>> parseTimeRefs "7:30pm 2022/08/3"
 [TimeReference {trText = "7:30pm 2022/08/3", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
 
->>> parseTimeRefs "2022.8.03 7:30 pm "
+>>> parseTimeRefs "2022.8.03 7:30 pm  "
 [TimeReference {trText = "2022.8.03 7:30 pm", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Nothing}]
 
 >>> parseTimeRefs "7:30pm 2022.8.03 America/Havana"
 [TimeReference {trText = "7:30pm 2022.8.03 America/Havana", trTimeOfDay = 19:30:00, trDateRef = Just (DayOfMonthRef 3 (Just (8,Just 2022))), trLocationRef = Just (TimeZoneRef America__Havana)}]
 
+>>> parseTimeRefs "tomorrow 10am -11 am"
+[TimeReference {trText = "tomorrow 10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "tomorrow 11 am", trTimeOfDay = 11:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "tomorrow 10am /  11 am"
+[TimeReference {trText = "tomorrow 10am", trTimeOfDay = 10:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "tomorrow 11 am", trTimeOfDay = 11:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "between 10am and 11:30am UTC"
+[TimeReference {trText = "10am UTC", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"}))},TimeReference {trText = "11:30am UTC", trTimeOfDay = 11:30:00, trDateRef = Nothing, trLocationRef = Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"}))}]
+
+>>> parseTimeRefs "Let's go on Wednesday at 10:00 or 11:00."
+[TimeReference {trText = "on Wednesday at 10:00", trTimeOfDay = 10:00:00, trDateRef = Just (DayOfWeekRef Wednesday), trLocationRef = Nothing},TimeReference {trText = "on Wednesday 11:00", trTimeOfDay = 11:00:00, trDateRef = Just (DayOfWeekRef Wednesday), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "10-11pm tomorrow works for me"
+[TimeReference {trText = "10pm tomorrow", trTimeOfDay = 22:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "11pm tomorrow", trTimeOfDay = 23:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "How about 10:00 or 11:00 pm tomorrow?"
+[TimeReference {trText = "10:00 pm tomorrow", trTimeOfDay = 22:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "11:00 pm tomorrow", trTimeOfDay = 23:00:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "7.30-8.30pm"
+[TimeReference {trText = "7.30pm", trTimeOfDay = 19:30:00, trDateRef = Nothing, trLocationRef = Nothing},TimeReference {trText = "8.30pm", trTimeOfDay = 20:30:00, trDateRef = Nothing, trLocationRef = Nothing}]
+
+>>> parseTimeRefs "7.30am-8.30pm tomorrow"
+[TimeReference {trText = "7.30am tomorrow", trTimeOfDay = 07:30:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing},TimeReference {trText = "8.30pm tomorrow", trTimeOfDay = 20:30:00, trDateRef = Just (DaysFromToday 1), trLocationRef = Nothing}]
+
+>>> parseTimeRefs "7.30-8.30"
+[]
+
 -}
 parseTimeRefs :: Text -> [TimeReference]
 parseTimeRefs =
   -- TODO use better error handling
-  fromMaybe []
+  map matchedToPlain
+    . fromMaybe []
     . parseMaybe timeRefsParser
     -- time reference can be either at the beginning or after a space
     . (Whitespace :)
@@ -231,61 +261,120 @@ parseTimeRefs =
 -- | Parser for multiple 'TimeReference' s.
 --
 -- This looks for all of them in the input and ignores everything surrounding.
-timeRefsParser :: TzParser [TimeReference]
+timeRefsParser :: TzParser [TimeReferenceMatched]
 timeRefsParser = choice'
   [ do
-      tr <- try timeRefParser
+      tr <- try timeRefConjugParser
       trs <- timeRefsParser
-      return $ tr : trs
+      return $ tr <> trs
   , anySingle >> timeRefsParser
   , takeRest >> pure []
   ]
 
--- | Parses a single 'TimeReference', consuming all input.
-timeRefParser :: TzParser TimeReference
+-- | Parses entries like @between 10am and 11am@ or
+-- @10am-11am on thursday or 1pm-2pm on wednesday@
+timeRefConjugParser :: TzParser [TimeReferenceMatched]
+timeRefConjugParser = do
+  firstConjugComponent <- timeRefParser
+  let conjugParser conjWord = do
+        optional' space
+        _ <- word' conjWord
+        -- no space here before `timeRefParser` requires a space before the contents
+        secondConjugComponent <- timeRefParser
+        pure $ unifyConjugComponents $ firstConjugComponent <> secondConjugComponent
+
+      unifyConjugComponents :: [TimeReferenceMatched] -> [TimeReferenceMatched]
+      unifyConjugComponents lst = do
+        let getUnique :: Eq a => (TimeReferenceMatched -> Maybe a) -> Maybe a
+            getUnique getter = do
+              let many = L.nub $ mapMaybe getter lst
+              case many of
+                [item] -> Just item
+                _ -> Nothing
+        let locRef = getUnique trmLocationRef
+            dateRef = getUnique trmDateRef
+        -- TODO: use lenses
+        flip map lst $
+          (whenJustFunc locRef \l tr -> addLocationIfMissing l tr)
+            . whenJustFunc dateRef \d tr -> addDateIfMissing d tr
+
+  choice'
+    -- note that and/or can be parsed either as conjugations or as "hyphens",
+    -- in the second case am/pm context is also shared
+    [ conjugParser "and"
+    , conjugParser "or"
+    , pure firstConjugComponent
+    ]
+
+addLocationIfMissing
+  :: Matched LocationReference
+  -> TimeReferenceMatched
+  -> TimeReferenceMatched
+addLocationIfMissing l tr =
+  if isNothing (trmLocationRef tr)
+  then tr { trmLocationRef = Just l, trmText = [int||#{trmText tr} (#{mtText l})|] }
+  else tr
+
+addDateIfMissing
+  :: Matched DateReference
+  -> TimeReferenceMatched
+  -> TimeReferenceMatched
+addDateIfMissing d tr =
+  if isNothing (trmDateRef tr)
+  then tr { trmDateRef = Just d, trmText = [int||#{trmText tr} (#{mtText d})|] }
+  else tr
+
+-- | Parses coupled 'TimeReference's, collecting the source text.
+timeRefParser :: TzParser [TimeReferenceMatched]
 timeRefParser = do
   _ <- space
-  (newTrText, timeReference) <- match timeRefParser'
-  return timeReference { trText = concatTokens newTrText }
-
--- | Parses a single 'TimeReference', but does not collect the source text.
-timeRefParser' :: TzParser TimeReference
-timeRefParser' = do
-  let trText = ""
-  precBuilder <- fromMaybe builderInit <$> do
+  (precText, precBuilder) <- match $ fromMaybe builderInit <$> do
     res <- optional' (builderParser False builderInit)
     optional' spacedComma
     pure res
-  trTimeOfDay <- timeOfDayParser
-  builder <- fromMaybe builderInit <$> optional' (builderParser True precBuilder)
-  let trLocationRef = trbLocRef builder
-      trDateRef = trbDateRef builder
-  pure TimeReference {..}
+  timeEntry <- timeEntryParser
+  (afterText, builder) <- match $ fromMaybe builderInit <$> optional' (builderParser True precBuilder)
+  let trmLocationRef = trbLocRef builder
+      trmDateRef = trbDateRef builder
+  let mkTrText refText =
+        T.concat [concatTokens precText, refText, concatTokens afterText]
+  let mkTimeReference todWithText = TimeReferenceMatched
+        { trmText = mkTrText $ mtText todWithText
+        , trmTimeOfDay = mtValue todWithText
+        , trmDateRef
+        , trmLocationRef
+        }
+  pure $ map mkTimeReference case timeEntry of
+    TESingle todwt -> [todwt]
+    TEPair todwt todwt' -> [todwt, todwt']
 
 ----------------------------------------------------------------------------
 ---- Collecting of optional time contexts
 ----------------------------------------------------------------------------
 data ContextBuilder = ContextBuilder
-  { trbDateRef :: Maybe DateReference
-  , trbLocRef  :: Maybe LocationReference
+  { trbDateRef :: Maybe (Matched DateReference)
+  , trbLocRef  :: Maybe (Matched LocationReference)
   } deriving stock (Show, Eq)
 
 builderInit :: ContextBuilder
 builderInit = ContextBuilder Nothing Nothing
 
 data SumContextBuilder
-  = SCBDate DateReference
-  | SCBLocRef LocationReference
+  = SCBDate (Matched DateReference)
+  | SCBLocRef (Matched LocationReference)
 
 sumBuilderParser :: TzParser SumContextBuilder
 sumBuilderParser =
-  choice' [SCBDate <$> dateRefParser, SCBLocRef <$> locRefParser]
+  choice'
+    [ SCBDate <$> matched dateRefParser
+    , SCBLocRef <$> matched locRefParser
+    ]
 
 builderParser :: Bool -> ContextBuilder -> TzParser ContextBuilder
 builderParser allowSpace b = do
   sumB <- optional'
-    (when allowSpace (void $ optional' spacedComma) >> sumBuilderParser)
-  case sumB of
+    (when allowSpace (void $ optional' spacedComma) >> matched sumBuilderParser)
+  case fmap mtValue sumB of
     Just (SCBDate dr) -> do
       when (isJust $ trbDateRef b) empty
       builderParser True b { trbDateRef = Just dr }
@@ -295,11 +384,63 @@ builderParser allowSpace b = do
     Nothing -> pure b
 
 ----------------------------------------------------------------------------
--- | Parses a 'TimeOfDay'.
---
--- This is permissive in the space, as it allows none to be between the time and
--- the AM/PM.
-timeOfDayParser :: TzParser TimeOfDay
+
+data TimeEntry
+  = TESingle (Matched TimeOfDay)
+  -- ^ E.g. @10am@
+  | TEPair (Matched TimeOfDay) (Matched TimeOfDay)
+  -- ^ E.g. @10am-11am@
+  deriving stock (Show, Eq)
+
+-- | Parses either a single time of day or a pair with shared
+-- date, location and am/pm contexts.
+timeEntryParser :: TzParser TimeEntry
+timeEntryParser = do
+  let todWithTextParser = matched timeOfDayParser
+  firstRef <- todWithTextParser
+  let delimitedPair :: TzParser a -> TzParser TimeEntry
+      delimitedPair delim = do
+        optional' space
+        delim
+        optional' space
+        secondRef <- todWithTextParser
+        let getIsAm
+              :: Matched (Maybe (TimeOfDay, Maybe $ Matched Bool), Bool -> TimeOfDay)
+              -> Maybe (Matched Bool)
+            getIsAm ref = fst (mtValue ref) >>= snd
+        let isAmOptions = mapMaybe getIsAm [firstRef, secondRef]
+        let applyIsAm
+              :: Matched Bool
+              -> Matched (Maybe (TimeOfDay, Maybe $ Matched Bool), Bool -> TimeOfDay)
+              -> Matched TimeOfDay
+            applyIsAm isAm ref = do
+              let shouldAppend = isNothing $ getIsAm ref
+              whenFunc shouldAppend (modifyText (<> mtText isAm)) $ fmap (($ mtValue isAm) . snd) ref
+            extractDefaultResult :: Matched (Maybe (TimeOfDay, a), b) -> Maybe (Matched TimeOfDay)
+            extractDefaultResult ref = traverse (fmap fst . fst) ref
+        case isAmOptions of
+          [isAm] -> pure $ (TEPair `on` applyIsAm isAm) firstRef secondRef
+          _ -> maybe empty pure $ TEPair <$> extractDefaultResult firstRef <*> extractDefaultResult secondRef
+
+  choice'
+    [ delimitedPair (punct '-')
+    , delimitedPair (punct '/')
+    , delimitedPair (word' "or")
+    , delimitedPair (word' "and")
+    , TESingle <$> traverse (\(mbRes, _) -> maybe empty (pure . fst) mbRes) firstRef
+    ]
+
+-- | Parses a 'TimeOfDay', returning a template for `timeEntryParser`, which can later
+-- provide another am/pm context that we can infer by default.
+timeOfDayParser
+  :: TzParser
+      (Maybe
+        (TimeOfDay -- if parsed correctly, this is a value with the default am/pm context applied
+        , Maybe (Matched Bool) -- if am/pm context parsed, return it here
+        )
+      , Bool -> TimeOfDay -- if it turns out that another am/pm context should be applied,
+                          -- provide construction function for that case
+      )
 timeOfDayParser = do
   _ <- optional' (relationPreposition >> space)
   hour <- hourParser
@@ -309,38 +450,43 @@ timeOfDayParser = do
           case T.uncons tryHour of
             Nothing -> empty
             Just (h, after)
-              | h `elem` ['h', 'H'] -> case after of
-                "" -> pure (Nothing, False)
-                nstr -> pure (readMinutes nstr, False)
+              | h `elem` ['h', 'H'] ->
+                  case after of
+                    "" -> pure (Nothing, False)
+                    nstr -> pure (readMinutes nstr, False)
               | otherwise -> empty
 
-    , do  isPoint <- token' $ \case
+    , do  isPeriod <- token' $ \case
             Punctuation '.' -> Just True
             Punctuation ':' -> Just False
             _ -> Nothing
           mins <- minuteParser
-          if isPoint
+          if isPeriod
           then pure (Just mins, True)
           else do
-            let secondParser = minuteParser
-            _ <- optional' $ punct ':' >> secondParser
+            _ <- optional' $ punct ':' >> secondsParser
             pure (Just mins, False)
     , pure (Nothing, True)
     ]
 
-  isAm <- if isAmRequired
-          then isAmParser
-          else fromMaybe True <$> optional' isAmParser
+  let mkTime isAm = do
+        let todSec = 0
+            todHour
+              | isAm = hour
+              -- pm here
+              | hour < 12 = hour + 12
+              -- ignore pm if hour > 12
+              | otherwise = hour
+            todMin = fromMaybe 0 maybeMin
+        TimeOfDay {..}
 
-  let todSec = 0
-      todHour
-        | isAm = hour
-        -- pm here
-        | hour < 12 = hour + 12
-        -- ignore pm if hour > 12
-        | otherwise = hour
-      todMin = fromMaybe 0 maybeMin
-  pure TimeOfDay {..}
+  mbIsAm <- optional' $ matched isAmParser
+  pure . (,mkTime) $ case mbIsAm of
+    Just isAm -> Just (mkTime $ mtValue isAm, Just isAm)
+    Nothing ->
+      if isAmRequired
+      then Nothing
+      else Just (mkTime True, Nothing)
 
 isAmParser :: TzParser Bool
 isAmParser = optional' space >>
@@ -517,8 +663,7 @@ isPossibleTimezoneAbbrev w =
   T.all isUpper w
     && T.length w >= 2
     && T.length w <= 5
-    && w /= "AM"
-    && w /= "PM"
+    && not (w `elem` ["AM", "PM", "OR", "AND"])
 
 --------------------------------------------------------------------------------
 -- Storages
@@ -667,6 +812,9 @@ minuteParser = do
   guard (len == 2 && min < 60)
   pure min
 
+secondsParser :: TzParser Int
+secondsParser = minuteParser
+
 readMinutes :: Text -> Maybe Int
 readMinutes nstr = do
   min <- readMaybe $ cs nstr
@@ -680,7 +828,7 @@ number = token' $ \case
 
 numberWithLength :: TzParser (Int, Int)
 numberWithLength = token' $ \case
-  Number nstr -> (,T.length nstr) <$> readMaybe (cs nstr)
+  Number nstr -> (,T.length nstr) <$> readMaybe @Int (cs nstr)
   _ -> empty
 
 anyWord :: TzParser Text
@@ -732,3 +880,36 @@ optional' = optional . try
 -- IOW in case any of the given parsers fails, no input is consumed.
 choice' :: [TzParser a] -> TzParser a
 choice' = choice . map try
+
+-- | Datatype for keeping value together with its parsed text (as a sequence of tokens)
+data Matched a = Matched
+  { mtText :: Text
+    -- ^ Consumed text
+  , mtValue :: a
+    -- ^ Parsed value
+  } deriving stock (Show, Eq, Generic, Functor, Foldable, Traversable)
+
+matched :: TzParser a -> TzParser (Matched a)
+matched parser = do
+  (tokens, a) <- match parser
+  pure $ Matched (concatTokens tokens) a
+
+-- TODO: use lenses
+modifyText :: (Text -> Text) -> Matched a -> Matched a
+modifyText f Matched {..} = Matched {mtText = f mtText, ..}
+
+data TimeReferenceMatched = TimeReferenceMatched
+  { trmText :: TimeReferenceText
+  , trmTimeOfDay :: TimeOfDay
+  , trmDateRef :: Maybe (Matched DateReference)
+  , trmLocationRef :: Maybe (Matched LocationReference)
+  }
+  deriving stock (Eq, Show)
+
+matchedToPlain :: TimeReferenceMatched -> TimeReference
+matchedToPlain TimeReferenceMatched {..} = TimeReference
+  { trDateRef = fmap mtValue trmDateRef
+  , trLocationRef = fmap mtValue trmLocationRef
+  , trText = trmText
+  , trTimeOfDay = trmTimeOfDay
+  }

@@ -110,6 +110,7 @@ tests:
     - tasty-hspec
     - tasty-hunit
     - tasty-quickcheck
+    - text
     - time
     - tztime
     - QuickCheck

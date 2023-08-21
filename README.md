@@ -6,9 +6,6 @@
 
 # tzbot
 
-| This project is participating in [ZuriHac 2022](https://zfoh.ch/zurihac2022/projects.html)! Join the [discord server](https://discord.gg/G49DeVY) for communications. |
-| --- |
-
 `tzbot` is a Slack bot that detects messages with references to some point in time,
 and converts them to your timezone.
 

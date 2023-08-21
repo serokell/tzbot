@@ -301,6 +301,7 @@ test-suite tzbot-test
       Test.TzBot.GetTimeshiftsSpec
       Test.TzBot.HandleTooManyRequests
       Test.TzBot.MessageBlocksSpec
+      Test.TzBot.ParserSpec
       Test.TzBot.RenderSpec
       Test.TzBot.TimeReferenceToUtcSpec
       Tree
@@ -376,6 +377,7 @@ test-suite tzbot-test
     , tasty-hspec
     , tasty-hunit
     , tasty-quickcheck
+    , text
     , time
     , tzbot
     , tztime
