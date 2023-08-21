@@ -7,6 +7,9 @@ module TzBot.Parser
 
   -- * Internals, exported for doctests.
   , runTzParser
+  , timeRefParser
+  , builderInit
+  , dateAndLocationParser
   , timeOfDayParser
   , timeEntryParser
   ) where
@@ -338,64 +341,139 @@ addDateIfMissing d tr =
   then tr { trmDateRef = Just d, trmText = [int||#{trmText tr} (#{mtText d})|] }
   else tr
 
--- | Parses coupled 'TimeReference's, collecting the source text.
+{- | Parsers either:
+
+* 1 time reference like "10am"
+* or 2 adjacent time references like "10am and 11am"
+
+Also parses an optional `DateReference` and a `LocationReference`.
+They can come before or after the time reference(s).
+If found, they will be shared by both time references.
+
+>>> prettyPrint $ runTzParser timeRefParser " 10am and 11pm tomorrow in BST"
+Just
+    [ TimeReferenceMatched
+        { trmText = "10am tomorrow in BST"
+        , trmTimeOfDay = 10:00:00
+        , trmDateRef = Just
+            ( Matched
+                { mtText = "tomorrow"
+                , mtValue = DaysFromToday 1
+                }
+            )
+        , trmLocationRef = Just
+            ( Matched
+                { mtText = "in BST"
+                , mtValue = TimeZoneAbbreviationRef
+                    ( TimeZoneAbbreviationInfo
+                        { tzaiAbbreviation = "BST"
+                        , tzaiOffsetMinutes = 60
+                        , tzaiFullName = "British Summer Time"
+                        }
+                    )
+                }
+            )
+        }
+    , TimeReferenceMatched
+        { trmText = "11pm tomorrow in BST"
+        , trmTimeOfDay = 23:00:00
+        , trmDateRef = Just
+            ( Matched
+                { mtText = "tomorrow"
+                , mtValue = DaysFromToday 1
+                }
+            )
+        , trmLocationRef = Just
+            ( Matched
+                { mtText = "in BST"
+                , mtValue = TimeZoneAbbreviationRef
+                    ( TimeZoneAbbreviationInfo
+                        { tzaiAbbreviation = "BST"
+                        , tzaiOffsetMinutes = 60
+                        , tzaiFullName = "British Summer Time"
+                        }
+                    )
+                }
+            )
+        }
+    ]
+-}
 timeRefParser :: TzParser [TimeReferenceMatched]
 timeRefParser = do
   _ <- space
-  (precText, precBuilder) <- match $ fromMaybe builderInit <$> do
-    res <- optional' (builderParser False builderInit)
+  (precText, dateAndLocation) <- match $ fromMaybe builderInit <$> do
+    dateAndLocation <- optional' (dateAndLocationParser False builderInit)
     optional' spacedComma
-    pure res
+    pure dateAndLocation
   timeEntry <- timeEntryParser
-  (afterText, builder) <- match $ fromMaybe builderInit <$> optional' (builderParser True precBuilder)
-  let trmLocationRef = trbLocRef builder
-      trmDateRef = trbDateRef builder
-  let mkTrText refText =
+  (afterText, dateAndLocation) <- match $ fromMaybe builderInit <$> optional' (dateAndLocationParser True dateAndLocation)
+  let
+      mkTrText :: Text -> Text
+      mkTrText refText =
         T.concat [concatTokens precText, refText, concatTokens afterText]
-  let mkTimeReference todWithText = TimeReferenceMatched
-        { trmText = mkTrText $ mtText todWithText
-        , trmTimeOfDay = mtValue todWithText
-        , trmDateRef
-        , trmLocationRef
+
+      mkTimeReference :: Matched TimeOfDay -> TimeReferenceMatched
+      mkTimeReference tod = TimeReferenceMatched
+        { trmText = mkTrText tod.mtText
+        , trmTimeOfDay = tod.mtValue
+        , trmDateRef = dateAndLocation.trbDateRef
+        , trmLocationRef = dateAndLocation.trbLocRef
         }
   pure $ map mkTimeReference case timeEntry of
-    TESingle todwt -> [todwt]
-    TEPair todwt todwt' -> [todwt, todwt']
+    TESingle tod -> [tod]
+    TEPair tod1 tod2 -> [tod1, tod2]
 
 ----------------------------------------------------------------------------
----- Collecting of optional time contexts
+---- Parsing optional date and location references
 ----------------------------------------------------------------------------
-data ContextBuilder = ContextBuilder
+
+data DateAndLocationBuilder = DateAndLocationBuilder
   { trbDateRef :: Maybe (Matched DateReference)
   , trbLocRef  :: Maybe (Matched LocationReference)
   } deriving stock (Show, Eq)
 
-builderInit :: ContextBuilder
-builderInit = ContextBuilder Nothing Nothing
+builderInit :: DateAndLocationBuilder
+builderInit = DateAndLocationBuilder Nothing Nothing
 
-data SumContextBuilder
-  = SCBDate (Matched DateReference)
-  | SCBLocRef (Matched LocationReference)
+{- | Tries to parse a date reference, a location reference, or both (in whatever order).
 
-sumBuilderParser :: TzParser SumContextBuilder
-sumBuilderParser =
-  choice'
-    [ SCBDate <$> matched dateRefParser
-    , SCBLocRef <$> matched locRefParser
-    ]
+>>> runTzParser (dateAndLocationParser False builderInit) "in 2 days"
+Just (DateAndLocationBuilder {trbDateRef = Just (Matched {mtText = "in 2 days", mtValue = DaysFromToday 2}), trbLocRef = Nothing})
 
-builderParser :: Bool -> ContextBuilder -> TzParser ContextBuilder
-builderParser allowSpace b = do
-  sumB <- optional'
-    (when allowSpace (void $ optional' spacedComma) >> matched sumBuilderParser)
-  case fmap mtValue sumB of
-    Just (SCBDate dr) -> do
-      when (isJust $ trbDateRef b) empty
-      builderParser True b { trbDateRef = Just dr }
-    Just (SCBLocRef lr) -> do
-      when (isJust $ trbLocRef b) empty
-      builderParser True b { trbLocRef = Just lr }
-    Nothing -> pure b
+>>> runTzParser (dateAndLocationParser False builderInit) "in Europe/London"
+Just (DateAndLocationBuilder {trbDateRef = Nothing, trbLocRef = Just (Matched {mtText = "in Europe/London", mtValue = TimeZoneRef Europe__London})})
+
+>>> runTzParser (dateAndLocationParser False builderInit) "tomorrow in Europe/London"
+Just (DateAndLocationBuilder {trbDateRef = Just (Matched {mtText = "tomorrow", mtValue = DaysFromToday 1}), trbLocRef = Just (Matched {mtText = "in Europe/London", mtValue = TimeZoneRef Europe__London})})
+
+>>> runTzParser (dateAndLocationParser False builderInit) "in Europe/London, today"
+Just (DateAndLocationBuilder {trbDateRef = Just (Matched {mtText = "today", mtValue = DaysFromToday 0}), trbLocRef = Just (Matched {mtText = "in Europe/London", mtValue = TimeZoneRef Europe__London})})
+
+
+If a component is found more than once (e.g. we find two date references), the parser fails:
+>>> runTzParser (dateAndLocationParser False builderInit) "tomorrow in Europe/London, today"
+Nothing
+
+-}
+dateAndLocationParser :: Bool -> DateAndLocationBuilder -> TzParser DateAndLocationBuilder
+dateAndLocationParser allowSpace dateAndLoc = do
+  dateOrLocationMaybe <- optional'
+    (when allowSpace (void $ optional' spacedComma) >> matched dateOrLocationParser)
+  case fmap mtValue dateOrLocationMaybe of
+    Just (Left dateRef) -> do
+      when (isJust dateAndLoc.trbDateRef) empty
+      dateAndLocationParser True dateAndLoc { trbDateRef = Just dateRef }
+    Just (Right locationRef) -> do
+      when (isJust dateAndLoc.trbLocRef) empty
+      dateAndLocationParser True dateAndLoc { trbLocRef = Just locationRef }
+    Nothing -> pure dateAndLoc
+  where
+    dateOrLocationParser :: TzParser (Either (Matched DateReference) (Matched LocationReference))
+    dateOrLocationParser =
+      choice'
+        [ Left <$> matched dateRefParser
+        , Right <$> matched locRefParser
+        ]
 
 ----------------------------------------------------------------------------
 
