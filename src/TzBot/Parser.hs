@@ -7,7 +7,8 @@ module TzBot.Parser
 
   -- * Internals, exported for doctests.
   , runTzParser
-  , timeRefParser
+  , timeRefGroupsParser
+  , timeRefGroupParser
   , builderInit
   , dateAndLocationParser
   , timeOfDayParser
@@ -268,8 +269,7 @@ runTzParser parser = parseMaybe parser . tokenize
 parseTimeRefs :: Text -> [TimeReference]
 parseTimeRefs =
   -- TODO use better error handling
-  map matchedToPlain
-    . fromMaybe []
+  fromMaybe []
     . parseMaybe timeRefsParser
     -- time reference can be either at the beginning or after a space
     . (Whitespace :)
@@ -278,68 +278,110 @@ parseTimeRefs =
 -- | Parser for multiple 'TimeReference' s.
 --
 -- This looks for all of them in the input and ignores everything surrounding.
-timeRefsParser :: TzParser [TimeReferenceMatched]
+timeRefsParser :: TzParser [TimeReference]
 timeRefsParser = choice'
   [ do
-      tr <- try timeRefConjugParser
+      tr <- try timeRefGroupsParser
       trs <- timeRefsParser
       return $ tr <> trs
   , anySingle >> timeRefsParser
   , takeRest >> pure []
   ]
 
--- | Parses entries like @between 10am and 11am@ or
--- @10am-11am on thursday or 1pm-2pm on wednesday@
-timeRefConjugParser :: TzParser [TimeReferenceMatched]
-timeRefConjugParser = do
-  firstConjugComponent <- timeRefParser
-  let conjugParser conjWord = do
-        optional' space
-        _ <- word' conjWord
-        -- no space here before `timeRefParser` requires a space before the contents
-        secondConjugComponent <- timeRefParser
-        pure $ unifyConjugComponents $ firstConjugComponent <> secondConjugComponent
+{- | Parses a sentence with up to 4 time references.
 
-      unifyConjugComponents :: [TimeReferenceMatched] -> [TimeReferenceMatched]
-      unifyConjugComponents lst = do
-        let getUnique :: Eq a => (TimeReferenceMatched -> Maybe a) -> Maybe a
-            getUnique getter = do
-              let many = L.nub $ mapMaybe getter lst
-              case many of
-                [item] -> Just item
-                _ -> Nothing
-        let locRef = getUnique trmLocationRef
-            dateRef = getUnique trmDateRef
-        -- TODO: use lenses
-        flip map lst $
-          (whenJustFunc locRef \l tr -> addLocationIfMissing l tr)
-            . whenJustFunc dateRef \d tr -> addDateIfMissing d tr
-
-  choice'
-    -- note that and/or can be parsed either as conjugations or as "hyphens",
-    -- in the second case am/pm context is also shared
-    [ conjugParser "and"
-    , conjugParser "or"
-    , pure firstConjugComponent
+>>> prettyPrint $ runTzParser timeRefGroupsParser " 10am"
+Just
+    [ TimeReference
+        { trText = "10am"
+        , trTimeOfDay = 10:00:00
+        , trDateRef = Nothing
+        , trLocationRef = Nothing
+        }
     ]
 
-addLocationIfMissing
-  :: Matched LocationReference
-  -> TimeReferenceMatched
-  -> TimeReferenceMatched
-addLocationIfMissing l tr =
-  if isNothing (trmLocationRef tr)
-  then tr { trmLocationRef = Just l, trmText = [int||#{trmText tr} (#{mtText l})|] }
-  else tr
+>>> prettyPrint $ runTzParser timeRefGroupsParser " 10am-11am on thursday in Asia/Tashkent or 1pm-2pm on wednesday in Europe/Paris"
+Just
+    [ TimeReference
+        { trText = "10am on thursday in Asia/Tashkent"
+        , trTimeOfDay = 10:00:00
+        , trDateRef = Just ( DayOfWeekRef Thursday )
+        , trLocationRef = Just ( TimeZoneRef Asia__Tashkent )
+        }
+    , TimeReference
+        { trText = "11am on thursday in Asia/Tashkent"
+        , trTimeOfDay = 11:00:00
+        , trDateRef = Just ( DayOfWeekRef Thursday )
+        , trLocationRef = Just ( TimeZoneRef Asia__Tashkent )
+        }
+    , TimeReference
+        { trText = "1pm on wednesday in Europe/Paris"
+        , trTimeOfDay = 13:00:00
+        , trDateRef = Just ( DayOfWeekRef Wednesday )
+        , trLocationRef = Just ( TimeZoneRef Europe__Paris )
+        }
+    , TimeReference
+        { trText = "2pm on wednesday in Europe/Paris"
+        , trTimeOfDay = 14:00:00
+        , trDateRef = Just ( DayOfWeekRef Wednesday )
+        , trLocationRef = Just ( TimeZoneRef Europe__Paris )
+        }
+    ]
+-}
+timeRefGroupsParser :: TzParser [TimeReference]
+timeRefGroupsParser = do
+  firstGroup <- timeRefGroupParser
+  let
+      parseSecondGroup :: Text -> TzParser [TimeReferenceMatched]
+      parseSecondGroup delimiter = do
+        optional' space
+        _ <- word' delimiter
+        -- no space here before `timeRefGroupParser` requires a space before the contents
+        secondGroup <- timeRefGroupParser
+        pure $ unifyGroups $ firstGroup <> secondGroup
 
-addDateIfMissing
-  :: Matched DateReference
-  -> TimeReferenceMatched
-  -> TimeReferenceMatched
-addDateIfMissing d tr =
-  if isNothing (trmDateRef tr)
-  then tr { trmDateRef = Just d, trmText = [int||#{trmText tr} (#{mtText d})|] }
-  else tr
+      -- If the user specified multiple time references but only 1 date/location reference,
+      -- we can infer that that date/location reference should apply to all time references.
+      --
+      -- Example: In "10am-11am or 1pm-2pm on wednesday",
+      -- "wednesday" should apply to all 4 time references.
+      unifyGroups :: [TimeReferenceMatched] -> [TimeReferenceMatched]
+      unifyGroups timeRefs = do
+        let getUnique :: Eq a => (TimeReferenceMatched -> Maybe a) -> Maybe a
+            getUnique getter = do
+              case L.nub $ mapMaybe getter timeRefs of
+                [item] -> Just item
+                _ -> Nothing
+        let locRefMaybe = getUnique trmLocationRef
+            dateRefMaybe = getUnique trmDateRef
+        flip map timeRefs \timeRef -> do
+          timeRef
+            & maybe id addDateIfMissing dateRefMaybe
+            & maybe id addLocationIfMissing locRefMaybe
+  choice'
+    [ parseSecondGroup "and"
+    , parseSecondGroup "or"
+    , pure firstGroup
+    ]
+    <&> fmap matchedToPlain
+  where
+    addLocationIfMissing
+      :: Matched LocationReference
+      -> TimeReferenceMatched
+      -> TimeReferenceMatched
+    addLocationIfMissing l tr =
+      if isNothing (trmLocationRef tr)
+      then tr { trmLocationRef = Just l, trmText = [int||#{trmText tr} (#{mtText l})|] }
+      else tr
+
+    addDateIfMissing
+      :: Matched DateReference
+      -> TimeReferenceMatched
+      -> TimeReferenceMatched
+    addDateIfMissing d tr =
+      if isNothing (trmDateRef tr)
+      then tr { trmDateRef = Just d, trmText = [int||#{trmText tr} (#{mtText d})|] }
+      else tr
 
 {- | Parsers either:
 
@@ -350,7 +392,7 @@ Also parses an optional `DateReference` and a `LocationReference`.
 They can come before or after the time reference(s).
 If found, they will be shared by both time references.
 
->>> prettyPrint $ runTzParser timeRefParser " 10am and 11pm tomorrow in BST"
+>>> prettyPrint $ runTzParser timeRefGroupParser " 10am and 11pm tomorrow in BST"
 Just
     [ TimeReferenceMatched
         { trmText = "10am tomorrow in BST"
@@ -398,8 +440,8 @@ Just
         }
     ]
 -}
-timeRefParser :: TzParser [TimeReferenceMatched]
-timeRefParser = do
+timeRefGroupParser :: TzParser [TimeReferenceMatched]
+timeRefGroupParser = do
   _ <- space
   (precText, dateAndLocation) <- match $ fromMaybe builderInit <$> do
     dateAndLocation <- optional' (dateAndLocationParser False builderInit)
