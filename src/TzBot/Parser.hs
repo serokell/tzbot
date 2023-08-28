@@ -719,7 +719,11 @@ timeOfDayParser = do
                 | h `elem` ['h', 'H'] ->
                     case after of
                       "" -> pure (False, 0)
-                      afterStr -> pure (False, fromMaybe 0 $ readMinutes afterStr)
+                      afterStr ->
+                        -- Try to parse what comes after the `h` separator as a number of minutes
+                        case readMinutes afterStr of
+                          Nothing -> empty
+                          Just mins -> pure (False, mins)
                 | otherwise -> empty
         , do
             -- Try to parse an "." separator and a required "minutes" component

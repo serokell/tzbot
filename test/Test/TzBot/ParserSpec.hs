@@ -5,6 +5,7 @@
 module Test.TzBot.ParserSpec
   ( test_parserSpec
   , test_Two_Time_References
+  , test_Regression_Tests
   ) where
 
 import TzPrelude
@@ -12,7 +13,7 @@ import TzPrelude
 import Data.Text qualified as T
 import Data.Time (DayOfWeek(..), TimeOfDay(..), defaultTimeLocale, formatTime)
 import Test.Tasty
-import Test.Tasty.HUnit (Assertion, assertFailure, testCase)
+import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Test.Tasty.Runners (TestTree(TestGroup))
 import Text.Interpolation.Nyan (int, rmode', rmode's)
 
@@ -206,6 +207,12 @@ test_Two_Time_References =
                 )
             }
         ]
+  ]
+
+test_Regression_Tests :: [TestTree]
+test_Regression_Tests =
+  [ testCase "#89" do
+      parseTimeRefs "7hff" @?= []
   ]
 
 mkTestCase :: HasCallStack => Text -> [TimeReference] -> Assertion
