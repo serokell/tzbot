@@ -4,6 +4,7 @@
 
 module Test.TzBot.ParserSpec
   ( test_parserSpec
+  , test_Two_Time_References
   ) where
 
 import TzPrelude
@@ -48,6 +49,7 @@ test_parserSpec = TestGroup "ParserBig"
           (Just (DayOfWeekRef Wednesday))
           (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
       ]
+
   , testCase "First slashed term has day of week, second has also UTC" $
     mkTestCase
       "How about Wednesday at 10:00 / 11:00 OR 14:00 / 15:00 at Thursday UTC"
@@ -96,6 +98,114 @@ test_parserSpec = TestGroup "ParserBig"
           (Nothing)
           (Just (TimeZoneAbbreviationRef (TimeZoneAbbreviationInfo {tzaiAbbreviation = "UTC", tzaiOffsetMinutes = 0, tzaiFullName = "UTC"})))
       ]
+  ]
+
+test_Two_Time_References :: [TestTree]
+test_Two_Time_References =
+  [ testCase "Each time reference can have its own date/location references" do
+      mkTestCase
+        "10am today in GMT and 11pm tomorrow in BST"
+        [ TimeReference
+            { trText = "10am today in GMT"
+            , trTimeOfDay = TimeOfDay 10 00 00
+            , trDateRef = Just
+                ( DaysFromToday 0 )
+            , trLocationRef = Just
+                ( TimeZoneAbbreviationRef
+                    ( TimeZoneAbbreviationInfo
+                        { tzaiAbbreviation = "GMT"
+                        , tzaiOffsetMinutes = 0
+                        , tzaiFullName = "GMT"
+                        }
+                    )
+                )
+            }
+        , TimeReference
+            { trText = "11pm tomorrow in BST"
+            , trTimeOfDay = TimeOfDay 23 00 00
+            , trDateRef = Just
+                ( DaysFromToday 1 )
+            , trLocationRef = Just
+                ( TimeZoneAbbreviationRef
+                    ( TimeZoneAbbreviationInfo
+                        { tzaiAbbreviation = "BST"
+                        , tzaiOffsetMinutes = 60
+                        , tzaiFullName = "British Summer Time"
+                        }
+                    )
+                )
+            }
+        ]
+
+  , testCase "Date/location references are shared" do
+      mkTestCase
+        "10am and 11pm today in BST"
+        [ TimeReference
+            { trText = "10am today in BST"
+            , trTimeOfDay = TimeOfDay 10 00 00
+            , trDateRef = Just
+                ( DaysFromToday 0 )
+            , trLocationRef = Just
+                ( TimeZoneAbbreviationRef
+                    ( TimeZoneAbbreviationInfo
+                        { tzaiAbbreviation = "BST"
+                        , tzaiOffsetMinutes = 60
+                        , tzaiFullName = "British Summer Time"
+                        }
+                    )
+                )
+            }
+        , TimeReference
+            { trText = "11pm today in BST"
+            , trTimeOfDay = TimeOfDay 23 00 00
+            , trDateRef = Just
+                ( DaysFromToday 0 )
+            , trLocationRef = Just
+                ( TimeZoneAbbreviationRef
+                    ( TimeZoneAbbreviationInfo
+                        { tzaiAbbreviation = "BST"
+                        , tzaiOffsetMinutes = 60
+                        , tzaiFullName = "British Summer Time"
+                        }
+                    )
+                )
+            }
+        ]
+
+  , testCase "Can have commas" do
+      mkTestCase
+        "10am and 11pm, today, in BST"
+        [ TimeReference
+            { trText = "10am, today, in BST"
+            , trTimeOfDay = TimeOfDay 10 00 00
+            , trDateRef = Just
+                ( DaysFromToday 0 )
+            , trLocationRef = Just
+                ( TimeZoneAbbreviationRef
+                    ( TimeZoneAbbreviationInfo
+                        { tzaiAbbreviation = "BST"
+                        , tzaiOffsetMinutes = 60
+                        , tzaiFullName = "British Summer Time"
+                        }
+                    )
+                )
+            }
+        , TimeReference
+            { trText = "11pm, today, in BST"
+            , trTimeOfDay = TimeOfDay 23 00 00
+            , trDateRef = Just
+                ( DaysFromToday 0 )
+            , trLocationRef = Just
+                ( TimeZoneAbbreviationRef
+                    ( TimeZoneAbbreviationInfo
+                        { tzaiAbbreviation = "BST"
+                        , tzaiOffsetMinutes = 60
+                        , tzaiFullName = "British Summer Time"
+                        }
+                    )
+                )
+            }
+        ]
   ]
 
 mkTestCase :: HasCallStack => Text -> [TimeReference] -> Assertion
