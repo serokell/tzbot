@@ -27,7 +27,7 @@ In this codebase and accompanying documentation, we may use the following terms:
   (sidenote: one could argue "offset abbreviations" or "named offsets" would be more accurate names).
   See: [Time Zones Aren’t Offsets – Offsets Aren’t Time Zones][time-zones-offsets].
 * **Sender**:
-  A user who sends a slack message with a reference to some moment in time.
+  A user who sends a Slack message with a reference to some moment in time.
 * **[Ephemeral message](https://api.slack.com/messaging/managing#ephemeral)**:
   A Slack message sent from a Slack bot visible only to a specific user.
   It has a "Only visible to you" label next to it.
@@ -47,7 +47,7 @@ Slack supports [these APIs](https://api.slack.com/apis/connections):
     * [Socket mode](https://api.slack.com/apis/connections/socket):
       receive events via a websocket connection.
     * RTM (Real Time Messaging) API:
-      receive events *and* post slack messages via a websocket connection.
+      receive events *and* post Slack messages via a websocket connection.
       Deprecated, new apps can’t use this mode.
 
 At the moment, `tzbot` is setup to receive events via Socket mode (using [`slacker`](https://github.com/velveteer/slacker)),
