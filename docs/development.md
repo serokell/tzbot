@@ -27,7 +27,7 @@ In this codebase and accompanying documentation, we may use the following terms:
   (sidenote: one could argue "offset abbreviations" or "named offsets" would be more accurate names).
   See: [Time Zones Aren’t Offsets – Offsets Aren’t Time Zones][time-zones-offsets].
 * **Sender**:
-  A user who sends a slack message with a reference to some moment in time.
+  A user who sends a Slack message with a reference to some moment in time.
 * **[Ephemeral message](https://api.slack.com/messaging/managing#ephemeral)**:
   A Slack message sent from a Slack bot visible only to a specific user.
   It has a "Only visible to you" label next to it.
@@ -47,7 +47,7 @@ Slack supports [these APIs](https://api.slack.com/apis/connections):
     * [Socket mode](https://api.slack.com/apis/connections/socket):
       receive events via a websocket connection.
     * RTM (Real Time Messaging) API:
-      receive events *and* post slack messages via a websocket connection.
+      receive events *and* post Slack messages via a websocket connection.
       Deprecated, new apps can’t use this mode.
 
 At the moment, `tzbot` is setup to receive events via Socket mode (using [`slacker`](https://github.com/velveteer/slacker)),
@@ -62,9 +62,6 @@ We have a [Makefile](/Makefile) which provides shortcuts for the most
 common developers' activities.
 
 ## Setting up a dev environment
-
-**NOTE**: Most [issues](https://github.com/serokell/tzbot/issues) (except #3)
-do not require setting up a Slack workspace. They can be worked on in isolation.
 
 1. [Create a Slack Workspace](https://slack.com/get-started#/createnew)
 1. Create a new Slack App
@@ -86,6 +83,8 @@ do not require setting up a Slack workspace. They can be worked on in isolation.
     * Open up the Slack client and log into the workspace you created in step 1.
     * Right click on a channel name and select
       "Open channel details" > "Integrations" > "Add apps" > "tzbot"
+1. To allow users to DM the bot, go `https://api.slack.com/apps/(app_id)` -> `App Home`
+   and set two flags around `Message Tabs` section: one to the right of it and one more below.
 1. Run the bot with `make run` (or `cabal run tzbot-exe` / `stack run`).
 
  [time-zones-offsets]: https://spin.atomicobject.com/2016/07/06/time-zones-offsets/

@@ -14,27 +14,40 @@ When a user in the Europe/Riga timezone sends a message such as:
 > Hey, can we meet tomorrow at 6pm?
 
 Every user on a timezone different than the sender's will receive an
-"ephemeral message" (a message visible only to that user):
+"ephemeral message" like this (a message visible only to that user):
 
-> "tomorrow at 6pm" in Europe/Riga will be 10:00, 12 April 2022 in America/Winnipeg
+![](./docs/imgs/example1.png)
 
 ## Features
 
-* [ ] When a Slack message is edited, the bot sends a new ephemeral message with the updated times.
-* [ ] Time references in codeblocks are ignored.
-* [ ] Supports messages sent to public and private channels, shared channels,
-      direct messages, group direct messages, and replies in threads.
-* [ ] Detects references to:
+* [x] When a Slack message is edited, the bot sends a new ephemeral message with all times
+      in the edited message and a link to it.
+* [x] Time references in codeblocks are ignored.
+* [x] Supports messages sent to public and private channels and shared channels
+      where bot is present; replies in threads are also supported.
+* [x] Users can send direct messages to the bot to translate time references.
+* [x] Every message in the workspace can be translated by selecting _Translate time refs_
+      from the message's context menu `⋮`.
+* [x] If a message contains wrongly converted or unrecognized time references, users can
+      report an issue from a message's context menu `⋮`;
+      the feedback can be either recorded to a file or sent to a configured
+      Slack channel.
+* [x] Detects references to:
   * invalid times (e.g., "tomorrow at 1:30", but the clocks skip from 00:59 to 02:00 on that day).
   * ambiguous times (e.g. "tomorrow at 1:30", but the clocks are set back from 01:59
     to 01:00 on that day, meaning the time "1:30" will occur twice at two different offsets).
-* [ ] Handles references with timezones, offsets and _some_ timezone abbreviations
+* [x] When a time reference is not invalid/ambiguous but the date can't be inferred precisely and
+      any timeshifts in sender/receiver timezone are around, the user will be warned about them.
+* [x] Handles references with timezones, offsets and _some_ timezone abbreviations
   (see [timezone_abbreviations.md](docs/timezone_abbreviations.md) for a full list).
-    > tuesday at 11am Australia/Brisbane
-    > tuesday at 11am UTC+3
-    > tuesday at 11am CST
+    * > tuesday at 11am Australia/Brisbane
+    * > tuesday at 11am UTC+3
+    * > tuesday at 11am CST
 
-For the initial MVP, we'll only support messages sent to public/private channels.
+  If a word _looks_ like a timezone abbreviation but is not known by the bot, the user is given
+  a hint of what abbreviations the sender probably meant.
+* [ ] Multiple time references with shared context are processed correctly. For example,
+      "Let's meet between 10 and 11pm tomorrow" contains two references: "10(pm) (tomorrow)" and "11pm tomorrow".
 
 ## Contributing
 
@@ -42,6 +55,7 @@ See:
   * [Contributing](CONTRIBUTING.md)
   * [Development](docs/development.md)
   * [Edge cases & pitfalls](docs/pitfalls.md)
+  * [Implementation details](docs/implementation_details.md)
 
 
 ## Comparison with similar tools
