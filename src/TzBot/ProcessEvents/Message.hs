@@ -204,7 +204,7 @@ processMessageEvent' evt mEventType sender timeRefs =
     -- the channel type of the message event is DM, it can only be
     -- the user-bot conversation. This means that the user wants
     -- to translate some time references and we send the translation
-    -- only to him, showing it in the way how other users would see
+    -- only to them, showing it in the way how other users would see
     -- it if it were sent to the common channel.
       let mbEphemeralMessage = renderAllTP sender $
             renderTemplate asForModalM now sender neTimeRefs

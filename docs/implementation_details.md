@@ -150,8 +150,9 @@ interpreted as "why isn't the bot working?".
 Users can also DM the bot. In this case, the bot will return an ephemeral message just as other
 users would see it if the message was posted in an ordinary channel.
 
-AFAIU there is no way to add the bot to an existing DM, so messages in such chats can be only translated
-using Slack entrypoints.
+AFAIU there is no way to add the bot to an existing DM
+(see [this discussion](https://forums.slackcommunity.com/s/question/0D53a00008vsItQCAU)),
+so messages in such chats can be only translated using Slack entrypoints.
 
 ## Using entrypoints
 

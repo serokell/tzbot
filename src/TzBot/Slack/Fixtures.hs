@@ -91,7 +91,7 @@ to fix it.
 
 You can also manually ask me to translate time references by opening the
 context menu `⋮` next to a message and selecting "Translate time refs".
-This works in all channels of the workspace, including direct messages.
+This works in all channels and direct messages.
 
 Finally, you can select "Report an issue" from the context menu `⋮` to
 report any issue with the bot. Your feedback is greatly appreciated!

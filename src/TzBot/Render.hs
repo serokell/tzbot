@@ -213,7 +213,7 @@ renderClockChangeWarning refText inferredTime mentionedTzInfo receiversTzLabel t
     let prevOffsetTZInfo = tzInfoFromOffset ccBefore
     [int|Dn|
   • _At #{renderTimeGeneral "%H:%M, %d %B %Y" prevOffsetTZInfo ccUTCTime} \
-in #{tziIdentifier ccTzInfo}, the clocks are turned #{clockChangeInfo ts}_.
+in #{ccTzIdentifier}, the clocks are turned #{clockChangeInfo ts}_.
     |]
     where
 

@@ -63,7 +63,7 @@ reportInput = Input
 mkBlocks :: Text -> Maybe TranslationPairs -> Block -> [Block]
 mkBlocks shownMessageText translatedMessage block =
   -- We always render the translation for other users (not author),
-  -- so the author can see how his message is translated for others
+  -- so the author can see how their message is translated for others
   [ BHeader Header { hText = PlainText "Message text" }
   , BSection $ markdownSection (Mrkdwn shownMessageText)
   , BDivider divider

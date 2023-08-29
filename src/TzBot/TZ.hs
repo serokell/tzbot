@@ -27,7 +27,8 @@ import Data.Vector.Unboxed qualified as VU
 import TzBot.TimeReference (DateReference(..), TimeRefSuccess(..), TimeReference(..))
 import TzBot.Util (NamedOffset, Offset(..))
 
--- | Represents a specific change in offset.
+-- | Represents a specific change in offset in some timezone,
+-- i.e. when the clocks are turned backward/forward.
 data ClockChange = ClockChange
   { ccUTCTime :: UTCTime
   -- ^ The time at which the offset change occurred / will occur.
@@ -35,12 +36,12 @@ data ClockChange = ClockChange
   -- ^ The offset before the change.
   , ccAfter    :: Offset
   -- ^ The offset after the change.
-  , ccTzInfo   :: TZI.TZInfo
+  , ccTzIdentifier   :: TZI.TZIdentifier
   -- ^ The rules for the time zone where this change occurs.
   } deriving stock (Eq, Show)
 
--- | See the "Clock change warnings" section in `docs/development.md`.
--- Sometimes the user does not specify a date, and we have to infer which date he meant.
+-- | See the "Clock change warnings" section in `docs/implementation_details.md`.
+-- Sometimes the user does not specify a date, and we have to infer which date they meant.
 --
 -- When we do this, we should check if there were any clock changes around the inferred date,
 -- in either the "source" time zone or the receiver's time zone,
@@ -71,17 +72,36 @@ checkForClockChanges TimeReference{trDateRef} TimeRefSuccess{trsUtcResult, trsTz
       nub [trsTzInfo, TZI.fromLabel receiverTzLabel]
         & concatMap \tz -> checkForClockChanges' tz lowerBound upperBound
 
--- | Find last clock change for given `TZTime`.
--- Note that it should exist, otherwise the function will
--- throw an error. Use this function on times
--- contained inside `TZError`, next to the clock change:
--- * second occurrence of amgiguous time inside `TZOverlap` constructor;
--- * invalid time adjusted forward by the length of the gap for `TZGap` constructor.
-findLastClockChange :: TZTime -> ClockChange
+{- | Find the most recent clock change that happened before the given `TZTime`.
+Note that it should exist, otherwise the function will
+throw an error.
+
+For example, the most recent clock change that happened _before_
+2022-11-07 10:00:00 in America/Winnipeg was the day before,
+when the clocks were turned backward 1 hour:
+
+  * from: "2022-11-06 02:00:00 CDT"
+  * to:   "2022-11-06 01:00:00 CST" (which is equivalent to "2022-11-06 07:00:00 UTC")
+
+See: https://www.timeanddate.com/time/zone/canada/winnipeg?year=2022
+
+>>> import TzPrelude
+>>> import Data.Time.TZTime.QQ (tz)
+>>> import TzBot.Util (prettyPrint)
+>>> prettyPrint $ findLastClockChange [tz|2022-11-07 10:00:00 [America/Winnipeg]|]
+ClockChange
+    { ccUTCTime = 2022-11-06 07:00:00 UTC
+    , ccBefore = -300
+    , ccAfter = -360
+    , ccTzIdentifier = "America/Winnipeg"
+    }
+-}
+findLastClockChange :: HasCallStack => TZTime -> ClockChange
 findLastClockChange tzt = do
-  let ccTzInfo = tzTimeTZInfo tzt
+  let tzInfo = tzTimeTZInfo tzt
+      ccTzIdentifier = tzInfo.tziIdentifier
       after = utcTimeToInt64 $ toUTC tzt
-  let tz@(TZ trans _ _) = tziRules ccTzInfo
+  let tz@(TZ trans _ _) = tzInfo.tziRules
       ixb = binarySearch trans after
   if ixb == 0
   then error "no clock change found"
@@ -106,7 +126,7 @@ checkForClockChanges' tzInfo (utcTimeToInt64 -> before) (utcTimeToInt64 -> after
           , Offset $ timeZoneMinutes $ timeZoneForIx tz ix)
           ) desiredClockChanges
       clockChanges = zip timeZones $ Data.List.tail timeZones
-  map (\((_ub, b), (ua, a)) -> ClockChange ua b a tzInfo) clockChanges
+  map (\((_ub, b), (ua, a)) -> ClockChange ua b a tzInfo.tziIdentifier) clockChanges
 
 int64ToUtcTime :: Int64 -> UTCTime
 int64ToUtcTime = posixSecondsToUTCTime . fromIntegral

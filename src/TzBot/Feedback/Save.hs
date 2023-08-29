@@ -52,7 +52,7 @@ saveFeedbackSlack entry channelId = sendMessage req
   where
     req = do
       -- We always render the translation for other users (not author),
-      -- so the author can see how his message is translated for others
+      -- so the author can see how their message is translated for others
       let pmrChannel = channelId
           pmrText = "New user feedback"
           pmrBlocks = NE.nonEmpty $

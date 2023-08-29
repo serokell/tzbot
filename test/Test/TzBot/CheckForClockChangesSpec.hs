@@ -31,9 +31,9 @@ autumnHavana2022utc = toUTC [tz|2022-11-06 05:00:00 [UTC]|]
 springHavana2023utc = toUTC [tz|2023-03-12 05:00:00 [UTC]|]
 
 springHavana2022, autumnHavana2022, springHavana2023 :: ClockChange
-springHavana2022 = ClockChange springHavana2022utc cst cdt (TZI.fromLabel America__Havana)
-autumnHavana2022 = ClockChange autumnHavana2022utc cdt cst (TZI.fromLabel America__Havana)
-springHavana2023 = ClockChange springHavana2023utc cst cdt (TZI.fromLabel America__Havana)
+springHavana2022 = ClockChange springHavana2022utc cst cdt ("America/Havana")
+autumnHavana2022 = ClockChange autumnHavana2022utc cdt cst ("America/Havana")
+springHavana2023 = ClockChange springHavana2023utc cst cdt ("America/Havana")
 
 cst, cdt :: Offset
 cst = Offset ((-5)*60)
@@ -74,7 +74,7 @@ test_checkForClockChanges =
         check
           (toUTC [tz|2023-03-14 00:00:00 [America/Havana]|]) "23:00" America__Havana
           Europe__Lisbon
-          [ ClockChange (toUTC [tz|2023-03-12 01:00:00 [America/Havana]|]) cst cdt (TZI.fromLabel America__Havana) ]
+          [ ClockChange (toUTC [tz|2023-03-12 01:00:00 [America/Havana]|]) cst cdt ("America/Havana") ]
 
         -- there's an offset change 3 days and 1 hour before, so we don't return it.
         check
@@ -87,7 +87,7 @@ test_checkForClockChanges =
         check
           (toUTC [tz|2023-03-09 00:00:00 [America/Havana]|]) "00:00" America__Havana
           Europe__Lisbon
-          [ ClockChange (toUTC [tz|2023-03-12 01:00:00 [America/Havana]|]) cst cdt (TZI.fromLabel America__Havana) ]
+          [ ClockChange (toUTC [tz|2023-03-12 01:00:00 [America/Havana]|]) cst cdt ("America/Havana") ]
 
         -- there's an offset change 3 days and 1 hour after, so we don't return it.
         check
@@ -100,7 +100,7 @@ test_checkForClockChanges =
         check
           (toUTC [tz|2023-03-14 00:00:00 [America/Havana]|]) "23:00 on Saturday" America__Havana
           Europe__Lisbon
-          [ ClockChange (toUTC [tz|2023-03-12 01:00:00 [America/Havana]|]) cst cdt (TZI.fromLabel America__Havana) ]
+          [ ClockChange (toUTC [tz|2023-03-12 01:00:00 [America/Havana]|]) cst cdt ("America/Havana") ]
 
         -- We will infer "01:00 on Sunday" means 01:00 on 19 March.
         -- There's an offset change 7 days and 1 hour before the inferred date/time, so we don't return it.
