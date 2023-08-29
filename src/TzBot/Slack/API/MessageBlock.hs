@@ -42,18 +42,18 @@ import TzBot.Util
 newtype MessageBlock = MessageBlock
   { mbElements :: [BlockElementLevel1]
   } deriving stock (Eq, Show, Generic)
-    deriving (FromJSON, ToJSON) via RecordWrapper MessageBlock
+    deriving (FromJSON) via RecordWrapper MessageBlock
 
 data BlockElementLevel1
   = BEL1List RichTextList
   | BEL1Plain PlainBlockElementLevel1
     deriving stock (Eq, Show, Generic)
-    deriving (FromJSON, ToJSON) via SumWrapper BlockElementLevel1
+    deriving (FromJSON) via SumWrapper BlockElementLevel1
 
 data RichTextList = RichTextList
   { rtlElements :: [BlockElementLevel1]
   } deriving stock (Eq, Show, Generic)
-    deriving (FromJSON, ToJSON) via TypedWrapper RichTextList
+    deriving (FromJSON) via TypedWrapper RichTextList
 
 data BlockElementType
   = BETRichTextSection -- ^ Simple text section
@@ -67,7 +67,7 @@ data PlainBlockElementLevel1 = PlainBlockElementLevel1
   , beElements :: Maybe [WithUnknown ElementText]
     -- ^ Level 2 elements
   } deriving stock (Eq, Show, Generic)
-    deriving (FromJSON, ToJSON) via RecordWrapper PlainBlockElementLevel1
+    deriving (FromJSON) via RecordWrapper PlainBlockElementLevel1
 
 ----
 data Style = Style
