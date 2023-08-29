@@ -51,7 +51,7 @@ import TzBot.Instances ()
 import TzBot.Slack.API (Mrkdwn(Mrkdwn), User(..))
 import TzBot.Slack.API.Block
 import TzBot.TimeReference
-import TzBot.TZ (TimeShift(..), checkForTimeshifts, findLastTimeshift)
+import TzBot.TZ (ClockChange(..), checkForClockChanges, findLastClockChange)
 import TzBot.Util
 
 -- Types
@@ -169,31 +169,31 @@ renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess@TimeRefSuccess
                 shouldShowThisTranslation = isNotSender || forModal
             guard shouldShowThisTranslation
             Just "You are in this timezone"
-      totalTimeshifts = checkForTimeshifts timeRef timeRefSucess userTzLabel
-      mbTimeshiftNote = do
-        guard $ not $ null totalTimeshifts
-        Just $ T.strip $ renderTimeshiftWarning
+      totalClockChanges = checkForClockChanges timeRef timeRefSucess userTzLabel
+      mbClockChangeWarning = do
+        guard $ not $ null totalClockChanges
+        Just $ T.strip $ renderClockChangeWarning
           (trText timeRef)
           trsUtcResult
           trsTzInfo
           userTzLabel
-          totalTimeshifts
+          totalClockChanges
 
   mbRenderedUserTime <&> \rt -> TranslationPair
     (renderOriginalTimeRef sender timeRef trsOriginalDate)
     rt
-    mbTimeshiftNote
-    mbTimeshiftNote
+    mbClockChangeWarning
+    mbClockChangeWarning
 
 -- | Render warning when conversion was successful but not sure in inferred date.
-renderTimeshiftWarning
+renderClockChangeWarning
   :: Text
   -> UTCTime
   -> TZI.TZInfo
   -> TZLabel
-  -> [TimeShift]
+  -> [ClockChange]
   -> Text
-renderTimeshiftWarning refText inferredTime mentionedTzInfo receiversTzLabel ts = do
+renderClockChangeWarning refText inferredTime mentionedTzInfo receiversTzLabel ts = do
   let renderedInferredTime = renderTimeGeneral "%d %B %Y" mentionedTzInfo inferredTime
       newLine = "\n"
   [int|n|
@@ -201,25 +201,25 @@ renderTimeshiftWarning refText inferredTime mentionedTzInfo receiversTzLabel ts 
     in #{TZI.tziIdentifier mentionedTzInfo} and
     converted it to #{receiversTzLabel}, but there is a time change near this date_:
 
-    #{T.intercalate newLine $ map renderTimeshiftWarningUnit ts}
+    #{T.intercalate newLine $ map renderClockChangeWarningUnit ts}
 
     _Beware that if this inference is not correct and the sender meant a different date,
     the conversion may not be accurate._
     |]
   where
 
-  renderTimeshiftWarningUnit :: TimeShift -> Text
-  renderTimeshiftWarningUnit ts@TimeShift {..} = do
-    let prevOffsetTZInfo = tzInfoFromOffset tsBefore
+  renderClockChangeWarningUnit :: ClockChange -> Text
+  renderClockChangeWarningUnit ts@ClockChange {..} = do
+    let prevOffsetTZInfo = tzInfoFromOffset ccBefore
     [int|Dn|
-  • _At #{renderTimeGeneral "%H:%M, %d %B %Y" prevOffsetTZInfo tsShiftUtc} \
-in #{tziIdentifier tsTzInfo}, the clocks are turned #{shiftInfo ts}_.
+  • _At #{renderTimeGeneral "%H:%M, %d %B %Y" prevOffsetTZInfo ccUTCTime} \
+in #{tziIdentifier ccTzInfo}, the clocks are turned #{clockChangeInfo ts}_.
     |]
     where
 
-    shiftInfo :: TimeShift -> Builder
-    shiftInfo TimeShift {..} = do
-      let offsetDiff = tsBefore `diffOffsetMinutes` tsAfter
+    clockChangeInfo :: ClockChange -> Builder
+    clockChangeInfo ClockChange {..} = do
+      let offsetDiff = ccBefore `diffOffsetMinutes` ccAfter
       let (hoursDiff, mbMinutesDiff) = absDivMinutesByHours offsetDiff
           direction = if offsetDiff > 0 then "backward" else "forward" :: Text
           shownMinutesDiff = mbMinutesDiff <&> \d ->
@@ -244,22 +244,22 @@ renderOriginalTimeRef sender timeRef originalDay = do
           Just $ formatTime defaultTimeLocale format originalDay
   [int||"#{trText timeRef}"#{mbShownOriginalDate}#{mbSenderTimeZone}|]
 
--- | Given a timeshift in a timezone, define the last local time in
+-- | Given a clock change in a timezone, define the last local time in
 -- the previous offset (first in the tuple) and
 -- the first local time in the next offset (second in the tuple).
-getTimeshiftBoundaries :: TimeShift -> (LocalTime, LocalTime)
-getTimeshiftBoundaries TimeShift {..} = do
+getClockChangeBoundaries :: ClockChange -> (LocalTime, LocalTime)
+getClockChangeBoundaries ClockChange {..} = do
   let getBoundaryLocalTime :: Offset -> LocalTime
       getBoundaryLocalTime o = zonedTimeToLocalTime $
-        utcToZonedTime (minutesToTimeZone $ unOffset o) tsShiftUtc
+        utcToZonedTime (minutesToTimeZone $ unOffset o) ccUTCTime
 
-      beforeTimeshift = getBoundaryLocalTime tsBefore
-      afterTimeshift = getBoundaryLocalTime tsAfter
+      beforeTimeshift = getBoundaryLocalTime ccBefore
+      afterTimeshift = getBoundaryLocalTime ccAfter
   (beforeTimeshift, afterTimeshift)
 
 renderOnOverlap :: User -> TimeReference -> OverlapInfo -> TranslationPair
 renderOnOverlap sender timeRef OverlapInfo {..} = do
-  let TimeShiftErrorInfo {..} = oiErrorInfo
+  let ClockChangeErrorInfo {..} = oiErrorInfo
       firstOffset = tztimeOffset oiFirstOccurrence
       secondOffset = tztimeOffset oiSecondOccurrence
       (hoursDiff, mbMinutesDiff) = absDivMinutesByHours $
@@ -268,15 +268,15 @@ renderOnOverlap sender timeRef OverlapInfo {..} = do
         [int|| (and #{d} minutes)|] :: Builder
       isImplicitSenderTimezone = isNothing $ trLocationRef timeRef
 
-      timeshift = findLastTimeshift oiSecondOccurrence
-      (beforeTimeshift, afterTimeshift) = getTimeshiftBoundaries timeshift
+      clockChange = findLastClockChange oiSecondOccurrence
+      (beforeClockChange, afterClockChange) = getClockChangeBoundaries clockChange
       tzIdentifier = tziIdentifier $ TZT.tzTimeTZInfo oiFirstOccurrence
 
   let shownTZ = shownTimezoneOnErrors isImplicitSenderTimezone tzIdentifier
 
   let commonPart forSender = [int|n|
-        At #{renderTimeOfDay beforeTimeshift}, the clocks are turned backward #{hoursDiff}
-        hour(s)#{shownMinutesDiff} to #{renderTimeOfDay afterTimeshift} and this
+        At #{renderTimeOfDay beforeClockChange}, the clocks are turned backward #{hoursDiff}
+        hour(s)#{shownMinutesDiff} to #{renderTimeOfDay afterClockChange} and this
         particular time occurs twice in #{shownTZ forSender}, first with the
         offset #{firstOffset} and then with #{secondOffset}.
         |] :: Builder
@@ -284,7 +284,7 @@ renderOnOverlap sender timeRef OverlapInfo {..} = do
         Please edit your message or write a new one and specify an offset explicitly.
         |] :: Builder
   TranslationPair
-    { tuTimeRef = renderOriginalTimeRef sender timeRef tseiOriginalDate
+    { tuTimeRef = renderOriginalTimeRef sender timeRef cceiOriginalDate
     , tuTranslation = "Ambiguous time"
     , tuNoteForSender = Just [int||_#{commonPart True} #{additionForSender}_|]
     , tuNoteForOthers = Just [int||_#{commonPart False}_|]
@@ -292,7 +292,7 @@ renderOnOverlap sender timeRef OverlapInfo {..} = do
 
 renderOnGap :: User -> TimeReference -> GapInfo -> TranslationPair
 renderOnGap sender timeRef GapInfo {..} = do
-  let TimeShiftErrorInfo {..} = giErrorInfo
+  let ClockChangeErrorInfo {..} = giErrorInfo
       prevOffset = tztimeOffset giPreviousTime
       nextOffset = tztimeOffset giNextTime
       (hoursDiff, mbMinutesDiff) = absDivMinutesByHours $
@@ -302,9 +302,9 @@ renderOnGap sender timeRef GapInfo {..} = do
         [int|| (and #{d} minutes)|] :: Builder
 
       isImplicitSenderTimezone = isNothing $ trLocationRef timeRef
-      timeshift = findLastTimeshift giNextTime
+      clockChange = findLastClockChange giNextTime
 
-      (beforeGap, afterGap) = getTimeshiftBoundaries timeshift
+      (beforeGap, afterGap) = getClockChangeBoundaries clockChange
 
       tzIdentifier = tziIdentifier $ TZT.tzTimeTZInfo giPreviousTime
 
@@ -321,7 +321,7 @@ renderOnGap sender timeRef GapInfo {..} = do
         |] :: Builder
 
   TranslationPair
-    { tuTimeRef = renderOriginalTimeRef sender timeRef tseiOriginalDate
+    { tuTimeRef = renderOriginalTimeRef sender timeRef cceiOriginalDate
     , tuTranslation = "Invalid time"
     , tuNoteForSender = Just [int||_#{commonPart True} #{additionForSender}_|]
     , tuNoteForOthers = Just [int||_#{commonPart False}_|]

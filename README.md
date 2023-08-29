@@ -36,8 +36,6 @@ Every user on a timezone different than the sender's will receive an
   * invalid times (e.g., "tomorrow at 1:30", but the clocks skip from 00:59 to 02:00 on that day).
   * ambiguous times (e.g. "tomorrow at 1:30", but the clocks are set back from 01:59
     to 01:00 on that day, meaning the time "1:30" will occur twice at two different offsets).
-* [x] When a time reference is not invalid/ambiguous but the date can't be inferred precisely and
-      any timeshifts in sender/receiver timezone are around, the user will be warned about them.
 * [x] Handles references with timezones, offsets and _some_ timezone abbreviations
   (see [timezone_abbreviations.md](docs/timezone_abbreviations.md) for a full list).
     * > tuesday at 11am Australia/Brisbane

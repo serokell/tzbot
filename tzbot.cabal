@@ -300,8 +300,8 @@ test-suite tzbot-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Test.TzBot.CheckForClockChangesSpec
       Test.TzBot.ConfigSpec
-      Test.TzBot.GetTimeshiftsSpec
       Test.TzBot.HandleTooManyRequests
       Test.TzBot.MessageBlocksSpec
       Test.TzBot.ParserSpec

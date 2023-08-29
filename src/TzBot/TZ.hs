@@ -3,10 +3,10 @@
 -- SPDX-License-Identifier: MPL-2.0
 
 module TzBot.TZ
-  ( TimeShift (..)
-  , checkForTimeshifts
-  , checkForTimeshifts'
-  , findLastTimeshift
+  ( ClockChange (..)
+  , checkForClockChanges
+  , checkForClockChanges'
+  , findLastClockChange
   ) where
 
 import TzPrelude
@@ -28,27 +28,27 @@ import TzBot.TimeReference (DateReference(..), TimeRefSuccess(..), TimeReference
 import TzBot.Util (NamedOffset, Offset(..))
 
 -- | Represents a specific change in offset.
-data TimeShift = TimeShift
-  { tsShiftUtc :: UTCTime
+data ClockChange = ClockChange
+  { ccUTCTime :: UTCTime
   -- ^ The time at which the offset change occurred / will occur.
-  , tsBefore   :: Offset
+  , ccBefore   :: Offset
   -- ^ The offset before the change.
-  , tsAfter    :: Offset
+  , ccAfter    :: Offset
   -- ^ The offset after the change.
-  , tsTzInfo   :: TZI.TZInfo
+  , ccTzInfo   :: TZI.TZInfo
   -- ^ The rules for the time zone where this change occurs.
   } deriving stock (Eq, Show)
 
--- | See the "Time shift warnings" section in `docs/development.md`.
+-- | See the "Clock change warnings" section in `docs/development.md`.
 -- Sometimes the user does not specify a date, and we have to infer which date he meant.
 --
--- When we do this, we should check if there were any time shifts around the inferred date,
+-- When we do this, we should check if there were any clock changes around the inferred date,
 -- in either the "source" time zone or the receiver's time zone,
 -- and, if so, emit a warning.
-checkForTimeshifts :: TimeReference -> TimeRefSuccess -> TZLabel -> [TimeShift]
-checkForTimeshifts TimeReference{trDateRef} TimeRefSuccess{trsUtcResult, trsTzInfo} receiverTzLabel =
+checkForClockChanges :: TimeReference -> TimeRefSuccess -> TZLabel -> [ClockChange]
+checkForClockChanges TimeReference{trDateRef} TimeRefSuccess{trsUtcResult, trsTzInfo} receiverTzLabel =
   case trDateRef of
-    -- The date was inferred: we should check if there were any time shifts 3 days before/after the inferred date.
+    -- The date was inferred: we should check if there were any clock changes 3 days before/after the inferred date.
     Nothing ->
       checkEachTimeZone
         (trsUtcResult & addUTCTime (nominalDay * -3))
@@ -56,57 +56,57 @@ checkForTimeshifts TimeReference{trDateRef} TimeRefSuccess{trsUtcResult, trsTzIn
     -- The user specified the day of week; we had to infer which week they meant.
     --
     -- It's possible they meant "last week" instead, so we should check if
-    -- there were any time shifts between last week and the date we inferred.
+    -- there were any clock changes between last week and the date we inferred.
     Just (DayOfWeekRef {}) ->
       checkEachTimeZone
         (trsUtcResult & addUTCTime (nominalDay * -7))
         trsUtcResult
-    -- The date was specified by the user; no need to perform the "time shift check"
+    -- The date was specified by the user; no need to perform the "clock change check"
     Just (DaysFromToday {}) -> []
     Just (DayOfMonthRef {}) -> []
   where
-    -- Check for time shifts in both the "source" time zone and the receiver's time zone.
-    checkEachTimeZone :: UTCTime -> UTCTime -> [TimeShift]
+    -- Check for clock changes in both the "source" time zone and the receiver's time zone.
+    checkEachTimeZone :: UTCTime -> UTCTime -> [ClockChange]
     checkEachTimeZone lowerBound upperBound =
       nub [trsTzInfo, TZI.fromLabel receiverTzLabel]
-        & concatMap \tz -> checkForTimeshifts' tz lowerBound upperBound
+        & concatMap \tz -> checkForClockChanges' tz lowerBound upperBound
 
--- | Find last timeshift for given `TZTime`.
+-- | Find last clock change for given `TZTime`.
 -- Note that it should exist, otherwise the function will
 -- throw an error. Use this function on times
--- contained inside `TZError`, next to the timeshift:
+-- contained inside `TZError`, next to the clock change:
 -- * second occurrence of amgiguous time inside `TZOverlap` constructor;
 -- * invalid time adjusted forward by the length of the gap for `TZGap` constructor.
-findLastTimeshift :: TZTime -> TimeShift
-findLastTimeshift tzt = do
-  let tsTzInfo = tzTimeTZInfo tzt
+findLastClockChange :: TZTime -> ClockChange
+findLastClockChange tzt = do
+  let ccTzInfo = tzTimeTZInfo tzt
       after = utcTimeToInt64 $ toUTC tzt
-  let tz@(TZ trans _ _) = tziRules tsTzInfo
+  let tz@(TZ trans _ _) = tziRules ccTzInfo
       ixb = binarySearch trans after
   if ixb == 0
-  then error "no timeshift found"
+  then error "no clock change found"
   else do
-    let tsShiftUtc = int64ToUtcTime $ trans VU.! ixb
-        tsBefore = Offset $ timeZoneMinutes $ timeZoneForIx tz (ixb - 1)
-        tsAfter = Offset $ timeZoneMinutes $ timeZoneForIx tz ixb
-    TimeShift {..}
+    let ccUTCTime = int64ToUtcTime $ trans VU.! ixb
+        ccBefore = Offset $ timeZoneMinutes $ timeZoneForIx tz (ixb - 1)
+        ccAfter = Offset $ timeZoneMinutes $ timeZoneForIx tz ixb
+    ClockChange {..}
 
-checkForTimeshifts' :: TZInfo -> UTCTime -> UTCTime -> [TimeShift]
-checkForTimeshifts' tzInfo (utcTimeToInt64 -> before) (utcTimeToInt64 -> after)
+checkForClockChanges' :: TZInfo -> UTCTime -> UTCTime -> [ClockChange]
+checkForClockChanges' tzInfo (utcTimeToInt64 -> before) (utcTimeToInt64 -> after)
   | before > after = []
   | otherwise = do
   let tz@(TZ trans _ _) = tziRules tzInfo
       ixb = binarySearch trans before
       startingFromIxb = VU.unsafeDrop ixb trans
-      desiredTimeshifts = zip [ixb..] $
+      desiredClockChanges = zip [ixb..] $
         takeWhile (<= after) $ VU.toList startingFromIxb
       timeZones =
         map (\(ix, int64utc) ->
           ( int64ToUtcTime int64utc
           , Offset $ timeZoneMinutes $ timeZoneForIx tz ix)
-          ) desiredTimeshifts
-      timeShifts = zip timeZones $ Data.List.tail timeZones
-  map (\((_ub, b), (ua, a)) -> TimeShift ua b a tzInfo) timeShifts
+          ) desiredClockChanges
+      clockChanges = zip timeZones $ Data.List.tail timeZones
+  map (\((_ub, b), (ua, a)) -> ClockChange ua b a tzInfo) clockChanges
 
 int64ToUtcTime :: Int64 -> UTCTime
 int64ToUtcTime = posixSecondsToUTCTime . fromIntegral

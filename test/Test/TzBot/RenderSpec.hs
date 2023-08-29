@@ -26,8 +26,8 @@ import TzBot.Slack.API
 arbitraryTime1 :: UTCTime
 arbitraryTime1 = toUTC [tz|2023-01-30 00:30:00 [Europe/Moscow]|]
 
-nearTimeshift :: UTCTime
-nearTimeshift = toUTC [tz|2023-03-11 00:30:00 [Europe/Moscow]|]
+nearClockChange :: UTCTime
+nearClockChange = toUTC [tz|2023-03-11 00:30:00 [Europe/Moscow]|]
 
 userMoscow :: User
 userMoscow = User {uId="msk", uIsBot=False, uTz=Europe__Moscow}
@@ -164,29 +164,29 @@ test_renderSpec = TestGroup "Render"
       ]
     ]
 
-  , TestGroup "TimeshiftWarning"
+  , TestGroup "ClockChangeWarning"
     [ testCase "Implicit date" $
-      mkChatCase nearTimeshift "10am" userMoscow userHavana
+      mkChatCase nearClockChange "10am" userMoscow userHavana
       [ translWithCommonNote
           "\"10am\", 11 March 2023 in Europe/Moscow"
           "02:00, Saturday, 11 March 2023 in America/Havana"
           "_Warning: We inferred that \"10am\" refers to 11 March 2023 in Europe/Moscow and converted it to America/Havana, but there is a time change near this date_:\n  \8226 _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.\n_Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._"
       ]
     , testCase "Day of week" $
-      mkChatCase nearTimeshift "10am on sunday" userMoscow userHavana
+      mkChatCase nearClockChange "10am on sunday" userMoscow userHavana
       [ translWithCommonNote
           "\"10am on sunday\", 12 March 2023 in Europe/Moscow"
           "03:00, Sunday, 12 March 2023 in America/Havana"
           "_Warning: We inferred that \"10am on sunday\" refers to 12 March 2023 in Europe/Moscow and converted it to America/Havana, but there is a time change near this date_:\n  \8226 _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.\n_Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._"
       ]
     , testCase "Day of week, inversed users" $
-      mkChatCase nearTimeshift "10am on sunday" userHavana userMoscow
+      mkChatCase nearClockChange "10am on sunday" userHavana userMoscow
       [ translWithCommonNote
           "\"10am on sunday\", 12 March 2023 in America/Havana"
           "17:00, Sunday, 12 March 2023 in Europe/Moscow"
           "_Warning: We inferred that \"10am on sunday\" refers to 12 March 2023 in America/Havana and converted it to Europe/Moscow, but there is a time change near this date_:\n  \8226 _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.\n_Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._"
       ]
-    , testCase "Timeshifts in both timezones" $
+    , testCase "Clock changes in both timezones" $
       mkChatCase
         (toUTC [tz|2023-03-25 15:00:00 [Europe/London]|])
         "10am"

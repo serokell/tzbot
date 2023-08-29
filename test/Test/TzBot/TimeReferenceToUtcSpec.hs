@@ -274,7 +274,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
         , teCurrentTime = time1
         , teResult = TRTUInvalidTimeZoneAbbrev $ UnknownTimeZoneAbbrev "MKS" ["MSK"]
         }
-  , testGroup "Timeshift subtleties" $
+  , testGroup "Clock changes subtleties" $
     [ testCase "Turn on DST, explicit time zone, Havana, Cuba" $
         mkTestCase $ TestEntry
           { teTimeRef =
@@ -283,7 +283,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = labelHavana
           , teCurrentTime = time2
           , teResult = TRTUInvalid $ GapInfo arbitraryTime arbitraryTime $
-            TimeShiftErrorInfo (fromGregorian 2022 3 13)
+            ClockChangeErrorInfo (fromGregorian 2022 3 13)
           }
     , testCase "Turn on DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
@@ -314,7 +314,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = labelHavana
           , teCurrentTime = time3
           , teResult = TRTUAmbiguous $ OverlapInfo arbitraryTime arbitraryTime $
-            TimeShiftErrorInfo (fromGregorian 2022 11 6)
+            ClockChangeErrorInfo (fromGregorian 2022 11 6)
           }
     , testCase "Turn off DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
