@@ -17,6 +17,7 @@ import Data.Time.TZTime.QQ (tz)
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
 import Test.Tasty.Runners (TestTree(..))
+import Text.Interpolation.Nyan
 
 import TzBot.Parser (parseTimeRefs)
 import TzBot.Render
@@ -170,21 +171,33 @@ test_renderSpec = TestGroup "Render"
       [ translWithCommonNote
           "\"10am\", 11 March 2023 in Europe/Moscow"
           "02:00, Saturday, 11 March 2023 in America/Havana"
-          "_Warning: We inferred that \"10am\" refers to 11 March 2023 in Europe/Moscow and converted it to America/Havana, but there is a time change near this date_:\n  \8226 _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.\n_Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._"
+          [int|s|
+            _Warning: We inferred that "10am" refers to 11 March 2023 in Europe/Moscow and converted it to America/Havana, but there is a time change near this date_:
+              • _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.
+            _Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._
+          |]
       ]
     , testCase "Day of week" $
       mkChatCase nearClockChange "10am on sunday" userMoscow userHavana
       [ translWithCommonNote
           "\"10am on sunday\", 12 March 2023 in Europe/Moscow"
           "03:00, Sunday, 12 March 2023 in America/Havana"
-          "_Warning: We inferred that \"10am on sunday\" refers to 12 March 2023 in Europe/Moscow and converted it to America/Havana, but there is a time change near this date_:\n  \8226 _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.\n_Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._"
+          [int|s|
+            _Warning: We inferred that "10am on sunday" refers to 12 March 2023 in Europe/Moscow and converted it to America/Havana, but there is a time change near this date_:
+              • _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.
+            _Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._
+          |]
       ]
     , testCase "Day of week, inversed users" $
       mkChatCase nearClockChange "10am on sunday" userHavana userMoscow
       [ translWithCommonNote
           "\"10am on sunday\", 12 March 2023 in America/Havana"
           "17:00, Sunday, 12 March 2023 in Europe/Moscow"
-          "_Warning: We inferred that \"10am on sunday\" refers to 12 March 2023 in America/Havana and converted it to Europe/Moscow, but there is a time change near this date_:\n  \8226 _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.\n_Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._"
+          [int|s|
+            _Warning: We inferred that "10am on sunday" refers to 12 March 2023 in America/Havana and converted it to Europe/Moscow, but there is a time change near this date_:
+              • _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.
+            _Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._
+          |]
       ]
     , testCase "Clock changes in both timezones" $
       mkChatCase
@@ -195,7 +208,12 @@ test_renderSpec = TestGroup "Render"
       [ translWithCommonNote
           "\"10am\", 26 March 2023 in Europe/London"
           "10:00, Sunday, 26 March 2023 in Europe/Lisbon"
-          "_Warning: We inferred that \"10am\" refers to 26 March 2023 in Europe/London and converted it to Europe/Lisbon, but there is a time change near this date_:\n  \8226 _At 01:00, 26 March 2023 in Europe/London, the clocks are turned forward 1 hour(s)_.\n  \8226 _At 01:00, 26 March 2023 in Europe/Lisbon, the clocks are turned forward 1 hour(s)_.\n_Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._"
+          [int|s|
+            _Warning: We inferred that "10am" refers to 26 March 2023 in Europe/London and converted it to Europe/Lisbon, but there is a time change near this date_:
+              • _At 01:00, 26 March 2023 in Europe/London, the clocks are turned forward 1 hour(s)_.
+              • _At 01:00, 26 March 2023 in Europe/Lisbon, the clocks are turned forward 1 hour(s)_.
+            _Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._
+          |]
       ]
     , TestGroup "ExplicitDate"
       [ testCase "No warning: tomorrow" $
