@@ -158,7 +158,7 @@ so messages in such chats can be only translated using Slack entrypoints.
 
 Currently there are two supported entrypoints in the message context menu `⋮`:
 
-* _Translate time refs_: Opens a modal window with all of the message's time references
+* _Translate time references_: Opens a modal window with all of the message's time references
   and the corresponding time converted to the user's time zone.
   The real advantage of this entrypoint is that it can be used for converting:
     * Old messages for which all ephemerals have been erased.

@@ -25,7 +25,7 @@ Users will receive an
 * [x] Supports messages sent to public and private channels and shared channels
       where the bot is present; replies in threads are also supported.
 * [x] Users can send direct messages to the bot to translate time references.
-* [x] Every message in the workspace can be translated by selecting _Translate time refs_
+* [x] Every message in the workspace can be translated by selecting _Translate time references_
       from the message's context menu `⋮`.
 * [x] If a message contains wrongly converted or unrecognized time references, users can
       report an issue from a message's context menu `⋮`;

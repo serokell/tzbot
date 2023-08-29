@@ -90,7 +90,7 @@ If a time reference is invalid for some reason, I will tell you why and how
 to fix it.
 
 You can also manually ask me to translate time references by opening the
-context menu `⋮` next to a message and selecting "Translate time refs".
+context menu `⋮` next to a message and selecting "Translate time references".
 This works in all channels and direct messages.
 
 Finally, you can select "Report an issue" from the context menu `⋮` to
