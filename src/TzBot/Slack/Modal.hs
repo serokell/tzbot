@@ -10,20 +10,20 @@ import Data.List (singleton)
 
 import TzBot.Feedback.Dialog.Types
 import TzBot.Instances ()
-import TzBot.Render (TranslationPairs, asForOthersS, renderSlackBlocks)
+import TzBot.Render (ConversionPairs, asForOthersS, renderSlackBlocks)
 import TzBot.Slack.API
 import TzBot.Slack.Fixtures qualified as Fixtures
 
 -- View modal
-mkShowModal :: Text -> Maybe TranslationPairs -> ReportDialogId -> Modal
-mkShowModal shownMessageText translatedMessage metadata =
+mkShowModal :: Text -> Maybe ConversionPairs -> ReportDialogId -> Modal
+mkShowModal shownMessageText conversionPairsMb metadata =
   Modal
     { mTitle = "View time references"
     , mSubmit = Nothing
     , mNotifyOnClose = False
     , mCallbackId = Fixtures.viewModal
     , mPrivateMetadata = unReportDialogId metadata
-    , mBlocks = mkBlocks shownMessageText translatedMessage $ BActions reportButton
+    , mBlocks = mkBlocks shownMessageText conversionPairsMb $ BActions reportButton
     }
 
 reportButton :: Actions
@@ -36,15 +36,15 @@ reportButton = Actions
   }
 
 -- Report modal
-mkReportModal :: Text -> Maybe TranslationPairs -> ReportDialogId -> Modal
-mkReportModal shownMessageText translatedMessage metadata =
+mkReportModal :: Text -> Maybe ConversionPairs -> ReportDialogId -> Modal
+mkReportModal shownMessageText conversionPairsMb metadata =
   Modal
     { mTitle = "Report"
     , mSubmit = Just "Submit"
     , mNotifyOnClose = False
     , mCallbackId = Fixtures.reportModal
     , mPrivateMetadata = unReportDialogId metadata
-    , mBlocks = mkBlocks shownMessageText translatedMessage $ BInput reportInput
+    , mBlocks = mkBlocks shownMessageText conversionPairsMb $ BInput reportInput
     }
 
 reportInput :: Input
@@ -60,16 +60,16 @@ reportInput = Input
       }
 
 -- Common funcs
-mkBlocks :: Text -> Maybe TranslationPairs -> Block -> [Block]
-mkBlocks shownMessageText translatedMessage block =
-  -- We always render the translation for other users (not author),
-  -- so the author can see how their message is translated for others
+mkBlocks :: Text -> Maybe ConversionPairs -> Block -> [Block]
+mkBlocks shownMessageText conversionPairsMb block =
+  -- We always render the conversion for other users (not author),
+  -- so the author can see how their message is converted for others
   [ BHeader Header { hText = PlainText "Message text" }
   , BSection $ markdownSection (Mrkdwn shownMessageText)
   , BDivider divider
   , BHeader Header { hText = PlainText "Time references" }
   ]
-  <> renderSlackBlocks asForOthersS translatedMessage
+  <> renderSlackBlocks asForOthersS conversionPairsMb
   <> [ BDivider divider
   , block
   ]

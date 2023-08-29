@@ -17,7 +17,7 @@ import TzBot.Feedback.Dialog.Types
 import TzBot.Feedback.Save
 import TzBot.Logger
 import TzBot.ProcessEvents.Common (openModalCommon)
-import TzBot.Render (TranslationPairs)
+import TzBot.Render (ConversionPairs)
 import TzBot.RunMonad (BotM)
 import TzBot.Slack (sendEphemeralMessage)
 import TzBot.Slack.API
@@ -34,7 +34,7 @@ processInteractive evt =
       whoTriggeredId = suId $ imeUser evt
       channelId = scId $ imeChannel evt
       triggerId = imeTriggerId evt
-      mkModalFunc :: Text -> Maybe TranslationPairs -> ReportDialogId -> Modal
+      mkModalFunc :: Text -> Maybe ConversionPairs -> ReportDialogId -> Modal
       mkModalFunc = case imeCallbackId evt of
         CTView   -> mkShowModal
         CTReport -> mkReportModal
@@ -64,7 +64,7 @@ processViewSubmission (ViewActionEvent view) =
         |]
       let feedbackEntry = FeedbackEntry
             { feMessageText = rpmMessageText
-            , feTimeTranslation = rpmTimeTranslation
+            , feTimeConversion = rpmTimeConversion
             , feUserReport = userInput
             , feMessageTimestamp = rpmMessageTimestamp
             , feSenderTimezone = rpmSenderTimeZone

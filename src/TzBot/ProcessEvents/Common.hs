@@ -22,7 +22,7 @@ import TzBot.Feedback.Dialog (insertDialogEntry)
 import TzBot.Feedback.Dialog.Types
 import TzBot.Logger
 import TzBot.Parser (parseTimeRefs)
-import TzBot.Render (TranslationPairs, asForModalM, renderAllTP, renderTemplate)
+import TzBot.Render (ConversionPairs, asForModalM, renderAllConversionPairs, renderTemplate)
 import TzBot.Slack (BotM, getUserCached, startModal)
 import TzBot.Slack.API
 import TzBot.Slack.API.MessageBlock
@@ -31,14 +31,14 @@ import TzBot.TimeReference (TimeReference)
 import TzBot.Util (WithUnknown(unUnknown))
 
 -- | Generic function that starts view or report modal where
---   time references translations can be viewed
+--   time reference conversions can be viewed
 --   and feedback can be left.
 openModalCommon
   :: Message
   -> ChannelId
   -> UserId
   -> TriggerId
-  -> (Text -> Maybe TranslationPairs -> ReportDialogId -> Modal)
+  -> (Text -> Maybe ConversionPairs -> ReportDialogId -> Modal)
   -- ^ The way how to build a modal.
   -- See "TzBot.Slack.Modal" for possible implementations
   -> BotM ()
@@ -47,16 +47,16 @@ openModalCommon message channelId whoTriggeredId triggerId mkModalFunc = do
       msgTimestamp = mTs message
   mbTimeRefs <- nonEmpty <$> getTimeReferencesFromMessage message
   sender <- getUserCached $ mUser message
-  translationPairs <- fmap join $ forM mbTimeRefs $ \neTimeRefs -> do
+  conversionPairs <- fmap join $ forM mbTimeRefs $ \neTimeRefs -> do
       whoTriggered <- getUserCached whoTriggeredId
       pure $
-        renderAllTP whoTriggered $
+        renderAllConversionPairs whoTriggered $
           renderTemplate asForModalM msgTimestamp sender neTimeRefs
 
   guid <- ReportDialogId <$> liftIO genText
   let metadata = ReportDialogEntry
         { rpmMessageText = mText message
-        , rpmTimeTranslation = translationPairs
+        , rpmTimeConversion = conversionPairs
         , rpmSenderTimeZone = uTz sender
         , rpmMessageTimestamp = mTs message
         , rpmUserId = whoTriggeredId
@@ -64,7 +64,7 @@ openModalCommon message channelId whoTriggeredId triggerId mkModalFunc = do
         , rpmThreadId = mThreadId message
         }
   insertDialogEntry guid metadata
-  let modal = mkModalFunc msgText translationPairs guid
+  let modal = mkModalFunc msgText conversionPairs guid
   startModal $ OpenViewReq modal triggerId
 
 -- | Extract separate text pieces from the Slack message that can contain

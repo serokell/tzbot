@@ -92,7 +92,7 @@ data UnknownTimeZoneAbbrev = UnknownTimeZoneAbbrev
 timeReferenceToUTC
   :: TZLabel -- ^ The timezone of the sender of the Slack message.
   -> UTCTime -- ^ The time at which the message was sent.
-  -> TimeReference -- ^ A time reference to translate to UTC.
+  -> TimeReference -- ^ A time reference to convert to UTC.
   -> TimeReferenceToUTCResult
 timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
   case eithTzInfo of

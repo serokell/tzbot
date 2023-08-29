@@ -33,7 +33,7 @@ import TzBot.Util (encodeText)
 
 {- |
 After the message event came, the bot sends some ephemerals
-containing translations of time references in that message.
+containing conversions of time references in that message.
 
 The bot has two entrypoints, \"view\" and \"report\", that
 can be triggered from the message context menu
@@ -42,7 +42,7 @@ This causes the `Interactive`/`IEMessageEvent` event to come.
 
 After this, \"view\" or \"report\" dialog window should start.
 Both of them contain the original message text and a table of
-time references translations, but the \"view\" window
+time references conversions, but the \"view\" window
 provides a button \"Report\" that will get the user to
 the \"report\" dialog. And instead \"report\" dialog contains
 an input block for user to share their thoughts.

@@ -9,7 +9,7 @@
 The bot's main function is to capture time references in a message and convert them
 to the receiver's time zone. This can be triggered by some events:
   * A new message was posted in a channel where the bot is present;
-  * A message that has been previously translated was recently edited and it now contains some new time references;
+  * A message that has been previously converted was recently edited and it now contains some new time references;
   * The user triggered an entrypoint from the message's context menu `⋮`;
   * The user DMed the bot.
 
@@ -78,9 +78,9 @@ Sometimes messages can have a rather tricky structure and the date/location refe
 This issue seems to require analyzing sentence structure and is quite subtle and interesting; we hope
 to solve it one day :smile:
 
-## Time translation
+## Time conversion
 
-The main goal of the `TzBot.TimeReference` module is to try to translate the obtained `TimeReference` to `UTCTime`
+The main goal of the `TzBot.TimeReference` module is to try to convert the obtained `TimeReference` to `UTCTime`
 collecting some additional meta info and handling errors related to clock changes.
 Sometimes the user provides incomplete information, and we have to infer what they meant.
 * "1am": The user supplied the time, but not the date or the time zone.
@@ -152,13 +152,13 @@ users would see it if the message was posted in an ordinary channel.
 
 AFAIU there is no way to add the bot to an existing DM
 (see [this discussion](https://forums.slackcommunity.com/s/question/0D53a00008vsItQCAU)),
-so messages in such chats can be only translated using Slack entrypoints.
+so messages in such chats can be only converted using Slack entrypoints.
 
 ## Using entrypoints
 
 Currently there are two supported entrypoints in the message context menu `⋮`:
 
-* _Translate time references_: Opens a modal window with all of the message's time references
+* _Convert time references_: Opens a modal window with all of the message's time references
   and the corresponding time converted to the user's time zone.
   The real advantage of this entrypoint is that it can be used for converting:
     * Old messages for which all ephemerals have been erased.

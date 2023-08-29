@@ -25,8 +25,8 @@ totalParser = info (commandParserWithDefault <**> helper) $
   mconcat
   [ fullDesc
   , progDesc
-      "Perform time references translation on new messages post to \
-       \Slack conversations or on direct user triggers."
+      "Converts time references contained within Slack messages to \
+       \users' timezones."
   , header "Slack timezone bot"
   , footer configAndEnvironmentNote
   ]

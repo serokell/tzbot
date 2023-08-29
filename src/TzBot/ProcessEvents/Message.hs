@@ -67,7 +67,7 @@ withSenderNotBot evt = do
 --
 -- For "message" event from the conversation, if the message contains any time references,
 -- get all users of that conversation, then send ephemerals to them,
--- containing translation of all found time references; send an ephemeral to the sender
+-- containing conversions of all found time references; send an ephemeral to the sender
 -- if the original message contains some possibly invalid/ambiguous references or unknown
 -- offset abbreviations. For messages in a thread, send ephemerals to that thread
 -- (regardless of possible thread broadcast).
@@ -129,10 +129,10 @@ processMessageEvent' evt mEventType sender timeRefs =
   sendAction
     :: Maybe Text
     -> SenderFlag
-    -> TranslationPairs
+    -> ConversionPairs
     -> UserId
     -> BotM ()
-  sendAction mbPermalinkForEdit toSender transl userId = do
+  sendAction mbPermalinkForEdit toSender conversionPairs userId = do
     whetherToShowHelpCmd <- getWhetherToShowHelpCmd
     let mbEditBlock =
           withMaybe mbPermalinkForEdit [] \permalink ->
@@ -145,10 +145,10 @@ processMessageEvent' evt mEventType sender timeRefs =
           { perUser = userId
           , perChannel = channelId
           , perThreadTs = mbThreadId
-          , perText = joinTranslationPairs toSender transl
+          , perText = joinConversionPairs toSender conversionPairs
           , perBlocks = NE.nonEmpty $ concat
             [ mbEditBlock
-            , renderSlackBlocks toSender (Just transl)
+            , renderSlackBlocks toSender (Just conversionPairs)
             , [ BSection $ markdownSection (Mrkdwn Fixtures.helpUsage)
               | whetherToShowHelpCmd ]
             ]
@@ -184,7 +184,7 @@ processMessageEvent' evt mEventType sender timeRefs =
           userInChannel <- getUserCached userInChannelId
           whenT (notBot userInChannel) do
             let mbEphemeralMessage =
-                  renderAllTP userInChannel ephemeralTemplate
+                  renderAllConversionPairs userInChannel ephemeralTemplate
             let senderFlag =
                   if isSender $ uId userInChannel
                   then asForSenderS
@@ -203,14 +203,14 @@ processMessageEvent' evt mEventType sender timeRefs =
     -- it's not possible to add the bot to any existing DMs, so if
     -- the channel type of the message event is DM, it can only be
     -- the user-bot conversation. This means that the user wants
-    -- to translate some time references and we send the translation
+    -- to convert some time references and we send the conversion
     -- only to them, showing it in the way how other users would see
     -- it if it were sent to the common channel.
-      let mbEphemeralMessage = renderAllTP sender $
+      let mbEphemeralMessage = renderAllConversionPairs sender $
             renderTemplate asForModalM now sender neTimeRefs
       whenJust mbEphemeralMessage $ \eph -> do
         logInfo [int||
-          Received message from the DM, sending translation to the author
+          Received message from the DM, sending conversion to the author
           |]
         sendAction Nothing asForOthersS eph (uId sender)
 
