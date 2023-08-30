@@ -28,7 +28,7 @@ steps:
     depends_on: build
     commands:
       - nix build -L .#checks.x86_64-linux.test
-      - nix develop .#doctest -c runghc test/doctests.hs
+      - nix develop .#doctest -c runghc doctest/doctests.hs
 
   - label: xrefcheck
     command: nix run github:serokell/xrefcheck

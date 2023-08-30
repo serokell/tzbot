@@ -236,7 +236,7 @@ test-suite doctests
   type: exitcode-stdio-1.0
   main-is: doctests.hs
   hs-source-dirs:
-      test
+      doctest
   default-extensions:
       AllowAmbiguousTypes
       ApplicativeDo
