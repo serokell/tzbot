@@ -55,13 +55,13 @@ openModalCommon message channelId whoTriggeredId triggerId mkModalFunc = do
 
   guid <- ReportDialogId <$> liftIO genText
   let metadata = ReportDialogEntry
-        { rpmMessageText = mText message
-        , rpmTimeConversion = conversionPairs
-        , rpmSenderTimeZone = uTz sender
-        , rpmMessageTimestamp = mTs message
-        , rpmUserId = whoTriggeredId
-        , rpmChannelId = channelId
-        , rpmThreadId = mThreadId message
+        { rpeMessageText = mText message
+        , rpeTimeConversion = conversionPairs
+        , rpeSenderTimeZone = uTz sender
+        , rpeMessageTimestamp = mTs message
+        , rpeUserId = whoTriggeredId
+        , rpeChannelId = channelId
+        , rpeThreadId = mThreadId message
         }
   insertDialogEntry guid metadata
   let modal = mkModalFunc msgText conversionPairs guid

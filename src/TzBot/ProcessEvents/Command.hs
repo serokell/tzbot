@@ -16,13 +16,13 @@ import TzBot.Slack.API (ChannelId(..), PostEphemeralReq(..), UserId(..))
 import TzBot.Slack.Fixtures qualified as Fixtures
 
 processHelpCommand :: SlashCommand -> BotM ()
-processHelpCommand SlashCommand {..} = do
-  let postEphemeralReq@PostEphemeralReq {..} = PostEphemeralReq
-        { perUser = UserId scUserId
-        , perChannel = ChannelId scChannelId
+processHelpCommand cmd = do
+  let postEphemeralReq = PostEphemeralReq
+        { perUser = UserId cmd.scUserId
+        , perChannel = ChannelId cmd.scChannelId
         , perText = Fixtures.helpMessage
         , perThreadTs = Nothing
         , perBlocks = Nothing
         }
-  logInfo [int||Sending help message to user #{perUser}|]
+  logInfo [int||Sending help message to user #{perUser postEphemeralReq}|]
   sendEphemeralMessage postEphemeralReq

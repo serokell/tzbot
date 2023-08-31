@@ -57,23 +57,23 @@ processViewSubmission (ViewActionEvent view) =
   mbMetadata <- lookupDialogEntry metadataEntryId
   case mbMetadata of
     Nothing -> logWarn [int||Dialog id not found: #{metadataEntryId}|]
-    Just _metadata@ReportDialogEntry {..} -> do
+    Just reportDialogEntry -> do
       logInfo [int||
-        Got feedback from user #{rpmUserId}, \
+        Got feedback from user #{rpeUserId reportDialogEntry}, \
         dialogId #{metadataEntryId}
         |]
       let feedbackEntry = FeedbackEntry
-            { feMessageText = rpmMessageText
-            , feTimeConversion = rpmTimeConversion
+            { feMessageText = reportDialogEntry.rpeMessageText
+            , feTimeConversion = reportDialogEntry.rpeTimeConversion
             , feUserReport = userInput
-            , feMessageTimestamp = rpmMessageTimestamp
-            , feSenderTimezone = rpmSenderTimeZone
+            , feMessageTimestamp = reportDialogEntry.rpeMessageTimestamp
+            , feSenderTimezone = reportDialogEntry.rpeSenderTimeZone
             }
       saveFeedback feedbackEntry
       sendEphemeralMessage $ PostEphemeralReq
-        { perUser = rpmUserId
-        , perChannel = rpmChannelId
-        , perThreadTs = rpmThreadId
+        { perUser = reportDialogEntry.rpeUserId
+        , perChannel = reportDialogEntry.rpeChannelId
+        , perThreadTs = reportDialogEntry.rpeThreadId
         , perText = "Thanks for your feedback!"
         , perBlocks = Nothing
         }

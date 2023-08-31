@@ -92,10 +92,10 @@ chooseNote (SenderFlag sender) =
 
 --------
 concatConversionPair :: SenderFlag -> ConversionPair -> Builder
-concatConversionPair sender t@ConversionPair {..} = do
-  let rightNote = chooseNote sender t
+concatConversionPair sender cp = do
+  let rightNote = chooseNote sender cp
   let note = maybe "" (("\n" <>) . fromText) rightNote
-  [int||#{cpTimeRef}:  #{cpConversion}#{note}|]
+  [int||#{cpTimeRef cp}:  #{cpConversion cp}#{note}|]
 
 -- Render generic
 renderAllConversionPairs :: User -> Template -> Maybe ConversionPairs
@@ -153,10 +153,10 @@ renderOnSuccess
   -> TimeRefSuccess
   -> User
   -> Maybe ConversionPair
-renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess@TimeRefSuccess {..} user = do
+renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess user = do
   let userTzLabel = uTz user
       renderedUserTime = do
-        let q = renderUserTime userTzLabel trsUtcResult
+        let q = renderUserTime userTzLabel timeRefSucess.trsUtcResult
         [int||#{q} in #{userTzLabel}|] :: Text
       mbRefTzLabel = getTzLabelMaybe (uTz sender) timeRef
       mbRenderedUserTime = case mbRefTzLabel of
@@ -174,13 +174,13 @@ renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess@TimeRefSuccess
         guard $ not $ null totalClockChanges
         Just $ T.strip $ renderClockChangeWarning
           (trText timeRef)
-          trsUtcResult
-          trsTzInfo
+          timeRefSucess.trsUtcResult
+          timeRefSucess.trsTzInfo
           userTzLabel
           totalClockChanges
 
   mbRenderedUserTime <&> \rt -> ConversionPair
-    (renderOriginalTimeRef sender timeRef trsOriginalDate)
+    (renderOriginalTimeRef sender timeRef timeRefSucess.trsOriginalDate)
     rt
     mbClockChangeWarning
     mbClockChangeWarning
@@ -209,17 +209,17 @@ renderClockChangeWarning refText inferredTime mentionedTzInfo receiversTzLabel t
   where
 
   renderClockChangeWarningUnit :: ClockChange -> Text
-  renderClockChangeWarningUnit ts@ClockChange {..} = do
-    let prevOffsetTZInfo = tzInfoFromOffset ccBefore
+  renderClockChangeWarningUnit cc = do
+    let prevOffsetTZInfo = tzInfoFromOffset cc.ccBefore
     [int|Dn|
-  • _At #{renderTimeGeneral "%H:%M, %d %B %Y" prevOffsetTZInfo ccUTCTime} \
-in #{ccTzIdentifier}, the clocks are turned #{clockChangeInfo ts}_.
+  • _At #{renderTimeGeneral "%H:%M, %d %B %Y" prevOffsetTZInfo (ccUTCTime cc)} \
+in #{ccTzIdentifier cc}, the clocks are turned #{clockChangeInfo}_.
     |]
     where
 
-    clockChangeInfo :: ClockChange -> Builder
-    clockChangeInfo ClockChange {..} = do
-      let offsetDiff = ccBefore `diffOffsetMinutes` ccAfter
+    clockChangeInfo :: Builder
+    clockChangeInfo = do
+      let offsetDiff = cc.ccBefore `diffOffsetMinutes` cc.ccAfter
       let (hoursDiff, mbMinutesDiff) = absDivMinutesByHours offsetDiff
           direction = if offsetDiff > 0 then "backward" else "forward" :: Text
           shownMinutesDiff = mbMinutesDiff <&> \d ->
@@ -232,9 +232,9 @@ renderOriginalTimeRef :: User -> TimeReference -> Day -> Text
 renderOriginalTimeRef sender timeRef originalDay = do
   let mbSenderTimeZone :: Maybe Builder
       mbSenderTimeZone = case trLocationRef timeRef of
-        Just (TimeZoneAbbreviationRef TimeZoneAbbreviationInfo {..}) -> do
-          guard $ notElem tzaiAbbreviation ["UTC", "GMT"]
-          Just [int||, #{tzaiFullName} (#{tzaiOffsetMinutes}) |]
+        Just (TimeZoneAbbreviationRef abbrevationInfo) -> do
+          guard $ notElem abbrevationInfo.tzaiAbbreviation ["UTC", "GMT"]
+          Just [int||, #{tzaiFullName abbrevationInfo} (#{tzaiOffsetMinutes abbrevationInfo}) |]
         Just _ -> Nothing
         Nothing -> Just [int|| in #{uTz sender}|]
       mbShownOriginalDate = case trDateRef timeRef of
@@ -248,29 +248,27 @@ renderOriginalTimeRef sender timeRef originalDay = do
 -- the previous offset (first in the tuple) and
 -- the first local time in the next offset (second in the tuple).
 getClockChangeBoundaries :: ClockChange -> (LocalTime, LocalTime)
-getClockChangeBoundaries ClockChange {..} = do
+getClockChangeBoundaries cc = do
   let getBoundaryLocalTime :: Offset -> LocalTime
-      getBoundaryLocalTime o = zonedTimeToLocalTime $
-        utcToZonedTime (minutesToTimeZone $ unOffset o) ccUTCTime
-
-      beforeTimeshift = getBoundaryLocalTime ccBefore
-      afterTimeshift = getBoundaryLocalTime ccAfter
-  (beforeTimeshift, afterTimeshift)
+      getBoundaryLocalTime o =
+        cc.ccUTCTime
+          & utcToZonedTime (minutesToTimeZone o.unOffset)
+          & zonedTimeToLocalTime
+  (getBoundaryLocalTime cc.ccBefore, getBoundaryLocalTime cc.ccAfter)
 
 renderOnOverlap :: User -> TimeReference -> OverlapInfo -> ConversionPair
-renderOnOverlap sender timeRef OverlapInfo {..} = do
-  let ClockChangeErrorInfo {..} = oiErrorInfo
-      firstOffset = tztimeOffset oiFirstOccurrence
-      secondOffset = tztimeOffset oiSecondOccurrence
+renderOnOverlap sender timeRef overlapInfo = do
+  let firstOffset = tztimeOffset overlapInfo.oiFirstOccurrence
+      secondOffset = tztimeOffset overlapInfo.oiSecondOccurrence
       (hoursDiff, mbMinutesDiff) = absDivMinutesByHours $
         firstOffset `diffOffsetMinutes` secondOffset
       shownMinutesDiff = mbMinutesDiff <&> \d ->
         [int|| (and #{d} minutes)|] :: Builder
       isImplicitSenderTimezone = isNothing $ trLocationRef timeRef
 
-      clockChange = findLastClockChange oiSecondOccurrence
+      clockChange = findLastClockChange overlapInfo.oiSecondOccurrence
       (beforeClockChange, afterClockChange) = getClockChangeBoundaries clockChange
-      tzIdentifier = tziIdentifier $ TZT.tzTimeTZInfo oiFirstOccurrence
+      tzIdentifier = tziIdentifier $ TZT.tzTimeTZInfo overlapInfo.oiFirstOccurrence
 
   let shownTZ = shownTimezoneOnErrors isImplicitSenderTimezone tzIdentifier
 
@@ -284,17 +282,16 @@ renderOnOverlap sender timeRef OverlapInfo {..} = do
         Please edit your message or write a new one and specify an offset explicitly.
         |] :: Builder
   ConversionPair
-    { cpTimeRef = renderOriginalTimeRef sender timeRef cceiOriginalDate
+    { cpTimeRef = renderOriginalTimeRef sender timeRef overlapInfo.oiErrorInfo.cceiOriginalDate
     , cpConversion = "Ambiguous time"
     , cpNoteForSender = Just [int||_#{commonPart True} #{additionForSender}_|]
     , cpNoteForOthers = Just [int||_#{commonPart False}_|]
     }
 
 renderOnGap :: User -> TimeReference -> GapInfo -> ConversionPair
-renderOnGap sender timeRef GapInfo {..} = do
-  let ClockChangeErrorInfo {..} = giErrorInfo
-      prevOffset = tztimeOffset giPreviousTime
-      nextOffset = tztimeOffset giNextTime
+renderOnGap sender timeRef gapInfo = do
+  let prevOffset = tztimeOffset gapInfo.giPreviousTime
+      nextOffset = tztimeOffset gapInfo.giNextTime
       (hoursDiff, mbMinutesDiff) = absDivMinutesByHours $
         prevOffset `diffOffsetMinutes` nextOffset
 
@@ -302,11 +299,11 @@ renderOnGap sender timeRef GapInfo {..} = do
         [int|| (and #{d} minutes)|] :: Builder
 
       isImplicitSenderTimezone = isNothing $ trLocationRef timeRef
-      clockChange = findLastClockChange giNextTime
+      clockChange = findLastClockChange gapInfo.giNextTime
 
       (beforeGap, afterGap) = getClockChangeBoundaries clockChange
 
-      tzIdentifier = tziIdentifier $ TZT.tzTimeTZInfo giPreviousTime
+      tzIdentifier = tziIdentifier $ TZT.tzTimeTZInfo gapInfo.giPreviousTime
 
   let shownTZ = shownTimezoneOnErrors isImplicitSenderTimezone tzIdentifier
   let commonPart forSender = [int|n|
@@ -316,12 +313,12 @@ renderOnGap sender timeRef GapInfo {..} = do
         |] :: Builder
       additionForSender = [int|n|
         Please edit your message or write a new one and amend the time. Did you mean
-        #{renderTimeOfDay $ TZT.tzTimeLocalTime giPreviousTime} or
-        #{renderTimeOfDay $ TZT.tzTimeLocalTime giNextTime} instead?
+        #{renderTimeOfDay $ TZT.tzTimeLocalTime $ giPreviousTime gapInfo} or
+        #{renderTimeOfDay $ TZT.tzTimeLocalTime $ giNextTime gapInfo} instead?
         |] :: Builder
 
   ConversionPair
-    { cpTimeRef = renderOriginalTimeRef sender timeRef cceiOriginalDate
+    { cpTimeRef = renderOriginalTimeRef sender timeRef gapInfo.giErrorInfo.cceiOriginalDate
     , cpConversion = "Invalid time"
     , cpNoteForSender = Just [int||_#{commonPart True} #{additionForSender}_|]
     , cpNoteForOthers = Just [int||_#{commonPart False}_|]
@@ -359,7 +356,7 @@ renderEphemeralMessageConversionPair modalFlag sender (timeRef, result) = case r
     Left $ renderOnOverlap sender timeRef overlapInfo
   TRTUInvalid gapInfo ->
     Left $ renderOnGap sender timeRef gapInfo
-  TRTUInvalidTimeZoneAbbrev UnknownTimeZoneAbbrev {..} -> do
+  TRTUInvalidTimeZoneAbbrev UnknownTimeZoneAbbrev {utzaCandidates, utzaAbbrev} -> do
     let mbNeCandidates = nonEmpty utzaCandidates
         mbCandidatesNoteForSender = flip fmap mbNeCandidates \neCandidates -> do
           let renderedCandidates =

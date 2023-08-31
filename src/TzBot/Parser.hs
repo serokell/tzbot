@@ -1165,9 +1165,9 @@ data TimeReferenceMatched = TimeReferenceMatched
   deriving stock (Eq, Show)
 
 matchedToPlain :: TimeReferenceMatched -> TimeReference
-matchedToPlain TimeReferenceMatched {..} = TimeReference
-  { trDateRef = fmap mtValue trmDateRef
-  , trLocationRef = fmap mtValue trmLocationRef
-  , trText = trmText
-  , trTimeOfDay = trmTimeOfDay
+matchedToPlain trm = TimeReference
+  { trDateRef = fmap mtValue trm.trmDateRef
+  , trLocationRef = fmap mtValue trm.trmLocationRef
+  , trText = trm.trmText
+  , trTimeOfDay = trm.trmTimeOfDay
   }

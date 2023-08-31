@@ -15,13 +15,13 @@ import TzBot.RunMonad
 import TzBot.Slack.Events (MemberJoinedChannelEvent(..), MemberLeftChannelEvent(..))
 
 processMemberJoinedChannel :: MemberJoinedChannelEvent -> BotM ()
-processMemberJoinedChannel MemberJoinedChannelEvent {..} = do
-  logInfo [int||user #{mjceUser} joined channel #{mjceChannel}|]
+processMemberJoinedChannel evt = do
+  logInfo [int||user #{mjceUser evt} joined channel #{mjceChannel evt}|]
   channelMembersCache <- asks bsConversationMembersCache
-  Cache.update mjceChannel (S.insert mjceUser) channelMembersCache
+  Cache.update evt.mjceChannel (S.insert evt.mjceUser) channelMembersCache
 
 processMemberLeftChannel :: MemberLeftChannelEvent -> BotM ()
-processMemberLeftChannel MemberLeftChannelEvent {..} = do
-  logInfo [int||user #{mlceUser} left channel #{mlceChannel}|]
+processMemberLeftChannel evt = do
+  logInfo [int||user #{mlceUser evt} left channel #{mlceChannel evt}|]
   channelMembersCache <- asks bsConversationMembersCache
-  Cache.update mlceChannel (S.delete mlceUser) channelMembersCache
+  Cache.update evt.mlceChannel (S.delete evt.mlceUser) channelMembersCache

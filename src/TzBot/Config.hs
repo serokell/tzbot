@@ -102,16 +102,16 @@ readConfigWithEnv env mbPath =
   -- After this, we catch yaml exception in order to pretty-print it later.
   handle handleFunc $ traverse evaluate $ toEither
     $ do
-  cAppToken <- fetchRequired "appToken" appTokenEnv cAppToken
-  cBotToken <- fetchRequired "botToken" botTokenEnv cBotToken
-  cMaxRetries <- fetchOptional maxRetriesEnv cMaxRetries `bindValidation` validateMaxTries
-  cCacheUsersInfo           <- fetchOptional cacheUsersEnv        cCacheUsersInfo
-  cCacheConversationMembers <- fetchOptional cacheConvMembersEnv  cCacheConversationMembers
-  cFeedbackChannel          <- fetchOptional feedbackChannelEnv   cFeedbackChannel
-  cFeedbackFile             <- fetchOptional feedbackFileEnv      cFeedbackFile
-  cCacheReportDialog        <- fetchOptional cacheReportDialogEnv cCacheReportDialog
-  cInverseHelpUsageChance   <- fetchOptional inverseHelpUsageChanceEnv cInverseHelpUsageChance
-  cLogLevel                 <- fetchOptional logLevelEnv          cLogLevel
+  cAppToken <- fetchRequired "appToken" appTokenEnv _cfg.cAppToken
+  cBotToken <- fetchRequired "botToken" botTokenEnv _cfg.cBotToken
+  cMaxRetries <- fetchOptional maxRetriesEnv _cfg.cMaxRetries `bindValidation` validateMaxTries
+  cCacheUsersInfo           <- fetchOptional cacheUsersEnv             _cfg.cCacheUsersInfo
+  cCacheConversationMembers <- fetchOptional cacheConvMembersEnv       _cfg.cCacheConversationMembers
+  cFeedbackChannel          <- fetchOptional feedbackChannelEnv        _cfg.cFeedbackChannel
+  cFeedbackFile             <- fetchOptional feedbackFileEnv           _cfg.cFeedbackFile
+  cCacheReportDialog        <- fetchOptional cacheReportDialogEnv      _cfg.cCacheReportDialog
+  cInverseHelpUsageChance   <- fetchOptional inverseHelpUsageChanceEnv _cfg.cInverseHelpUsageChance
+  cLogLevel                 <- fetchOptional logLevelEnv               _cfg.cLogLevel
   pure Config {..}
   where
     handleFunc :: Y.ParseException -> IO (Either [LoadConfigError] $ Config 'CSFinal)
@@ -127,7 +127,7 @@ readConfigWithEnv env mbPath =
 
     _cfg :: Config 'CSInterm
     -- The most easy way to read file on demand, acceptable here.
-    _cfg@Config {..} = unsafePerformIO $
+    _cfg = unsafePerformIO $
         loadYamlSettings (maybeToList mbPath) [toJSON defaultConfig] ignoreEnv
 
     fetchRequired

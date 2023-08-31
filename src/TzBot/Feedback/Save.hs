@@ -42,9 +42,9 @@ logFeedbackError (displayException -> err) = do
 --   and record to the file if configured.
 saveFeedback :: FeedbackEntry -> BotM ()
 saveFeedback entry = UnliftIO.handleAny logFeedbackError $ do
-  FeedbackConfig {..} <- asks bsFeedbackConfig
-  whenJust fcFeedbackChannel $ saveFeedbackSlack entry
-  whenJust fcFeedbackFile $ saveFeedbackFile entry
+  feedbackConfig <- asks bsFeedbackConfig
+  whenJust feedbackConfig.fcFeedbackChannel $ saveFeedbackSlack entry
+  whenJust feedbackConfig.fcFeedbackFile $ saveFeedbackFile entry
 
 -- Send to the slack channel
 saveFeedbackSlack :: FeedbackEntry -> ChannelId -> BotM ()

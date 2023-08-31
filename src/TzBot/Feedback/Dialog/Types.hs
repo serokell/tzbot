@@ -23,11 +23,11 @@ newtype ReportDialogId = ReportDialogId { unReportDialogId :: Text }
   deriving newtype (ToJSON, FromJSON, Buildable, Hashable)
 
 data ReportDialogEntry = ReportDialogEntry
-  { rpmMessageText :: Text
-  , rpmTimeConversion :: Maybe ConversionPairs
-  , rpmSenderTimeZone :: TZLabel
-  , rpmMessageTimestamp :: UTCTime
-  , rpmUserId :: UserId
-  , rpmChannelId :: ChannelId
-  , rpmThreadId :: Maybe ThreadId
+  { rpeMessageText :: Text
+  , rpeTimeConversion :: Maybe ConversionPairs
+  , rpeSenderTimeZone :: TZLabel
+  , rpeMessageTimestamp :: UTCTime
+  , rpeUserId :: UserId
+  , rpeChannelId :: ChannelId
+  , rpeThreadId :: Maybe ThreadId
   } deriving stock (Eq, Show, Generic)

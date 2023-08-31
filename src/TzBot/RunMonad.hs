@@ -66,8 +66,8 @@ instance K.KatipContext BotM where
   getKatipNamespace = view bsLogNamespaceL
 
 runKatipWithBotState :: BotState -> K.KatipContextT m a -> m a
-runKatipWithBotState BotState {..} action =
-  K.runKatipContextT bsLogEnv bsLogContext bsLogNamespace action
+runKatipWithBotState bs action =
+  K.runKatipContextT bs.bsLogEnv bs.bsLogContext bs.bsLogNamespace action
 ----------------------------------------------------------------------------
 -- Exceptions
 ----------------------------------------------------------------------------
