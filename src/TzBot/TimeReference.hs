@@ -94,13 +94,13 @@ timeReferenceToUTC
   -> UTCTime -- ^ The time at which the message was sent.
   -> TimeReference -- ^ A time reference to convert to UTC.
   -> TimeReferenceToUTCResult
-timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
+timeReferenceToUTC sendersTZLabel eventTimestamp timeRef =
   case eithTzInfo of
     Left abbrev -> TRTUInvalidTimeZoneAbbrev abbrev
     Right tzInfo -> do
       let eventLocalTime = TZT.fromUTC tzInfo eventTimestamp
       let eithRefTime = eventLocalTime & TZT.modifyLocalStrict (
-            dayTransition >>> TZT.atTimeOfDay trTimeOfDay
+            dayTransition >>> TZT.atTimeOfDay timeRef.trTimeOfDay
             )
       case eithRefTime of
         Left err -> tzErrorToResult err
@@ -120,9 +120,9 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
         ClockChangeErrorInfo (localDay invalidTime)
   -- This doesn't include setting time, only date changes
   dayTransition :: LocalTime -> LocalTime
-  dayTransition eventLocalTime = case trDateRef of
+  dayTransition eventLocalTime = case timeRef.trDateRef of
     Nothing -> do
-      let thatTimeOfCurrentDay = TZT.atTimeOfDay trTimeOfDay eventLocalTime
+      let thatTimeOfCurrentDay = TZT.atTimeOfDay timeRef.trTimeOfDay eventLocalTime
       if thatTimeOfCurrentDay >= eventLocalTime
         then eventLocalTime
         else TZT.addCalendarClip (TZT.calendarDays 1) eventLocalTime
@@ -138,11 +138,11 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
           TZT.atDay (fromGregorian year monthOfYear dayOfMonth) eventLocalTime
 
   eithTzInfo :: Either UnknownTimeZoneAbbrev TZI.TZInfo
-  eithTzInfo = case trLocationRef of
+  eithTzInfo = case timeRef.trLocationRef of
     Nothing -> pure $ TZI.fromLabel sendersTZLabel
     Just (TimeZoneRef tzLabel) -> pure $ TZI.fromLabel tzLabel
     Just (OffsetRef offset) -> pure $ tzInfoFromOffset offset
-    Just (TimeZoneAbbreviationRef abbrev) -> pure $ tzInfoFromOffset $ tzaiOffsetMinutes abbrev
+    Just (TimeZoneAbbreviationRef abbrev) -> pure $ tzInfoFromOffset $ abbrev.tzaiOffsetMinutes
     Just (UnknownTimeZoneAbbreviationRef unknownAbbrev) -> Left unknownAbbrev
 
 -- | Given a day of month and current time, try to figure out what day was really meant.

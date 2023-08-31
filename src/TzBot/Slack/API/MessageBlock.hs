@@ -134,12 +134,12 @@ extractPieces :: [MessageBlock] -> ([Text], [ExtractError])
 extractPieces mBlocks = runWriter $ concat <$> mapM goMessageBlock mBlocks
   where
   goMessageBlock :: MessageBlock -> Writer [ExtractError] [Text]
-  goMessageBlock MessageBlock {..} = concat <$> mapM goBlockElementLevel1 mbElements
+  goMessageBlock msgBlock = concat <$> mapM goBlockElementLevel1 msgBlock.mbElements
 
   goBlockElementLevel1 :: BlockElementLevel1 -> Writer [ExtractError] [Text]
   goBlockElementLevel1 = \case
-    BEL1List RichTextList {..} -> concat <$> mapM goBlockElementLevel1 rtlElements
-    BEL1Plain PlainBlockElementLevel1 {..} -> do
+    BEL1List RichTextList {rtlElements} -> concat <$> mapM goBlockElementLevel1 rtlElements
+    BEL1Plain PlainBlockElementLevel1 {beType, beElements} -> do
       whenLeft (unUnknown beType) \val ->
         tell [EEUnknownBlockElementLevel1Type $ UnknownBlockElementLevel1Type val]
       -- ignore multiline code block
@@ -156,9 +156,9 @@ extractPieces mBlocks = runWriter $ concat <$> mapM goMessageBlock mBlocks
         let _type = fromMaybe "unknown" (val ^? key "type" . _String)
         tell [EEUnknownBlockElementLevel2 $ UnknownBlockElementLevel2Error _type val]
         go Nothing (prependMbCurrentToPrevious mbCurPiece prevPieces) es
-      Right ElementText {..} -> do
-        let etTextB = fromText etText
-        if (etStyle >>= styCode) == Just True
+      Right elementText -> do
+        let etTextB = fromText elementText.etText
+        if (elementText.etStyle >>= styCode) == Just True
           -- ignore simple code block
           then go Nothing (prependMbCurrentToPrevious mbCurPiece prevPieces) es
           else go (Just $ maybe etTextB (<> etTextB) mbCurPiece) prevPieces es

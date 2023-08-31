@@ -44,9 +44,9 @@ import TzBot.Util (multTimeSpec, randomTimeSpec, timeToTimespec, (+-))
 --
 --   Automatic periodical cleaning is also included.
 data TzCache k v = TzCache
-  { rcCache  :: Cache k v
-  , rcExpiry :: TimeSpec
-  , rcExpiryRandomAmplitude :: Maybe TimeSpec
+  { tcCache  :: Cache k v
+  , tcExpiry :: TimeSpec
+  , tcExpiryRandomAmplitude :: Maybe TimeSpec
   }
 
 data TzCacheSettings = TzCacheSettings
@@ -85,18 +85,18 @@ withTzCache
   -> (TzCache k v -> IO a) -- ^ Action that uses the cache
   -> IO a
 withTzCache
-    TzCacheSettings {..}
-    (timeToTimespec -> rcExpiry)
+    settings
+    (timeToTimespec -> tcExpiry)
     action
   = do
   let isRandAmpValid :: Double -> Bool
       isRandAmpValid x = x > 0 && x < 1
-  when (fmap isRandAmpValid tcsExpiryRandomAmplitudeFraction == Just False) $
+  when (fmap isRandAmpValid settings.tcsExpiryRandomAmplitudeFraction == Just False) $
     error "Expiry random amplitude should be <1 and >0"
-  let rcExpiryRandomAmplitude = (flip multTimeSpec rcExpiry) <$> tcsExpiryRandomAmplitudeFraction
-  rcCache <- Cache.newCache $ Just rcExpiry
+  let tcExpiryRandomAmplitude = (flip multTimeSpec tcExpiry) <$> settings.tcsExpiryRandomAmplitudeFraction
+  tcCache <- Cache.newCache $ Just tcExpiry
   withAsync
-    (cleaningThread (toUnit tcsCleaningPeriod) rcCache)
+    (cleaningThread (toUnit settings.tcsCleaningPeriod) tcCache)
     (\_ -> action TzCache {..})
 
 cleaningThread :: (Hashable k) => Time Hour -> Cache k v -> IO ()
@@ -112,13 +112,13 @@ insert
   -> v
   -> TzCache k v
   -> m ()
-insert key val TzCache {..} = do
-  expiry <- case rcExpiryRandomAmplitude of
-    Nothing -> pure rcExpiry
+insert key val cache = do
+  expiry <- case cache.tcExpiryRandomAmplitude of
+    Nothing -> pure cache.tcExpiry
     Just randAmp -> do
-      let (minTimeSpec, maxTimeSpec) = rcExpiry +- randAmp
+      let (minTimeSpec, maxTimeSpec) = cache.tcExpiry +- randAmp
       liftIO $ randomTimeSpec (minTimeSpec, maxTimeSpec)
-  liftIO $ Cache.insert' rcCache (Just expiry) key val
+  liftIO $ Cache.insert' cache.tcCache (Just expiry) key val
 
 -- | Try to get a value by the key from the cache, delete if it is expired.
 -- If the value is either absent or expired, perform given fetch action
@@ -133,7 +133,7 @@ fetchWithCache
 fetchWithCache key fetchAction cache =
   katipAddNamespace "cache" $ do
   logDebug [int||Fetching key=#{key}|]
-  mv <- liftIO $ Cache.lookup (rcCache cache) key
+  mv <- liftIO $ Cache.lookup (tcCache cache) key
   case mv of
     Just v -> logDebug "Using cache" >> pure v
     Nothing -> do
@@ -150,7 +150,7 @@ lookup
   => k
   -> TzCache k v
   -> m (Maybe v)
-lookup key TzCache {..} = liftIO $ Cache.lookup rcCache key
+lookup key cache = liftIO $ Cache.lookup cache.tcCache key
 
 -- | Update the value by the key, expiration is not taken into account.
 update
@@ -159,8 +159,8 @@ update
   -> (v -> v)
   -> TzCache k v
   -> m ()
-update key valFunc TzCache {..} = do
-  atomically $ modifyTVar' (CacheI.container rcCache) $ \hm ->
+update key valFunc cache = do
+  atomically $ modifyTVar' (CacheI.container cache.tcCache) $ \hm ->
     HM.adjust itemFunc key hm
   where
     itemFunc :: CacheI.CacheItem v -> CacheI.CacheItem v

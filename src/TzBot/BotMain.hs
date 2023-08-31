@@ -62,7 +62,7 @@ dumpConfig = \case
 run :: Options -> IO ()
 run opts = do
   let mbConfigFilePath = oConfigFile opts
-  bsConfig@Config {..} <- readConfig mbConfigFilePath
+  bsConfig <- readConfig mbConfigFilePath
   runManaged $ do
 
     let fifteenPercentAmplitudeSettings = defaultTzCacheSettings
@@ -73,8 +73,8 @@ run opts = do
     let extractShutdownFunction :: IO () -> IO ()
         extractShutdownFunction = writeIORef gracefulShutdownContainer
     let sCfg = defaultSlackConfig
-              & setApiToken (unBotToken cBotToken)
-              & setAppToken (unAppLevelToken cAppToken)
+              & setApiToken (unBotToken bsConfig.cBotToken)
+              & setAppToken (unAppLevelToken bsConfig.cAppToken)
               & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
               & setGracefulShutdownHandler extractShutdownFunction
 
@@ -82,24 +82,24 @@ run opts = do
     bsFeedbackConfig <-
       managed $ withFeedbackConfig bsConfig
     bsUserInfoCache <-
-      managed $ withTzCache fifteenPercentAmplitudeSettings cCacheUsersInfo
+      managed $ withTzCache fifteenPercentAmplitudeSettings bsConfig.cCacheUsersInfo
     bsConversationMembersCache <-
-      managed $ withTzCache fifteenPercentAmplitudeSettings cCacheConversationMembers
+      managed $ withTzCache fifteenPercentAmplitudeSettings bsConfig.cCacheConversationMembers
     let defaultMessageInfoCachingTime = hour 1
     bsMessageCache <-
       managed $ withTzCacheDefault defaultMessageInfoCachingTime
     bsMessageLinkCache <-
       managed $ withTzCacheDefault defaultMessageInfoCachingTime
     bsReportEntries <-
-      managed $ withTzCacheDefault cCacheReportDialog
+      managed $ withTzCacheDefault bsConfig.cCacheReportDialog
     -- auto-acknowledge received messages
-    (bsLogNamespace, bsLogContext, bsLogEnv) <- managed $ withLogger cLogLevel
+    (bsLogNamespace, bsLogContext, bsLogEnv) <- managed $ withLogger bsConfig.cLogLevel
     liftIO $ runSocketMode sCfg $ handler gracefulShutdownContainer BotState {..}
 
 withFeedbackConfig :: BotConfig -> (FeedbackConfig -> IO a) -> IO a
-withFeedbackConfig Config {..} action = do
-  let fcFeedbackChannel = cFeedbackChannel
-  withFeedbackFile cFeedbackFile $ \fcFeedbackFile ->
+withFeedbackConfig config action = do
+  let fcFeedbackChannel = config.cFeedbackChannel
+  withFeedbackFile config.cFeedbackFile $ \fcFeedbackFile ->
     action FeedbackConfig {..}
   where
     withFeedbackFile :: Maybe FilePath -> (Maybe Handle -> IO a) -> IO a
