@@ -31,7 +31,7 @@ steps:
       - nix develop .#doctest -c runghc test/doctests.hs
 
   - label: xrefcheck
-    command: nix run github:serokell/xrefcheck
+    command: nix run -vvvvv github:serokell/xrefcheck
     soft_fail:
       - exit_status: 1
 
