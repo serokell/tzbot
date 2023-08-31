@@ -22,7 +22,7 @@ steps:
 
   - label: build
     key: build
-    command: nix build -L .#checks.x86_64-linux.build-all
+    command: nix develop .#ci -c strace -e 'trace=signal' nix build -vvvvv -L .#checks.x86_64-linux.build-all
 
   - label: tests
     depends_on: build
