@@ -9,7 +9,7 @@
 The bot's main function is to capture time references in a message and convert them
 to the receiver's time zone. This can be triggered by some events:
   * A new message was posted in a channel where the bot is present;
-  * A message that has been previously converted was recently edited and it now contains some new time references;
+  * A message has been edited and it now contains some new time references;
   * The user triggered an entrypoint from the message's context menu `⋮`;
   * The user DMed the bot.
 

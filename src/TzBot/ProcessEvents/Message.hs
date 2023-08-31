@@ -28,7 +28,12 @@ import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.TimeReference (TimeReference)
 import TzBot.Util (whenT, withMaybe)
 
-data MessageEventType = METMessage | METMessageEdited
+data MessageEventType
+  = METMessage
+  | METMessageEdited
+    -- ^ A message has been edited.
+      Message
+      -- ^ The state of the message _before_ it was edited.
   deriving stock (Eq)
 
 -- We don't need to handle MDMessageBroadcast anyhow,
@@ -41,9 +46,9 @@ filterMessageTypeWithLog evt = case meMessageDetails evt of
   MDMessage          -> do
     logInfo [int||Handling new message|]
     pure $ Just METMessage
-  MDMessageEdited {} -> do
+  MDMessageEdited previousMsg -> do
     logInfo [int||Message was edited|]
-    pure $ Just METMessageEdited
+    pure $ Just $ METMessageEdited previousMsg
   MDMessageBroadcast -> do
     logInfo [int||Incoming message is thread broadcast, ignoring|]
     pure Nothing
@@ -96,7 +101,7 @@ processMessageEvent' evt mEventType sender timeRefs =
   case meChannelType evt of
     Just CTDirectChannel -> handleDirectMessage
     _ -> case mEventType of
-      METMessageEdited -> handleMessageChanged
+      METMessageEdited previousMsg -> handleMessageChanged previousMsg
       METMessage -> handleNewMessage
 
   where
@@ -155,19 +160,21 @@ processMessageEvent' evt mEventType sender timeRefs =
           }
     sendEphemeralMessage req
 
-  handleMessageChanged :: BotM ()
-  handleMessageChanged = katipAddNamespaceText "edit" do
+  handleMessageChanged :: Message -> BotM ()
+  handleMessageChanged previousMsg = katipAddNamespaceText "edit" do
     messageRefsCache <- asks bsMessageCache
-    mbMessageRefs <- Cache.lookup msgId messageRefsCache
-    -- if not found or expired, just ignore this message
-    -- it's too old or just didn't contain any time refs
-    whenJust mbMessageRefs $ \oldRefs -> do
-      let newRefsFound = not $ all (`elem` oldRefs) timeRefs
-      -- no new references found, ignoring
-      when newRefsFound $ withNonEmptyTimeRefs timeRefs \neTimeRefs -> do
-        Cache.insert msgId timeRefs messageRefsCache
-        permalink <- getMessagePermalinkCached channelId msgId
-        handleChannelMessageCommon (Just permalink) neTimeRefs
+    -- Fetch the time references from the old message (before it was edited).
+    -- If they're not found in the cache, parse the message.
+    oldRefs <- do
+      Cache.lookup msgId messageRefsCache >>= \case
+        Just cachedTimeRefs -> pure cachedTimeRefs
+        Nothing -> getTimeReferencesFromMessage previousMsg
+    let newRefsFound = not $ all (`elem` oldRefs) timeRefs
+    -- If no new references are found, we ignore the edited message.
+    when newRefsFound $ withNonEmptyTimeRefs timeRefs \neTimeRefs -> do
+      Cache.insert msgId timeRefs messageRefsCache
+      permalink <- getMessagePermalinkCached channelId msgId
+      handleChannelMessageCommon (Just permalink) neTimeRefs
 
   handleNewMessage :: BotM ()
   handleNewMessage = do
@@ -196,7 +203,6 @@ processMessageEvent' evt mEventType sender timeRefs =
 
   handleDirectMessage :: BotM ()
   handleDirectMessage =
-    when (mEventType /= METMessageEdited) $
     withNonEmptyTimeRefs timeRefs $ \neTimeRefs -> do
     -- According to
     -- https://forums.slackcommunity.com/s/question/0D53a00008vsItQCAU
