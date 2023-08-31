@@ -15,7 +15,7 @@ import Data.Time.Zones.All (TZLabel)
 import Formatting (Buildable)
 
 import TzBot.Instances ()
-import TzBot.Render (TranslationPairs)
+import TzBot.Render (ConversionPairs)
 import TzBot.Slack.API (ChannelId, ThreadId, UserId)
 
 newtype ReportDialogId = ReportDialogId { unReportDialogId :: Text }
@@ -24,7 +24,7 @@ newtype ReportDialogId = ReportDialogId { unReportDialogId :: Text }
 
 data ReportDialogEntry = ReportDialogEntry
   { rpmMessageText :: Text
-  , rpmTimeTranslation :: Maybe TranslationPairs
+  , rpmTimeConversion :: Maybe ConversionPairs
   , rpmSenderTimeZone :: TZLabel
   , rpmMessageTimestamp :: UTCTime
   , rpmUserId :: UserId

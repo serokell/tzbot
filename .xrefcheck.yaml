@@ -1,0 +1,9 @@
+networking:
+  externalRefRedirects:
+    - to: "https://forums.slackcommunity.com/*"
+      on: permanent
+      outcome: follow
+
+scanners:
+  markdown:
+    flavor: GitHub

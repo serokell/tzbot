@@ -6,27 +6,26 @@
 
 # tzbot
 
-`tzbot` is a Slack bot that detects messages with references to some point in time,
+`tzbot` is a Slack bot that detects messages with references to some point in time
 and converts them to your timezone.
 
 When a user in the Europe/Riga timezone sends a message such as:
 
 > Hey, can we meet tomorrow at 6pm?
 
-Every user on a timezone different than the sender's will receive an
-"ephemeral message" like this (a message visible only to that user):
+Users will receive an
+"ephemeral message" (a message visible only to that user):
 
 ![](./docs/imgs/example1.png)
 
 ## Features
 
-* [x] When a Slack message is edited, the bot sends a new ephemeral message with all times
-      in the edited message and a link to it.
-* [x] Time references in codeblocks are ignored.
+* [x] When a Slack message is edited, the bot sends a new ephemeral message.
+* [x] Time references in code blocks are ignored.
 * [x] Supports messages sent to public and private channels and shared channels
-      where bot is present; replies in threads are also supported.
-* [x] Users can send direct messages to the bot to translate time references.
-* [x] Every message in the workspace can be translated by selecting _Translate time refs_
+      where the bot is present; replies in threads are also supported.
+* [x] Users can send direct messages to the bot to convert time references.
+* [x] Every message in the workspace can be converted by selecting _Convert time references_
       from the message's context menu `⋮`.
 * [x] If a message contains wrongly converted or unrecognized time references, users can
       report an issue from a message's context menu `⋮`;
@@ -36,8 +35,6 @@ Every user on a timezone different than the sender's will receive an
   * invalid times (e.g., "tomorrow at 1:30", but the clocks skip from 00:59 to 02:00 on that day).
   * ambiguous times (e.g. "tomorrow at 1:30", but the clocks are set back from 01:59
     to 01:00 on that day, meaning the time "1:30" will occur twice at two different offsets).
-* [x] When a time reference is not invalid/ambiguous but the date can't be inferred precisely and
-      any timeshifts in sender/receiver timezone are around, the user will be warned about them.
 * [x] Handles references with timezones, offsets and _some_ timezone abbreviations
   (see [timezone_abbreviations.md](docs/timezone_abbreviations.md) for a full list).
     * > tuesday at 11am Australia/Brisbane

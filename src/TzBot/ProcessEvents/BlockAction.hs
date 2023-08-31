@@ -14,7 +14,7 @@ import Text.Interpolation.Nyan (int, rmode')
 
 import TzBot.Feedback.Dialog (lookupDialogEntry)
 import TzBot.Feedback.Dialog.Types
-  (ReportDialogEntry(ReportDialogEntry, rpmMessageText, rpmMessageTimestamp, rpmSenderTimeZone, rpmTimeTranslation))
+  (ReportDialogEntry(ReportDialogEntry, rpmMessageText, rpmMessageTimestamp, rpmSenderTimeZone, rpmTimeConversion))
 import TzBot.Logger
 import TzBot.Slack (BotM, updateModal)
 import TzBot.Slack.API (UpdateViewReq(UpdateViewReq))
@@ -34,5 +34,5 @@ processReportButtonToggled val =
     Nothing -> logWarn [int||Dialog id not found: #{metadataEntryId}|]
     Just _metadata@ReportDialogEntry {..} -> updateModal $
       UpdateViewReq
-        (mkReportModal rpmMessageText rpmTimeTranslation metadataEntryId)
+        (mkReportModal rpmMessageText rpmTimeConversion metadataEntryId)
         (vId $ vaeView val)

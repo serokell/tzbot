@@ -9,10 +9,10 @@ features:
     display_name: TzBot
     always_online: true
   shortcuts:
-    - name: Translate time refs
+    - name: Convert time references
       type: message
       callback_id: tz_view
-      description: Translate to the user's timezone
+      description: Convert to the user's timezone
     - name: Report an issue
       type: message
       callback_id: tz_report

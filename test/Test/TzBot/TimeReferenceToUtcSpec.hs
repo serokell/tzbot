@@ -51,7 +51,7 @@ data TestEntry = TestEntry
   , teResult :: TimeReferenceToUTCResult
   }
 
-newtype TranslateWrapper = TranslateWrapper TimeReferenceToUTCResult
+newtype ConvertWrapper = ConvertWrapper TimeReferenceToUTCResult
   deriving stock (Show)
 
 comparePartlyTimeRefSuccess :: TimeRefSuccess -> TimeRefSuccess -> Bool
@@ -59,8 +59,8 @@ comparePartlyTimeRefSuccess t1 t2 =
   trsUtcResult t1 == trsUtcResult t2
   && trsOriginalDate t1 == trsOriginalDate t2
 
-instance Eq TranslateWrapper where
-  (TranslateWrapper v1) == (TranslateWrapper v2) = case (v1, v2) of
+instance Eq ConvertWrapper where
+  (ConvertWrapper v1) == (ConvertWrapper v2) = case (v1, v2) of
     (TRTUSuccess s1, TRTUSuccess s2) -> comparePartlyTimeRefSuccess s1 s2
     (TRTUInvalid g1, TRTUInvalid g2) -> ((==) `on` giErrorInfo) g1 g2
     (TRTUAmbiguous o1, TRTUAmbiguous o2) -> ((==) `on` oiErrorInfo) o1 o2
@@ -70,7 +70,7 @@ instance Eq TranslateWrapper where
 mkTestCase :: TestEntry -> Assertion
 mkTestCase TestEntry {..} = do
   let res = timeReferenceToUTC teUserLabel teCurrentTime teTimeRef
-  TranslateWrapper res @?= TranslateWrapper teResult
+  ConvertWrapper res @?= ConvertWrapper teResult
 
 utcToUtcLocalTime :: UTCTime -> LocalTime
 utcToUtcLocalTime = utcToLocalTime utc
@@ -274,7 +274,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
         , teCurrentTime = time1
         , teResult = TRTUInvalidTimeZoneAbbrev $ UnknownTimeZoneAbbrev "MKS" ["MSK"]
         }
-  , testGroup "Timeshift subtleties" $
+  , testGroup "Clock changes subtleties" $
     [ testCase "Turn on DST, explicit time zone, Havana, Cuba" $
         mkTestCase $ TestEntry
           { teTimeRef =
@@ -283,7 +283,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = labelHavana
           , teCurrentTime = time2
           , teResult = TRTUInvalid $ GapInfo arbitraryTime arbitraryTime $
-            TimeShiftErrorInfo (fromGregorian 2022 3 13)
+            ClockChangeErrorInfo (fromGregorian 2022 3 13)
           }
     , testCase "Turn on DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)
@@ -314,7 +314,7 @@ test_TimeReferenceToUtc = testGroup "TimeReference to UTC" $
           , teUserLabel = labelHavana
           , teCurrentTime = time3
           , teResult = TRTUAmbiguous $ OverlapInfo arbitraryTime arbitraryTime $
-            TimeShiftErrorInfo (fromGregorian 2022 11 6)
+            ClockChangeErrorInfo (fromGregorian 2022 11 6)
           }
     , testCase "Turn off DST, explicit offset, Havana, Cuba" $ do
         let offset = Offset $ hour * (-5)

@@ -69,7 +69,7 @@ feedbackFile: feedback.log
 cacheReportDialog: 1h
 
 # Inverse chance of appending help command usage hint to the ephemeral
-# message containing time translations.
+# message containing time conversions.
 # Envvar: #{CT.inverseHelpUsageChanceEnv}
 #
 inverseHelpUsageChance: 15

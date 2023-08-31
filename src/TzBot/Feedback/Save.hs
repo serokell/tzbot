@@ -19,7 +19,7 @@ import Text.Interpolation.Nyan (int, rmode')
 import UnliftIO.Exception qualified as UnliftIO
 
 import TzBot.Logger
-import TzBot.Render (TranslationPairs, asForOthersS, renderSlackBlocks)
+import TzBot.Render (ConversionPairs, asForOthersS, renderSlackBlocks)
 import TzBot.RunMonad
 import TzBot.Slack (sendMessage)
 import TzBot.Slack.API
@@ -27,7 +27,7 @@ import TzBot.Util (RecordWrapper(..))
 
 data FeedbackEntry = FeedbackEntry
   { feMessageText      :: Text
-  , feTimeTranslation  :: Maybe TranslationPairs
+  , feTimeConversion   :: Maybe ConversionPairs
   , feUserReport       :: Text
   , feMessageTimestamp :: UTCTime
   , feSenderTimezone   :: TZLabel
@@ -51,16 +51,16 @@ saveFeedbackSlack :: FeedbackEntry -> ChannelId -> BotM ()
 saveFeedbackSlack entry channelId = sendMessage req
   where
     req = do
-      -- We always render the translation for other users (not author),
-      -- so the author can see how his message is translated for others
+      -- We always render the conversion for other users (not author),
+      -- so the author can see how their message is converted for others
       let pmrChannel = channelId
           pmrText = "New user feedback"
           pmrBlocks = NE.nonEmpty $
             [ BHeader (Header "Message")
             , BSection $ markdownSection (Mrkdwn $ feMessageText entry)
             , BDivider divider
-            , BHeader (Header "Time translation")
-            ] <> renderSlackBlocks asForOthersS (feTimeTranslation entry)
+            , BHeader (Header "Time conversion")
+            ] <> renderSlackBlocks asForOthersS (feTimeConversion entry)
             <>
             [ BDivider divider
             , BHeader (Header "Details")

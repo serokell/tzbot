@@ -4,16 +4,16 @@
 
 module TzBot.Render
   ( -- * Types
-    TranslationPair (..)
-  , TranslationPairs
+    ConversionPair (..)
+  , ConversionPairs
   , Template
 
     -- * Render generic
-  , renderAllTP
+  , renderAllConversionPairs
 
     -- * Render text
   , renderAll
-  , joinTranslationPairs
+  , joinConversionPairs
 
     -- * Render Slack
   , renderSlackBlocks
@@ -51,29 +51,29 @@ import TzBot.Instances ()
 import TzBot.Slack.API (Mrkdwn(Mrkdwn), User(..))
 import TzBot.Slack.API.Block
 import TzBot.TimeReference
-import TzBot.TZ (TimeShift(..), checkForTimeshifts, findLastTimeshift)
+import TzBot.TZ (ClockChange(..), checkForClockChanges, findLastClockChange)
 import TzBot.Util
 
 -- Types
 
--- We use `Left` to keep translation errors (invalid/ambiguous time,
+-- We use `Left` to keep conversion errors (invalid/ambiguous time,
 -- invalid offset abbreviation) and they are common for all users,
--- and valid translations (`Right`) depend on the receiver timezone.
-type EitherTemplateUnit = Either TranslationPair (User -> Maybe TranslationPair)
+-- and valid conversions (`Right`) depend on the receiver timezone.
+type EitherTemplateUnit = Either ConversionPair (User -> Maybe ConversionPair)
 
-data TranslationPair = TranslationPair
-  { tuTimeRef :: Text
+data ConversionPair = ConversionPair
+  { cpTimeRef :: Text
     -- ^ The piece of the original message containing a time reference
-  , tuTranslation :: Text
-    -- ^ Valid or invalid translation of the time reference
-  , tuNoteForSender :: Maybe Text
+  , cpConversion :: Text
+    -- ^ Valid or invalid conversion of the time reference
+  , cpNoteForSender :: Maybe Text
     -- ^ Additional optional information for the sender
-  , tuNoteForOthers :: Maybe Text
+  , cpNoteForOthers :: Maybe Text
     -- ^ Additional optional information for others (not the sender)
   } deriving stock (Eq, Show, Generic)
-    deriving ToJSON via RecordWrapper TranslationPair
+    deriving ToJSON via RecordWrapper ConversionPair
 
-type TranslationPairs = NE.NonEmpty TranslationPair
+type ConversionPairs = NE.NonEmpty ConversionPair
 
 newtype Template = Template { unTemplate :: NE.NonEmpty EitherTemplateUnit }
 
@@ -86,20 +86,20 @@ asForSenderS, asForOthersS :: SenderFlag
 asForSenderS = SenderFlag True
 asForOthersS = SenderFlag False
 
-chooseNote :: SenderFlag -> TranslationPair -> Maybe Text
+chooseNote :: SenderFlag -> ConversionPair -> Maybe Text
 chooseNote (SenderFlag sender) =
-  if sender then tuNoteForSender else tuNoteForOthers
+  if sender then cpNoteForSender else cpNoteForOthers
 
 --------
-concatTranslationPair :: SenderFlag -> TranslationPair -> Builder
-concatTranslationPair sender t@TranslationPair {..} = do
+concatConversionPair :: SenderFlag -> ConversionPair -> Builder
+concatConversionPair sender t@ConversionPair {..} = do
   let rightNote = chooseNote sender t
   let note = maybe "" (("\n" <>) . fromText) rightNote
-  [int||#{tuTimeRef}:  #{tuTranslation}#{note}|]
+  [int||#{cpTimeRef}:  #{cpConversion}#{note}|]
 
 -- Render generic
-renderAllTP :: User -> Template -> Maybe TranslationPairs
-renderAllTP user =
+renderAllConversionPairs :: User -> Template -> Maybe ConversionPairs
+renderAllConversionPairs user =
   nonEmpty . mapMaybe (either Just ($ user)) . NE.toList . unTemplate
 
 -- | We show this message because we may have not found
@@ -110,32 +110,32 @@ noRefsFoundMsg = "No time references found."
 -- Render text
 renderAll :: User -> Template -> Maybe Text
 renderAll user =
-  fmap (joinTranslationPairs asForSenderS) . renderAllTP user
+  fmap (joinConversionPairs asForSenderS) . renderAllConversionPairs user
 
-joinTranslationPairs :: SenderFlag -> TranslationPairs -> Text
-joinTranslationPairs sender =
+joinConversionPairs :: SenderFlag -> ConversionPairs -> Text
+joinConversionPairs sender =
   TL.toStrict . toLazyText . fold . NE.toList
-    . NE.map ((<> singleton '\n') . concatTranslationPair sender)
+    . NE.map ((<> singleton '\n') . concatConversionPair sender)
 
 -- Render Slack block
-renderSlackBlocks :: SenderFlag -> Maybe TranslationPairs -> [Block]
+renderSlackBlocks :: SenderFlag -> Maybe ConversionPairs -> [Block]
 renderSlackBlocks forSender =
   maybe [noRefsFoundSection]
-    (intercalate [BDivider divider] . NE.toList . NE.map mkTranslationBlocks)
+    (intercalate [BDivider divider] . NE.toList . NE.map mkConversionBlocks)
   where
     noRefsFoundSection = BSection $ markdownSection $ Mrkdwn noRefsFoundMsg
-    mkTranslationBlocks :: TranslationPair -> [Block]
-    mkTranslationBlocks timeRef = do
-      let t = (Mrkdwn $ tuTimeRef timeRef, Mrkdwn $ tuTranslation timeRef)
+    mkConversionBlocks :: ConversionPair -> [Block]
+    mkConversionBlocks timeRef = do
+      let t = (Mrkdwn $ cpTimeRef timeRef, Mrkdwn $ cpConversion timeRef)
           mbNote = chooseNote forSender timeRef
-          translationBlock = BSection $ fieldsSection Nothing $ NE.singleton t
+          conversionBlock = BSection $ fieldsSection Nothing $ NE.singleton t
           mkNoteBlock note = BSection $ markdownSection $ Mrkdwn note
-      withMaybe mbNote [translationBlock] $ \note -> [translationBlock, mkNoteBlock note]
+      withMaybe mbNote [conversionBlock] $ \note -> [conversionBlock, mkNoteBlock note]
 
 -- | Render a template that can be later specialized to different users.
 renderTemplate :: ModalFlag -> UTCTime -> User -> NE.NonEmpty TimeReference -> Template
 renderTemplate modalFlag now sender timeRefs =
-  Template $ NE.map (renderEphemeralMessageTranslationPair modalFlag sender)
+  Template $ NE.map (renderEphemeralMessageConversionPair modalFlag sender)
     $ attach (timeReferenceToUTC (uTz sender) now) timeRefs
 
 -- | This flag defines whether time references are rendered to be shown
@@ -152,7 +152,7 @@ renderOnSuccess
   -> TimeReference
   -> TimeRefSuccess
   -> User
-  -> Maybe TranslationPair
+  -> Maybe ConversionPair
 renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess@TimeRefSuccess {..} user = do
   let userTzLabel = uTz user
       renderedUserTime = do
@@ -166,34 +166,34 @@ renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess@TimeRefSuccess
           then Just renderedUserTime
           else do
             let isNotSender = ((/=) `on` uId) sender user
-                shouldShowThisTranslation = isNotSender || forModal
-            guard shouldShowThisTranslation
+                shouldShowThisConversion = isNotSender || forModal
+            guard shouldShowThisConversion
             Just "You are in this timezone"
-      totalTimeshifts = checkForTimeshifts timeRef timeRefSucess userTzLabel
-      mbTimeshiftNote = do
-        guard $ not $ null totalTimeshifts
-        Just $ T.strip $ renderTimeshiftWarning
+      totalClockChanges = checkForClockChanges timeRef timeRefSucess userTzLabel
+      mbClockChangeWarning = do
+        guard $ not $ null totalClockChanges
+        Just $ T.strip $ renderClockChangeWarning
           (trText timeRef)
           trsUtcResult
           trsTzInfo
           userTzLabel
-          totalTimeshifts
+          totalClockChanges
 
-  mbRenderedUserTime <&> \rt -> TranslationPair
+  mbRenderedUserTime <&> \rt -> ConversionPair
     (renderOriginalTimeRef sender timeRef trsOriginalDate)
     rt
-    mbTimeshiftNote
-    mbTimeshiftNote
+    mbClockChangeWarning
+    mbClockChangeWarning
 
 -- | Render warning when conversion was successful but not sure in inferred date.
-renderTimeshiftWarning
+renderClockChangeWarning
   :: Text
   -> UTCTime
   -> TZI.TZInfo
   -> TZLabel
-  -> [TimeShift]
+  -> [ClockChange]
   -> Text
-renderTimeshiftWarning refText inferredTime mentionedTzInfo receiversTzLabel ts = do
+renderClockChangeWarning refText inferredTime mentionedTzInfo receiversTzLabel ts = do
   let renderedInferredTime = renderTimeGeneral "%d %B %Y" mentionedTzInfo inferredTime
       newLine = "\n"
   [int|n|
@@ -201,25 +201,25 @@ renderTimeshiftWarning refText inferredTime mentionedTzInfo receiversTzLabel ts 
     in #{TZI.tziIdentifier mentionedTzInfo} and
     converted it to #{receiversTzLabel}, but there is a time change near this date_:
 
-    #{T.intercalate newLine $ map renderTimeshiftWarningUnit ts}
+    #{T.intercalate newLine $ map renderClockChangeWarningUnit ts}
 
     _Beware that if this inference is not correct and the sender meant a different date,
     the conversion may not be accurate._
     |]
   where
 
-  renderTimeshiftWarningUnit :: TimeShift -> Text
-  renderTimeshiftWarningUnit ts@TimeShift {..} = do
-    let prevOffsetTZInfo = tzInfoFromOffset tsBefore
+  renderClockChangeWarningUnit :: ClockChange -> Text
+  renderClockChangeWarningUnit ts@ClockChange {..} = do
+    let prevOffsetTZInfo = tzInfoFromOffset ccBefore
     [int|Dn|
-  • _At #{renderTimeGeneral "%H:%M, %d %B %Y" prevOffsetTZInfo tsShiftUtc} \
-in #{tziIdentifier tsTzInfo}, the clocks are turned #{shiftInfo ts}_.
+  • _At #{renderTimeGeneral "%H:%M, %d %B %Y" prevOffsetTZInfo ccUTCTime} \
+in #{ccTzIdentifier}, the clocks are turned #{clockChangeInfo ts}_.
     |]
     where
 
-    shiftInfo :: TimeShift -> Builder
-    shiftInfo TimeShift {..} = do
-      let offsetDiff = tsBefore `diffOffsetMinutes` tsAfter
+    clockChangeInfo :: ClockChange -> Builder
+    clockChangeInfo ClockChange {..} = do
+      let offsetDiff = ccBefore `diffOffsetMinutes` ccAfter
       let (hoursDiff, mbMinutesDiff) = absDivMinutesByHours offsetDiff
           direction = if offsetDiff > 0 then "backward" else "forward" :: Text
           shownMinutesDiff = mbMinutesDiff <&> \d ->
@@ -244,22 +244,22 @@ renderOriginalTimeRef sender timeRef originalDay = do
           Just $ formatTime defaultTimeLocale format originalDay
   [int||"#{trText timeRef}"#{mbShownOriginalDate}#{mbSenderTimeZone}|]
 
--- | Given a timeshift in a timezone, define the last local time in
+-- | Given a clock change in a timezone, define the last local time in
 -- the previous offset (first in the tuple) and
 -- the first local time in the next offset (second in the tuple).
-getTimeshiftBoundaries :: TimeShift -> (LocalTime, LocalTime)
-getTimeshiftBoundaries TimeShift {..} = do
+getClockChangeBoundaries :: ClockChange -> (LocalTime, LocalTime)
+getClockChangeBoundaries ClockChange {..} = do
   let getBoundaryLocalTime :: Offset -> LocalTime
       getBoundaryLocalTime o = zonedTimeToLocalTime $
-        utcToZonedTime (minutesToTimeZone $ unOffset o) tsShiftUtc
+        utcToZonedTime (minutesToTimeZone $ unOffset o) ccUTCTime
 
-      beforeTimeshift = getBoundaryLocalTime tsBefore
-      afterTimeshift = getBoundaryLocalTime tsAfter
+      beforeTimeshift = getBoundaryLocalTime ccBefore
+      afterTimeshift = getBoundaryLocalTime ccAfter
   (beforeTimeshift, afterTimeshift)
 
-renderOnOverlap :: User -> TimeReference -> OverlapInfo -> TranslationPair
+renderOnOverlap :: User -> TimeReference -> OverlapInfo -> ConversionPair
 renderOnOverlap sender timeRef OverlapInfo {..} = do
-  let TimeShiftErrorInfo {..} = oiErrorInfo
+  let ClockChangeErrorInfo {..} = oiErrorInfo
       firstOffset = tztimeOffset oiFirstOccurrence
       secondOffset = tztimeOffset oiSecondOccurrence
       (hoursDiff, mbMinutesDiff) = absDivMinutesByHours $
@@ -268,31 +268,31 @@ renderOnOverlap sender timeRef OverlapInfo {..} = do
         [int|| (and #{d} minutes)|] :: Builder
       isImplicitSenderTimezone = isNothing $ trLocationRef timeRef
 
-      timeshift = findLastTimeshift oiSecondOccurrence
-      (beforeTimeshift, afterTimeshift) = getTimeshiftBoundaries timeshift
+      clockChange = findLastClockChange oiSecondOccurrence
+      (beforeClockChange, afterClockChange) = getClockChangeBoundaries clockChange
       tzIdentifier = tziIdentifier $ TZT.tzTimeTZInfo oiFirstOccurrence
 
   let shownTZ = shownTimezoneOnErrors isImplicitSenderTimezone tzIdentifier
 
   let commonPart forSender = [int|n|
-        At #{renderTimeOfDay beforeTimeshift}, the clocks are turned backward #{hoursDiff}
-        hour(s)#{shownMinutesDiff} to #{renderTimeOfDay afterTimeshift} and this
+        At #{renderTimeOfDay beforeClockChange}, the clocks are turned backward #{hoursDiff}
+        hour(s)#{shownMinutesDiff} to #{renderTimeOfDay afterClockChange} and this
         particular time occurs twice in #{shownTZ forSender}, first with the
         offset #{firstOffset} and then with #{secondOffset}.
         |] :: Builder
       additionForSender = [int|n|
         Please edit your message or write a new one and specify an offset explicitly.
         |] :: Builder
-  TranslationPair
-    { tuTimeRef = renderOriginalTimeRef sender timeRef tseiOriginalDate
-    , tuTranslation = "Ambiguous time"
-    , tuNoteForSender = Just [int||_#{commonPart True} #{additionForSender}_|]
-    , tuNoteForOthers = Just [int||_#{commonPart False}_|]
+  ConversionPair
+    { cpTimeRef = renderOriginalTimeRef sender timeRef cceiOriginalDate
+    , cpConversion = "Ambiguous time"
+    , cpNoteForSender = Just [int||_#{commonPart True} #{additionForSender}_|]
+    , cpNoteForOthers = Just [int||_#{commonPart False}_|]
     }
 
-renderOnGap :: User -> TimeReference -> GapInfo -> TranslationPair
+renderOnGap :: User -> TimeReference -> GapInfo -> ConversionPair
 renderOnGap sender timeRef GapInfo {..} = do
-  let TimeShiftErrorInfo {..} = giErrorInfo
+  let ClockChangeErrorInfo {..} = giErrorInfo
       prevOffset = tztimeOffset giPreviousTime
       nextOffset = tztimeOffset giNextTime
       (hoursDiff, mbMinutesDiff) = absDivMinutesByHours $
@@ -302,9 +302,9 @@ renderOnGap sender timeRef GapInfo {..} = do
         [int|| (and #{d} minutes)|] :: Builder
 
       isImplicitSenderTimezone = isNothing $ trLocationRef timeRef
-      timeshift = findLastTimeshift giNextTime
+      clockChange = findLastClockChange giNextTime
 
-      (beforeGap, afterGap) = getTimeshiftBoundaries timeshift
+      (beforeGap, afterGap) = getClockChangeBoundaries clockChange
 
       tzIdentifier = tziIdentifier $ TZT.tzTimeTZInfo giPreviousTime
 
@@ -320,11 +320,11 @@ renderOnGap sender timeRef GapInfo {..} = do
         #{renderTimeOfDay $ TZT.tzTimeLocalTime giNextTime} instead?
         |] :: Builder
 
-  TranslationPair
-    { tuTimeRef = renderOriginalTimeRef sender timeRef tseiOriginalDate
-    , tuTranslation = "Invalid time"
-    , tuNoteForSender = Just [int||_#{commonPart True} #{additionForSender}_|]
-    , tuNoteForOthers = Just [int||_#{commonPart False}_|]
+  ConversionPair
+    { cpTimeRef = renderOriginalTimeRef sender timeRef cceiOriginalDate
+    , cpConversion = "Invalid time"
+    , cpNoteForSender = Just [int||_#{commonPart True} #{additionForSender}_|]
+    , cpNoteForOthers = Just [int||_#{commonPart False}_|]
     }
 
 -- | Divide minutes by hours, producing integer amount of hours and possibly
@@ -347,12 +347,12 @@ shownTimezoneOnErrors implicitSenderTimezone tzLabel forSender
 -- Under `Left` we collect errors, that should be shown to all users (including sender),
 -- and under `Right` we collect valid time references that should be rendered differently
 -- for each user.
-renderEphemeralMessageTranslationPair
+renderEphemeralMessageConversionPair
   :: ModalFlag
   -> User
   -> (TimeReference, TimeReferenceToUTCResult)
   -> EitherTemplateUnit
-renderEphemeralMessageTranslationPair modalFlag sender (timeRef, result) = case result of
+renderEphemeralMessageConversionPair modalFlag sender (timeRef, result) = case result of
   TRTUSuccess timeRefSuc ->
     Right $ renderOnSuccess modalFlag sender timeRef timeRefSuc
   TRTUAmbiguous overlapInfo ->
@@ -366,7 +366,7 @@ renderEphemeralMessageTranslationPair modalFlag sender (timeRef, result) = case 
                 T.intercalate ", " $
                   map unTimeZoneAbbreviation $ NE.toList neCandidates
           [int||_Maybe you meant: #{renderedCandidates}_|]
-    Left $ TranslationPair
+    Left $ ConversionPair
       [int||"#{trText timeRef}"|]
       [int||Contains unrecognized timezone abbreviation: #{utzaAbbrev}|]
       mbCandidatesNoteForSender

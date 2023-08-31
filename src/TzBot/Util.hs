@@ -160,9 +160,6 @@ newtype WithUnknown a = WithUnknown { unUnknown :: Either Value a }
 instance (FromJSON a) => FromJSON (WithUnknown a) where
   parseJSON val = WithUnknown <$> asum [Right <$> parseJSON val, pure $ Left val]
 
-instance (ToJSON a) => ToJSON (WithUnknown a) where
-  toJSON (WithUnknown eith) = either (String . show) toJSON eith
-
 ----
 newtype CIStorage a = CIStorage { unCIStorage :: H.HashMap (CI.CI Text) a }
 

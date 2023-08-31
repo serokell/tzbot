@@ -92,7 +92,7 @@ data UnknownTimeZoneAbbrev = UnknownTimeZoneAbbrev
 timeReferenceToUTC
   :: TZLabel -- ^ The timezone of the sender of the Slack message.
   -> UTCTime -- ^ The time at which the message was sent.
-  -> TimeReference -- ^ A time reference to translate to UTC.
+  -> TimeReference -- ^ A time reference to convert to UTC.
   -> TimeReferenceToUTCResult
 timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
   case eithTzInfo of
@@ -114,10 +114,10 @@ timeReferenceToUTC sendersTZLabel eventTimestamp TimeReference {..} =
   tzErrorToResult = \case
     TZT.TZOverlap invalidTime first_ second_ -> TRTUAmbiguous $
       OverlapInfo first_ second_ $
-        TimeShiftErrorInfo (localDay invalidTime)
+        ClockChangeErrorInfo (localDay invalidTime)
     TZT.TZGap invalidTime first_ second_ -> TRTUInvalid $
       GapInfo first_ second_ $
-        TimeShiftErrorInfo (localDay invalidTime)
+        ClockChangeErrorInfo (localDay invalidTime)
   -- This doesn't include setting time, only date changes
   dayTransition :: LocalTime -> LocalTime
   dayTransition eventLocalTime = case trDateRef of
@@ -207,8 +207,8 @@ data TimeRefSuccess = TimeRefSuccess
     -- or in the sender's current timezone otherwise.
   } deriving stock (Eq, Show)
 
-newtype TimeShiftErrorInfo = TimeShiftErrorInfo
-  { tseiOriginalDate :: Day
+newtype ClockChangeErrorInfo = ClockChangeErrorInfo
+  { cceiOriginalDate :: Day
     -- ^ The day that was originally mentioned by the sender
     -- in specified or implicit sender's timezone.
   } deriving stock (Eq, Show)
@@ -220,7 +220,7 @@ data OverlapInfo = OverlapInfo
     -- ^ Instance with the earlier offset.
   , oiSecondOccurrence :: TZT.TZTime
     -- ^ Instance with the later offset.
-  , oiErrorInfo :: TimeShiftErrorInfo
+  , oiErrorInfo :: ClockChangeErrorInfo
   } deriving stock (Eq, Show)
 
 data GapInfo = GapInfo
@@ -232,7 +232,7 @@ data GapInfo = GapInfo
   -- ^ The local time specified by the user shifted forward by the length of the gap.
   -- E.g., if they said "2:30am" but the clocks were turned forward 1 hour at 2am (such that 2:30am did not occur),
   -- then this field would be 2:30am + 1 hour = 3:30am.
-  , giErrorInfo :: TimeShiftErrorInfo
+  , giErrorInfo :: ClockChangeErrorInfo
   } deriving stock (Show, Generic, Eq)
 
 

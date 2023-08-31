@@ -9,7 +9,7 @@
 The bot's main function is to capture time references in a message and convert them
 to the receiver's time zone. This can be triggered by some events:
   * A new message was posted in a channel where the bot is present;
-  * A message that has been previously translated was recently edited and it now contains some new time references;
+  * A message that has been previously converted was recently edited and it now contains some new time references;
   * The user triggered an entrypoint from the message's context menu `⋮`;
   * The user DMed the bot.
 
@@ -78,10 +78,10 @@ Sometimes messages can have a rather tricky structure and the date/location refe
 This issue seems to require analyzing sentence structure and is quite subtle and interesting; we hope
 to solve it one day :smile:
 
-## Time translation
+## Time conversion
 
-The main goal of the `TzBot.TimeReference` module is to try to translate the obtained `TimeReference` to `UTCTime`
-collecting some additional meta info and handling possible timeshift errors.
+The main goal of the `TzBot.TimeReference` module is to try to convert the obtained `TimeReference` to `UTCTime`
+collecting some additional meta info and handling errors related to clock changes.
 Sometimes the user provides incomplete information, and we have to infer what they meant.
 * "1am": The user supplied the time, but not the date or the time zone.
   * In this case, we interpret "1am" as 1am of the current day; unless that time is already in the past,
@@ -99,10 +99,10 @@ If our inference does not match the sender's true intention, and if the time zon
 we inferred differ from the rules for the day they meant, then there is a possibility that the conversion will
 not be correct.
 
-## Time shift warnings
+## Clock change warnings
 
 When the user does not specify a date and we have to infer it, sometimes this inferred date may be
-close to a time shift (a time when the clocks go forward or backward).
+close to a clock change (a time when the clocks go forward or backward).
 When this happens, an incorrect guess on our part is very likely to result in a misleading conversion.
 
 For example, say it's 01:00 AM, 25 Mar 2023, and the user is in Europe/London.
@@ -115,8 +115,8 @@ However, if our inference is wrong, and they actually meant "10am tomorrow", the
 On the morning of the 26th, at 01:00, Europe/London [transitions from UTC+0 to UTC+1](https://www.timeanddate.com/time/change/uk/london?year=2023),
 which means the result of the conversion _should_ have been "12:00, 26 March 2023, in Europe/Moscow", not "13:00".
 
-For this reason, when we infer a date, and if that date is "near" (3 days before or after) a time shift,
-we warn the user that the accurancy of the conversion depends on whether we inferred the date correctly or not.
+For this reason, when we infer a date, and if that date is "near" (3 days before or after) a clock change,
+we warn the user that the accuracy of the conversion depends on whether we inferred the date correctly or not.
 
 > "10am", 25 March 2023 in Europe/London
 
@@ -128,9 +128,9 @@ we warn the user that the accurancy of the conversion depends on whether we infe
 >
 > _Beware that if this inference is not correct and the sender meant a different date, the conversion may not be accurate._
 
-Note that we check if there is a time shift "near" the inferred date in both the "source" time zone and in each receiver's time zones.
-If there if a time shift in the source time zone, every channel member will see a warning.
-If there is a time shift in a receiver's time zone, only that receiver will see a warning.
+Note that we check if there is a clock change "near" the inferred date in both the "source" time zone and in each receiver's time zone.
+If there is a clock change in the source time zone, every channel member will see a warning.
+If there is a clock change in a receiver's time zone, only that receiver will see a warning.
 
 ## Processing messages from channels and direct messages
 
@@ -150,14 +150,15 @@ interpreted as "why isn't the bot working?".
 Users can also DM the bot. In this case, the bot will return an ephemeral message just as other
 users would see it if the message was posted in an ordinary channel.
 
-AFAIU there is no way to add the bot to an existing DM, so messages in such chats can be only translated
-using Slack entrypoints.
+AFAIU there is no way to add the bot to an existing DM
+(see [this discussion](https://forums.slackcommunity.com/s/question/0D53a00008vsItQCAU)),
+so messages in such chats can be only converted using Slack entrypoints.
 
 ## Using entrypoints
 
 Currently there are two supported entrypoints in the message context menu `⋮`:
 
-* _Translate time refs_: Opens a modal window with all of the message's time references
+* _Convert time references_: Opens a modal window with all of the message's time references
   and the corresponding time converted to the user's time zone.
   The real advantage of this entrypoint is that it can be used for converting:
     * Old messages for which all ephemerals have been erased.
