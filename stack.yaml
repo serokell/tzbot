@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MPL-2.0
 
-resolver: lts-20.5
+resolver: lts-20.26
 
 packages:
 - .
