@@ -119,7 +119,7 @@
           buildInputs = [
             stack2cabal
             deploy-rs.defaultPackage.${system}
-            strace
+            pkgs.strace
           ];
         };
         doctest = hs-pkgs.shellFor {
