@@ -51,3 +51,10 @@ you must be able to justify that.
 
 - [ ] My commits comply with [the policy used in Serokell](https://www.notion.so/serokell/Where-and-how-to-commit-your-work-58f8973a4b3142c8abbd2e6fd5b3a08e).
 - [ ] My code complies with the [style guide](../tree/master/docs/code-style.md).
+
+## ✓ Release Checklist
+
+- [ ] I updated the version number in `package.yaml`.
+- [ ] (After merging) I created a new entry in the [releases](https://github.com/serokell/tzbot/releases) page,
+      with a summary of all user-facing changes.
+    *  I made sure a tag was created using the format `vX.Y`

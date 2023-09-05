@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+name: CI
+
+on:
+  push:
+
+jobs:
+  validate:
+    runs-on: [self-hosted, nix]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: check trailing whitespaces
+        run: nix build -L .#checks.x86_64-linux.trailing-whitespace
+
+      - name: shellcheck
+        run: nix build -L .#checks.x86_64-linux.shellcheck
+        if: success() || failure()
+
+      - name: validate cabal files
+        run: nix develop .#ci -c ./scripts/validate-cabal-files.sh
+        if: success() || failure()
+
+      - name: stylish
+        run: nix build -L .#checks.x86_64-linux.stylish-haskell
+        if: success() || failure()
+
+      - name: lint
+        run: nix build -L .#checks.x86_64-linux.hlint
+        if: success() || failure()
+
+      # not working for unknown reason (OPS-1487)
+      # - name: xrefcheck
+      #   run: nix run github:serokell/xrefcheck
+      #   if: success() || failure()
+
+      - name: REUSE lint
+        run: nix build -L .#checks.x86_64-linux.reuse-lint
+        if: success() || failure()
+
+  build:
+    runs-on: [self-hosted, nix]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: build
+        run: nix build -L .#checks.x86_64-linux.build-all
+
+  test:
+    runs-on: [self-hosted, nix]
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: test
+        run: nix build -L .#checks.x86_64-linux.test
+
+      - name: doctest
+        run: nix develop .#doctest -c runghc doctest/doctests.hs
+        if: success() || failure()
+
+  deploy:
+    runs-on: [self-hosted, nix]
+    needs: [test]
+    if: ${{ github.ref == 'refs/heads/staging' }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: deploy staging
+        run: nix develop .#ci -c deploy .#staging --ssh-user deploy --skip-checks
