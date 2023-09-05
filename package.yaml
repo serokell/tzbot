@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 name:                tzbot
-version:             0.1.0.0
+version:             1.0
 github:              serokell/tzbot
 license:             MPL-2.0
 license-file:        LICENSE
