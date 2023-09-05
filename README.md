@@ -9,14 +9,7 @@
 `tzbot` is a Slack bot that detects messages with references to some point in time
 and converts them to your timezone.
 
-When a user in the Europe/Riga timezone sends a message such as:
-
-> Hey, can we meet tomorrow at 6pm?
-
-Users will receive an
-"ephemeral message" (a message visible only to that user):
-
-![](./docs/imgs/example1.png)
+![A screenshot of the bot converting "tomorrow at 6pm"](./docs/imgs/example1.png)
 
 ## Features
 
