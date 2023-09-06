@@ -154,6 +154,10 @@ neConcatMap func ns = foldr1 (<>) $ fmap func ns
 stripPrefixIfPresent :: Eq a => [a] -> [a] -> [a]
 stripPrefixIfPresent pref x = fromMaybe x $ stripPrefix pref x
 
+-- | The `FromJSON` instance will try to deserialize the json
+-- to a value of type @a@.
+--
+-- If it's not possible, the json document will be stored as-is in a `Left` constructor.
 newtype WithUnknown a = WithUnknown { unUnknown :: Either Value a }
   deriving stock (Show, Eq)
 
