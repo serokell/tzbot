@@ -85,8 +85,10 @@ getTextPiecesFromMessage
   -> m [Text]
 getTextPiecesFromMessage message = do
   let throwAwayTooShort = filter (\x -> T.compareLength x 2 == GT)
-  throwAwayTooShort <$> case unUnknown $ msgBlocks message of
-    Left unknownBlocksValue -> do
+  throwAwayTooShort <$> case unUnknown <$> msgBlocks message of
+    Nothing ->
+      pure $ ignoreCodeBlocksManually $ mText message
+    Just (Left unknownBlocksValue) -> do
       logWarn [int||
         Failed to parse message blocks, \
         trying to ignore code blocks manually
@@ -96,7 +98,7 @@ getTextPiecesFromMessage message = do
         #{encodePrettyToTextBuilder unknownBlocksValue}
         |]
       pure $ ignoreCodeBlocksManually $ mText message
-    Right blocks -> do
+    Just (Right blocks) -> do
       let (pieces, exErrs) = extractPieces blocks
       let (l1Errs, l2Errs) = splitExtractErrors exErrs
       when (not $ null l1Errs) $

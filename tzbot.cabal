@@ -306,6 +306,7 @@ test-suite tzbot-test
       Test.TzBot.MessageBlocksSpec
       Test.TzBot.ParserSpec
       Test.TzBot.RenderSpec
+      Test.TzBot.Slack.API.Parser
       Test.TzBot.TimeReferenceToUtcSpec
       Tree
       Paths_tzbot

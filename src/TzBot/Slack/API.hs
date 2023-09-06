@@ -225,7 +225,7 @@ data Message = Message
   , mThreadId :: Maybe ThreadId
   , mEdited :: Bool
   , mSubType :: Maybe Text
-  , msgBlocks :: WithUnknown [MessageBlock]
+  , msgBlocks :: Maybe (WithUnknown [MessageBlock])
   } deriving stock (Eq, Show, Generic)
 
 instance FromJSON Message where
@@ -241,7 +241,7 @@ parseMessage o = do
   mSubType <- o .:? "subtype"
   mEdited <- fmap (isJust @Text) . runMaybeT $
     MaybeT (o .:? "edited") >>= MaybeT . (.:? "ts")
-  msgBlocks <- o .: "blocks"
+  msgBlocks <- o .:? "blocks"
   pure Message {..}
 
 -- | See: https://api.slack.com/types/user
