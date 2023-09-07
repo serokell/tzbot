@@ -6,7 +6,7 @@ module TzBot.BotMain where
 
 import TzPrelude
 
-import Control.Monad.Managed (managed, runManaged)
+import Control.Monad.Managed (Managed, managed, runManaged)
 import Data.ByteString qualified as BS
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
@@ -59,42 +59,48 @@ dumpConfig = \case
                                 use --force to overwrite|] >> exitFailure)
       writeAction
 
+initBotState :: Options -> Managed BotState
+initBotState opts = do
+  let mbConfigFilePath = oConfigFile opts
+  bsConfig <- liftIO $ readConfig mbConfigFilePath
+
+  let fifteenPercentAmplitudeSettings = defaultTzCacheSettings
+        { tcsExpiryRandomAmplitudeFraction = Just 0.15
+        }
+  bsManager <- liftIO $ newManager tlsManagerSettings
+  bsFeedbackConfig <-
+    managed $ withFeedbackConfig bsConfig
+  bsUserInfoCache <-
+    managed $ withTzCache fifteenPercentAmplitudeSettings bsConfig.cCacheUsersInfo
+  bsConversationMembersCache <-
+    managed $ withTzCache fifteenPercentAmplitudeSettings bsConfig.cCacheConversationMembers
+  let defaultMessageInfoCachingTime = hour 1
+  bsMessageCache <-
+    managed $ withTzCacheDefault defaultMessageInfoCachingTime
+  bsMessageLinkCache <-
+    managed $ withTzCacheDefault defaultMessageInfoCachingTime
+  bsReportEntries <-
+    managed $ withTzCacheDefault bsConfig.cCacheReportDialog
+  (bsLogNamespace, bsLogContext, bsLogEnv) <- managed $ withLogger bsConfig.cLogLevel
+  pure BotState {..}
+
+
+
 run :: Options -> IO ()
 run opts = do
-  let mbConfigFilePath = oConfigFile opts
-  bsConfig <- readConfig mbConfigFilePath
   runManaged $ do
-
-    let fifteenPercentAmplitudeSettings = defaultTzCacheSettings
-          { tcsExpiryRandomAmplitudeFraction = Just 0.15
-          }
-
+    botState <- initBotState opts
     gracefulShutdownContainer <- liftIO $ newIORef $ (pure () :: IO ())
     let extractShutdownFunction :: IO () -> IO ()
         extractShutdownFunction = writeIORef gracefulShutdownContainer
     let sCfg = defaultSlackConfig
-              & setApiToken (unBotToken bsConfig.cBotToken)
-              & setAppToken (unAppLevelToken bsConfig.cAppToken)
+              & setApiToken (unBotToken botState.bsConfig.cBotToken)
+              & setAppToken (unAppLevelToken botState.bsConfig.cAppToken)
               & setOnException handleThreadExceptionSensibly -- auto-handle disconnects
               & setGracefulShutdownHandler extractShutdownFunction
 
-    bsManager <- liftIO $ newManager tlsManagerSettings
-    bsFeedbackConfig <-
-      managed $ withFeedbackConfig bsConfig
-    bsUserInfoCache <-
-      managed $ withTzCache fifteenPercentAmplitudeSettings bsConfig.cCacheUsersInfo
-    bsConversationMembersCache <-
-      managed $ withTzCache fifteenPercentAmplitudeSettings bsConfig.cCacheConversationMembers
-    let defaultMessageInfoCachingTime = hour 1
-    bsMessageCache <-
-      managed $ withTzCacheDefault defaultMessageInfoCachingTime
-    bsMessageLinkCache <-
-      managed $ withTzCacheDefault defaultMessageInfoCachingTime
-    bsReportEntries <-
-      managed $ withTzCacheDefault bsConfig.cCacheReportDialog
     -- auto-acknowledge received messages
-    (bsLogNamespace, bsLogContext, bsLogEnv) <- managed $ withLogger bsConfig.cLogLevel
-    liftIO $ runSocketMode sCfg $ handler gracefulShutdownContainer BotState {..}
+    liftIO $ runSocketMode sCfg $ handler gracefulShutdownContainer botState
 
 withFeedbackConfig :: BotConfig -> (FeedbackConfig -> IO a) -> IO a
 withFeedbackConfig config action = do
