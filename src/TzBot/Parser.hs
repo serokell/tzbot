@@ -265,11 +265,15 @@ runTzParser parser = parseMaybe parser . tokenize
 >>> parseTimeRefs "7.30-8.30"
 []
 
+Time references are de-duplicated.
+>>> parseTimeRefs "10am and 10am"
+[TimeReference {trText = "10am", trTimeOfDay = 10:00:00, trDateRef = Nothing, trLocationRef = Nothing}]
+
 -}
 parseTimeRefs :: Text -> [TimeReference]
 parseTimeRefs =
-  -- TODO use better error handling
-  fromMaybe []
+  L.nub
+    . fromMaybe []
     . parseMaybe timeRefsParser
     -- time reference can be either at the beginning or after a space
     . (Whitespace :)
