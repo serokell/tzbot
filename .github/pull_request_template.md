@@ -8,6 +8,8 @@ another describing your solution.
 
 ## Related issue(s)
 
+Fixed #
+
 <!--
 Short description of how the PR relates to the issue, including an issue link.
 For example:
@@ -20,7 +22,6 @@ If this PR does not fully resolve the linked issue and is not meant to close it,
 replace `Fixed #` with `Fixed part of #`.
 -->
 
-Fixed #
 
 ## :white_check_mark: Checklist for your Pull Request
 
