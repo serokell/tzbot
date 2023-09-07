@@ -66,7 +66,7 @@ test_renderSpec = TestGroup "Render"
       mkChatCase arbitraryTime1 "10am" userMoscow userMoscow2
       [ convertWithoutNotes
           "\"10am\", 30 January 2023 in Europe/Moscow"
-          "You are in this timezone"
+          "10:00, Monday, 30 January 2023 in your timezone (Europe/Moscow)"
       ]
     , testCase "Back to author, same timezone" $
       mkChatCase arbitraryTime1 "10am" userMoscow userMoscow
@@ -161,7 +161,7 @@ test_renderSpec = TestGroup "Render"
       mkModalCase arbitraryTime1 "10am" userMoscow userMoscow
       [ convertWithoutNotes
           "\"10am\", 30 January 2023 in Europe/Moscow"
-          "You are in this timezone"
+          "10:00, Monday, 30 January 2023 in your timezone (Europe/Moscow)"
       ]
     ]
 

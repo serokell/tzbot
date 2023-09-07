@@ -168,7 +168,7 @@ renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess user = do
             let isNotSender = ((/=) `on` uId) sender user
                 shouldShowThisConversion = isNotSender || forModal
             guard shouldShowThisConversion
-            Just "You are in this timezone"
+            Just renderedUserTime
       totalClockChanges = checkForClockChanges timeRef timeRefSucess userTzLabel
       mbClockChangeWarning = do
         guard $ not $ null totalClockChanges
