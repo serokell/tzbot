@@ -16,7 +16,7 @@ import Data.Aeson (KeyValue((.=)), ToJSON(..), object)
 import Katip
 import Text.Interpolation.Nyan (int, rmode's)
 
-import TzBot.Slack.API (MessageId(..))
+import TzBot.Slack.API (ChannelId(..), MessageId(..))
 
 logSugar_ :: (KatipContext m, HasCallStack) => Severity -> Text -> m ()
 logSugar_ sev = logLocM sev . logStr
@@ -50,7 +50,10 @@ withLogger logLevel action = do
 katipAddNamespaceText :: (KatipContext m) => Text -> m a -> m a
 katipAddNamespaceText txt = katipAddNamespace $ Namespace [txt]
 
--- contexts
+----------------------------------------------------------------------------
+-- Contexts
+----------------------------------------------------------------------------
+
 type EventType = Text
 type EventId = Text
 data EventContext = EventContext EventType EventId
@@ -67,11 +70,16 @@ instance ToObject EventContext
 instance LogItem EventContext where
   payloadKeys _verb _a = AllKeys
 
---
-newtype MessageContext = MessageContext MessageId
+-- | A message is uniquely identified by the Channel ID
+-- and the message timestamp (i.e. `MessageId`).
+data MessageContext = MessageContext ChannelId MessageId
 
 instance ToJSON MessageContext where
-  toJSON (MessageContext msgId) = object ["message_id" .= msgId]
+  toJSON (MessageContext channelId msgId) =
+    object
+      [ "channel_id" .= channelId
+      , "message_id" .= msgId
+      ]
 
 instance ToObject MessageContext
 
