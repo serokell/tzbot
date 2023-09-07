@@ -254,19 +254,19 @@ convertWithoutNotes :: Text -> Text -> ConversionPair
 convertWithoutNotes q w = ConversionPair q w Nothing Nothing
 
 mkModalCase :: HasCallStack => UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
-mkModalCase = mkTestCase asForModalM
+mkModalCase = mkTestCase IsModal
 
 mkChatCase :: HasCallStack => UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
-mkChatCase = mkTestCase asForMessageM
+mkChatCase = mkTestCase IsEphemeral
 
 convertWithCommonNote :: Text -> Text -> Text -> ConversionPair
 convertWithCommonNote q w e = ConversionPair q w (Just e) (Just e)
 
-mkTestCase :: HasCallStack => ModalFlag -> UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
-mkTestCase modalFlag eventTimestamp refText sender otherUser expectedOtherUserConversions = do
+mkTestCase :: HasCallStack => ModalOrEphemeral -> UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
+mkTestCase modalOrEphemeral eventTimestamp refText sender otherUser expectedOtherUserConversions = do
   let [timeRef] = parseTimeRefs refText
       ephemeralTemplate =
-        renderTemplate modalFlag eventTimestamp sender $
+        renderTemplate modalOrEphemeral eventTimestamp sender $
           NE.singleton timeRef
 
       otherUserConversions = renderAllConversionPairs otherUser ephemeralTemplate

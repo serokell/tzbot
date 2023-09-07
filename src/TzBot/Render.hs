@@ -26,9 +26,7 @@ module TzBot.Render
   , asForSenderS
   , asForOthersS
 
-  , ModalFlag
-  , asForModalM
-  , asForMessageM
+  , ModalOrEphemeral(..)
   ) where
 
 import TzPrelude
@@ -133,27 +131,29 @@ renderSlackBlocks forSender =
       withMaybe mbNote [conversionBlock] $ \note -> [conversionBlock, mkNoteBlock note]
 
 -- | Render a template that can be later specialized to different users.
-renderTemplate :: ModalFlag -> UTCTime -> User -> NE.NonEmpty TimeReference -> Template
-renderTemplate modalFlag now sender timeRefs =
-  Template $ NE.map (renderEphemeralMessageConversionPair modalFlag sender)
+renderTemplate :: ModalOrEphemeral -> UTCTime -> User -> NE.NonEmpty TimeReference -> Template
+renderTemplate modalOrEphemeral now sender timeRefs =
+  Template $ NE.map (renderEphemeralMessageConversionPair modalOrEphemeral sender)
     $ attach (timeReferenceToUTC (uTz sender) now) timeRefs
 
--- | This flag defines whether time references are rendered to be shown
--- in a chat or in a modal view.
-newtype ModalFlag = ModalFlag Bool
+-- | This flag defines whether a time reference conversion will be rendered
+-- in an ephemeral message or in a modal view.
+data ModalOrEphemeral = IsModal | IsEphemeral
+  deriving stock (Eq, Show)
 
-asForModalM, asForMessageM :: ModalFlag
-asForModalM = ModalFlag True
-asForMessageM = ModalFlag False
-
+-- | Renders a time reference and the result of a successful conversion.
+--
+-- Returns `Nothing` when we're attempting to render an ephemeral message
+-- for the sender of the original message,
+-- and the time reference is relative to the sender's timezone.
 renderOnSuccess
-  :: ModalFlag
+  :: ModalOrEphemeral
   -> User
   -> TimeReference
   -> TimeRefSuccess
   -> User
   -> Maybe ConversionPair
-renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess user = do
+renderOnSuccess modalOrEphemeral sender timeRef timeRefSucess user = do
   let userTzLabel = uTz user
       renderedUserTime = do
         let q = renderUserTime userTzLabel timeRefSucess.trsUtcResult
@@ -166,7 +166,7 @@ renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess user = do
           then Just renderedUserTime
           else do
             let isNotSender = ((/=) `on` uId) sender user
-                shouldShowThisConversion = isNotSender || forModal
+                shouldShowThisConversion = isNotSender || (modalOrEphemeral == IsModal)
             guard shouldShowThisConversion
             Just renderedUserTime
       totalClockChanges = checkForClockChanges timeRef timeRefSucess userTzLabel
@@ -345,13 +345,13 @@ shownTimezoneOnErrors implicitSenderTimezone tzLabel forSender
 -- and under `Right` we collect valid time references that should be rendered differently
 -- for each user.
 renderEphemeralMessageConversionPair
-  :: ModalFlag
+  :: ModalOrEphemeral
   -> User
   -> (TimeReference, TimeReferenceToUTCResult)
   -> EitherTemplateUnit
-renderEphemeralMessageConversionPair modalFlag sender (timeRef, result) = case result of
+renderEphemeralMessageConversionPair modalOrEphemeral sender (timeRef, result) = case result of
   TRTUSuccess timeRefSuc ->
-    Right $ renderOnSuccess modalFlag sender timeRef timeRefSuc
+    Right $ renderOnSuccess modalOrEphemeral sender timeRef timeRefSuc
   TRTUAmbiguous overlapInfo ->
     Left $ renderOnOverlap sender timeRef overlapInfo
   TRTUInvalid gapInfo ->

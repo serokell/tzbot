@@ -22,7 +22,8 @@ import TzBot.Feedback.Dialog (insertDialogEntry)
 import TzBot.Feedback.Dialog.Types
 import TzBot.Logger
 import TzBot.Parser (parseTimeRefs)
-import TzBot.Render (ConversionPairs, asForModalM, renderAllConversionPairs, renderTemplate)
+import TzBot.Render
+  (ConversionPairs, ModalOrEphemeral(..), renderAllConversionPairs, renderTemplate)
 import TzBot.Slack (BotM, getUserCached, startModal)
 import TzBot.Slack.API
 import TzBot.Slack.API.MessageBlock
@@ -51,7 +52,7 @@ openModalCommon message channelId whoTriggeredId triggerId mkModalFunc = do
       whoTriggered <- getUserCached whoTriggeredId
       pure $
         renderAllConversionPairs whoTriggered $
-          renderTemplate asForModalM msgTimestamp sender neTimeRefs
+          renderTemplate IsModal msgTimestamp sender neTimeRefs
 
   guid <- ReportDialogId <$> liftIO genText
   let metadata = ReportDialogEntry
