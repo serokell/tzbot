@@ -66,7 +66,7 @@ test_renderSpec = TestGroup "Render"
       mkChatCase arbitraryTime1 "10am" userMoscow userMoscow2
       [ convertWithoutNotes
           "\"10am\", 30 January 2023 in Europe/Moscow"
-          "You are in this timezone"
+          "10:00, Monday, 30 January 2023 in your timezone (Europe/Moscow)"
       ]
     , testCase "Back to author, same timezone" $
       mkChatCase arbitraryTime1 "10am" userMoscow userMoscow
@@ -161,7 +161,7 @@ test_renderSpec = TestGroup "Render"
       mkModalCase arbitraryTime1 "10am" userMoscow userMoscow
       [ convertWithoutNotes
           "\"10am\", 30 January 2023 in Europe/Moscow"
-          "You are in this timezone"
+          "10:00, Monday, 30 January 2023 in your timezone (Europe/Moscow)"
       ]
     ]
 
@@ -254,19 +254,19 @@ convertWithoutNotes :: Text -> Text -> ConversionPair
 convertWithoutNotes q w = ConversionPair q w Nothing Nothing
 
 mkModalCase :: HasCallStack => UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
-mkModalCase = mkTestCase asForModalM
+mkModalCase = mkTestCase IsModal
 
 mkChatCase :: HasCallStack => UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
-mkChatCase = mkTestCase asForMessageM
+mkChatCase = mkTestCase IsEphemeral
 
 convertWithCommonNote :: Text -> Text -> Text -> ConversionPair
 convertWithCommonNote q w e = ConversionPair q w (Just e) (Just e)
 
-mkTestCase :: HasCallStack => ModalFlag -> UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
-mkTestCase modalFlag eventTimestamp refText sender otherUser expectedOtherUserConversions = do
+mkTestCase :: HasCallStack => ModalOrEphemeral -> UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
+mkTestCase modalOrEphemeral eventTimestamp refText sender otherUser expectedOtherUserConversions = do
   let [timeRef] = parseTimeRefs refText
       ephemeralTemplate =
-        renderTemplate modalFlag eventTimestamp sender $
+        renderTemplate modalOrEphemeral eventTimestamp sender $
           NE.singleton timeRef
 
       otherUserConversions = renderAllConversionPairs otherUser ephemeralTemplate

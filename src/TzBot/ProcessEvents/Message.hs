@@ -182,7 +182,7 @@ processMessageEvent' evt mEventType sender timeRefs =
 
   handleChannelMessageCommon :: Maybe Text -> NonEmpty TimeReference -> BotM ()
   handleChannelMessageCommon mbPermalink neTimeRefs = do
-    let ephemeralTemplate = renderTemplate asForMessageM now sender neTimeRefs
+    let ephemeralTemplate = renderTemplate IsEphemeral now sender neTimeRefs
 
     let sendActionLocal userInChannelId = do
           userInChannel <- getUserCached userInChannelId
@@ -210,7 +210,7 @@ processMessageEvent' evt mEventType sender timeRefs =
     -- only to them, showing it in the way how other users would see
     -- it if it were sent to the common channel.
       let mbEphemeralMessage = renderAllConversionPairs sender $
-            renderTemplate asForModalM now sender neTimeRefs
+            renderTemplate IsModal now sender neTimeRefs
       whenJust mbEphemeralMessage $ \eph -> do
         logInfo [int||
           Received message from the DM, sending conversion to the author
