@@ -7,6 +7,7 @@ module TzBot.Slack.Modal where
 import TzPrelude
 
 import Data.List (singleton)
+import Text.Interpolation.Nyan
 
 import TzBot.Feedback.Dialog.Types
 import TzBot.Instances ()
@@ -44,12 +45,20 @@ mkReportModal shownMessageText conversionPairsMb metadata =
     , mNotifyOnClose = False
     , mCallbackId = Fixtures.reportModal
     , mPrivateMetadata = unReportDialogId metadata
-    , mBlocks = mkBlocks shownMessageText conversionPairsMb $ BInput reportInput
+    , mBlocks = mkBlocks messageText conversionPairsMb $ BInput reportInput
     }
+  where
+    messageText =
+      [int||
+        *Note*: The contents of this message will be shared with the development team.
+
+
+        #{shownMessageText}
+      |]
 
 reportInput :: Input
 reportInput = Input
-      { iLabel = "Time references processed wrongly/unrecognized?"
+      { iLabel = "Are there any issues with how this message was processed?"
       , iBlockId = Fixtures.reportInputBlockId
       , iElement = PlainTextInput
         { ptiActionId = Fixtures.reportInputElementActionId
