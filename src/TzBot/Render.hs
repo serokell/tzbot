@@ -157,7 +157,7 @@ renderOnSuccess (ModalFlag forModal) sender timeRef timeRefSucess user = do
   let userTzLabel = uTz user
       renderedUserTime = do
         let q = renderUserTime userTzLabel timeRefSucess.trsUtcResult
-        [int||#{q} in #{userTzLabel}|] :: Text
+        [int||#{q} in your timezone (#{userTzLabel})|] :: Text
       mbRefTzLabel = getTzLabelMaybe (uTz sender) timeRef
       mbRenderedUserTime = case mbRefTzLabel of
         Nothing -> Just renderedUserTime

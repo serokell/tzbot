@@ -46,21 +46,21 @@ test_renderSpec = TestGroup "Render"
       mkChatCase arbitraryTime1 "10am" userMoscow userHavana
       [ convertWithoutNotes
           "\"10am\", 30 January 2023 in Europe/Moscow"
-          "02:00, Monday, 30 January 2023 in America/Havana"
+          "02:00, Monday, 30 January 2023 in your timezone (America/Havana)"
       ]
 
     , testCase "Implicit day" $
       mkChatCase arbitraryTime1 "10am in Europe/Helsinki" userMoscow userHavana
       [ convertWithoutNotes
           "\"10am in Europe/Helsinki\", 30 January 2023"
-          "03:00, Monday, 30 January 2023 in America/Havana"
+          "03:00, Monday, 30 January 2023 in your timezone (America/Havana)"
       ]
 
     , testCase "Everything explicit" $
       mkChatCase arbitraryTime1 "10am in Europe/Helsinki 3 Feb" userMoscow userHavana
       [ convertWithoutNotes
           "\"10am in Europe/Helsinki 3 Feb\""
-          "03:00, Friday, 03 February 2023 in America/Havana"
+          "03:00, Friday, 03 February 2023 in your timezone (America/Havana)"
       ]
     , testCase "Same timezone" $
       mkChatCase arbitraryTime1 "10am" userMoscow userMoscow2
@@ -75,25 +75,25 @@ test_renderSpec = TestGroup "Render"
       mkChatCase arbitraryTime1 "10am in Europe/Helsinki" userMoscow userMoscow
       [ convertWithoutNotes
           "\"10am in Europe/Helsinki\", 30 January 2023"
-          "11:00, Monday, 30 January 2023 in Europe/Moscow"
+          "11:00, Monday, 30 January 2023 in your timezone (Europe/Moscow)"
       ]
     , testCase "Implicit timezone & implicit date & explicit weekday" $
       mkChatCase arbitraryTime1 "10am on wednesday" userMoscow userHavana
       [ convertWithoutNotes
           "\"10am on wednesday\", 01 February 2023 in Europe/Moscow"
-          "02:00, Wednesday, 01 February 2023 in America/Havana"
+          "02:00, Wednesday, 01 February 2023 in your timezone (America/Havana)"
       ]
     , testCase "Implicit timezone & implicit date & explicit days from today" $
       mkChatCase arbitraryTime1 "10am in 3 days" userMoscow userHavana
       [ convertWithoutNotes
           "\"10am in 3 days\", 02 February 2023 in Europe/Moscow"
-          "02:00, Thursday, 02 February 2023 in America/Havana"
+          "02:00, Thursday, 02 February 2023 in your timezone (America/Havana)"
       ]
     , testCase "Implicit timezone & explicit day & implicit month" $
       mkChatCase arbitraryTime1 "10am on the 21st" userMoscow userHavana
       [ convertWithoutNotes
           "\"10am on the 21st\", 21 January 2023 in Europe/Moscow"
-          "02:00, Saturday, 21 January 2023 in America/Havana"
+          "02:00, Saturday, 21 January 2023 in your timezone (America/Havana)"
       ]
     , testCase "Unknown timezone abbreviation, no similar known ones" $
       mkChatCase arbitraryTime1 "10am KAMAZ" userMoscow userHavana
@@ -113,7 +113,7 @@ test_renderSpec = TestGroup "Render"
       mkChatCase arbitraryTime1 "10am MSK" userMoscow userHavana
       [ convertWithoutNotes
           "\"10am MSK\", 30 January 2023, Moscow Time (UTC+03:00) "
-          "02:00, Monday, 30 January 2023 in America/Havana"
+          "02:00, Monday, 30 January 2023 in your timezone (America/Havana)"
       ]
     , TestGroup "Overlap"
       [ testCase "Explicit timezone" $
@@ -170,7 +170,7 @@ test_renderSpec = TestGroup "Render"
       mkChatCase nearClockChange "10am" userMoscow userHavana
       [ convertWithCommonNote
           "\"10am\", 11 March 2023 in Europe/Moscow"
-          "02:00, Saturday, 11 March 2023 in America/Havana"
+          "02:00, Saturday, 11 March 2023 in your timezone (America/Havana)"
           [int|s|
             _Warning: We inferred that "10am" refers to 11 March 2023 in Europe/Moscow and converted it to America/Havana, but there is a time change near this date_:
               • _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.
@@ -181,7 +181,7 @@ test_renderSpec = TestGroup "Render"
       mkChatCase nearClockChange "10am on sunday" userMoscow userHavana
       [ convertWithCommonNote
           "\"10am on sunday\", 12 March 2023 in Europe/Moscow"
-          "03:00, Sunday, 12 March 2023 in America/Havana"
+          "03:00, Sunday, 12 March 2023 in your timezone (America/Havana)"
           [int|s|
             _Warning: We inferred that "10am on sunday" refers to 12 March 2023 in Europe/Moscow and converted it to America/Havana, but there is a time change near this date_:
               • _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.
@@ -192,7 +192,7 @@ test_renderSpec = TestGroup "Render"
       mkChatCase nearClockChange "10am on sunday" userHavana userMoscow
       [ convertWithCommonNote
           "\"10am on sunday\", 12 March 2023 in America/Havana"
-          "17:00, Sunday, 12 March 2023 in Europe/Moscow"
+          "17:00, Sunday, 12 March 2023 in your timezone (Europe/Moscow)"
           [int|s|
             _Warning: We inferred that "10am on sunday" refers to 12 March 2023 in America/Havana and converted it to Europe/Moscow, but there is a time change near this date_:
               • _At 00:00, 12 March 2023 in America/Havana, the clocks are turned forward 1 hour(s)_.
@@ -207,7 +207,7 @@ test_renderSpec = TestGroup "Render"
         (User {uId="lisbon", uIsBot=False, uTz=Europe__Lisbon})
       [ convertWithCommonNote
           "\"10am\", 26 March 2023 in Europe/London"
-          "10:00, Sunday, 26 March 2023 in Europe/Lisbon"
+          "10:00, Sunday, 26 March 2023 in your timezone (Europe/Lisbon)"
           [int|s|
             _Warning: We inferred that "10am" refers to 26 March 2023 in Europe/London and converted it to Europe/Lisbon, but there is a time change near this date_:
               • _At 01:00, 26 March 2023 in Europe/London, the clocks are turned forward 1 hour(s)_.
@@ -224,7 +224,7 @@ test_renderSpec = TestGroup "Render"
           (User {uId="lisbon", uIsBot=False, uTz=Europe__Lisbon})
         [ convertWithoutNotes
           "\"10am tomorrow\", 26 March 2023 in Europe/London"
-          "10:00, Sunday, 26 March 2023 in Europe/Lisbon"
+          "10:00, Sunday, 26 March 2023 in your timezone (Europe/Lisbon)"
         ]
       , testCase "No warning: 2 days ahead" $
         mkChatCase
@@ -234,7 +234,7 @@ test_renderSpec = TestGroup "Render"
           (User {uId="lisbon", uIsBot=False, uTz=Europe__Lisbon})
         [ convertWithoutNotes
           "\"10am 2 days ahead\", 26 March 2023 in Europe/London"
-          "10:00, Sunday, 26 March 2023 in Europe/Lisbon"
+          "10:00, Sunday, 26 March 2023 in your timezone (Europe/Lisbon)"
         ]
       , testCase "No warning: fully specified date" $
         mkChatCase
@@ -244,7 +244,7 @@ test_renderSpec = TestGroup "Render"
           (User {uId="lisbon", uIsBot=False, uTz=Europe__Lisbon})
         [ convertWithoutNotes
           "\"10am 26 march\" in Europe/London"
-          "10:00, Sunday, 26 March 2023 in Europe/Lisbon"
+          "10:00, Sunday, 26 March 2023 in your timezone (Europe/Lisbon)"
         ]
       ]
     ]
@@ -253,16 +253,16 @@ test_renderSpec = TestGroup "Render"
 convertWithoutNotes :: Text -> Text -> ConversionPair
 convertWithoutNotes q w = ConversionPair q w Nothing Nothing
 
-mkModalCase :: UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
+mkModalCase :: HasCallStack => UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
 mkModalCase = mkTestCase asForModalM
 
-mkChatCase :: UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
+mkChatCase :: HasCallStack => UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
 mkChatCase = mkTestCase asForMessageM
 
 convertWithCommonNote :: Text -> Text -> Text -> ConversionPair
 convertWithCommonNote q w e = ConversionPair q w (Just e) (Just e)
 
-mkTestCase :: ModalFlag -> UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
+mkTestCase :: HasCallStack => ModalFlag -> UTCTime -> Text -> User -> User -> [ConversionPair] -> Assertion
 mkTestCase modalFlag eventTimestamp refText sender otherUser expectedOtherUserConversions = do
   let [timeRef] = parseTimeRefs refText
       ephemeralTemplate =
