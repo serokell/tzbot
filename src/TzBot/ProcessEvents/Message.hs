@@ -82,7 +82,7 @@ withSenderNotBot evt = do
 processMessageEvent :: MessageEvent -> BotM ()
 processMessageEvent evt =
   katipAddNamespaceText "message" $
-  katipAddContext (MessageContext evt.meChannel evt.meMessage.mMessageId) $
+  katipAddContext (MessageContext evt.meChannel evt.meMessage.mMessageId evt.meMessage.mThreadId) $
   whenJustM (filterMessageTypeWithLog evt) $ \mEventType ->
   whenJustM (withSenderNotBot evt) $ \sender -> do
     timeRefs <- getTimeReferencesFromMessage evt.meMessage
