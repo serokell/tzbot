@@ -76,17 +76,22 @@ getTimeReferencesFromMessage message =
   concatMap parseTimeRefs <$> getTextPiecesFromMessage message
 
 -- | Extract separate text pieces from the Slack message that can contain
--- the whole time reference. The main way is analyzing the message's block
--- structure, but since it's not documented it can not work sometimes,
--- `ignoreCodeBlocksManually` is used a reserve function.
+-- the whole time reference.
+--
+-- This analyses the message's block structure.
+-- The blocks API is not fully documented, so there's a chance our block parser
+-- may fail.
+-- When that happens, we use `ignoreCodeBlocksManually` as a fallback.
 getTextPiecesFromMessage
   :: (KatipContext m)
   => Message
   -> m [Text]
 getTextPiecesFromMessage message = do
   let throwAwayTooShort = filter (\x -> T.compareLength x 2 == GT)
-  throwAwayTooShort <$> case unUnknown $ msgBlocks message of
-    Left unknownBlocksValue -> do
+  throwAwayTooShort <$> case unUnknown <$> msgBlocks message of
+    Nothing ->
+      pure $ ignoreCodeBlocksManually $ mText message
+    Just (Left unknownBlocksValue) -> do
       logWarn [int||
         Failed to parse message blocks, \
         trying to ignore code blocks manually
@@ -96,7 +101,7 @@ getTextPiecesFromMessage message = do
         #{encodePrettyToTextBuilder unknownBlocksValue}
         |]
       pure $ ignoreCodeBlocksManually $ mText message
-    Right blocks -> do
+    Just (Right blocks) -> do
       let (pieces, exErrs) = extractPieces blocks
       let (l1Errs, l2Errs) = splitExtractErrors exErrs
       when (not $ null l1Errs) $
@@ -105,9 +110,11 @@ getTextPiecesFromMessage message = do
         logWarn [int||Unknown level2 block types: #{listF $ map ubeType l2Errs}|]
       pure pieces
 
-{- | Simple function that works in a very naive way, but it's just reserve
- - option when Slack blocks can't be parsed.
- -}
+{- | Analyses a string, naively looks for code blocks wrapped in single or triple backticks
+and ignores them.
+
+All text before/after/between code blocks will be returned.
+-}
 ignoreCodeBlocksManually :: Text -> [Text]
 ignoreCodeBlocksManually txt =
   concatMap (splitByCodeBlocks simpleCodeDelimiter) $

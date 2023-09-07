@@ -152,7 +152,7 @@ lookup
   -> m (Maybe v)
 lookup key cache = liftIO $ Cache.lookup cache.tcCache key
 
--- | Update the value by the key, expiration is not taken into account.
+-- | Update the value by the key (if the key exists in the cache), expiration is not taken into account.
 update
   :: forall k v m. (Hashable k, MonadIO m)
   => k

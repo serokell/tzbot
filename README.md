@@ -36,7 +36,7 @@ and converts them to your timezone.
 
   If a word _looks_ like a timezone abbreviation but is not known by the bot, the user is given
   a hint of what abbreviations the sender probably meant.
-* [ ] Multiple time references with shared context are processed correctly. For example,
+* [x] Multiple time references with shared context are processed correctly. For example,
       "Let's meet between 10 and 11pm tomorrow" contains two references: "10(pm) (tomorrow)" and "11pm tomorrow".
 
 ## Contributing

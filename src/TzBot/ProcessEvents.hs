@@ -28,6 +28,7 @@ import TzBot.ProcessEvents.Interactive qualified as I
 import TzBot.ProcessEvents.Message (processMessageEvent)
 import TzBot.RunMonad (BotM, BotState(..), runBotM)
 import TzBot.Slack.API.Block (ActionId(..))
+import TzBot.Slack.Events
 import TzBot.Slack.Fixtures qualified as Fixtures
 import TzBot.Util (encodeText)
 
@@ -61,25 +62,25 @@ handler shutdownRef bState _cfg e = run $ do
 
     EventValue eventType evtRaw
       | eventType == "message" ->
-        decodeAndProcess eventType envelopeIdentifier processMessageEvent evtRaw
+        decodeAndProcess @MessageEvent eventType envelopeIdentifier processMessageEvent evtRaw
       | eventType == "member_joined_channel" ->
-        decodeAndProcess eventType envelopeIdentifier processMemberJoinedChannel evtRaw
+        decodeAndProcess @MemberJoinedChannelEvent eventType envelopeIdentifier processMemberJoinedChannel evtRaw
       | eventType == "member_left_channel" ->
-        decodeAndProcess eventType envelopeIdentifier processMemberLeftChannel evtRaw
+        decodeAndProcess @MemberLeftChannelEvent eventType envelopeIdentifier processMemberLeftChannel evtRaw
       | otherwise -> logWarn [int||Unrecognized EventValue #{encodeText evtRaw}|]
 
     -- BlockAction events form a subset of Interactive, so check them first
     BlockAction actionId blockActionRaw
       | actionId == unActionId Fixtures.reportButtonActionId ->
-        decodeAndProcess actionId envelopeIdentifier B.processReportButtonToggled blockActionRaw
+        decodeAndProcess @(ViewActionEvent Value) actionId envelopeIdentifier B.processReportButtonToggled blockActionRaw
       | otherwise ->
         logWarn [int||Unrecognized BlockAction #s{e}|]
 
     Interactive interactiveType interactiveRaw
       | interactiveType == "message_action" ->
-        decodeAndProcess interactiveType envelopeIdentifier I.processInteractive interactiveRaw
+        decodeAndProcess @InteractiveMessageEvent interactiveType envelopeIdentifier I.processInteractive interactiveRaw
       | interactiveType == "view_submission" ->
-        decodeAndProcess interactiveType envelopeIdentifier I.processViewSubmission interactiveRaw
+        decodeAndProcess @SubmitViewEvent interactiveType envelopeIdentifier I.processViewSubmission interactiveRaw
       | otherwise ->
         logWarn [int||Unrecognized Interactive event #s{e}|]
     _ -> logWarn [int||Unknown SocketModeEvent #s{e}|]
@@ -100,7 +101,7 @@ handler shutdownRef bState _cfg e = run $ do
       Hello HelloBody {} -> "hello_body"
       Disconnect DisconnectBody {} -> "disconnect_body"
 
-decodeAndProcess :: FromJSON a => Text -> Text -> (a -> BotM b) -> Value -> BotM ()
+decodeAndProcess :: FromJSON a => Text -> Text -> (a -> BotM ()) -> Value -> BotM ()
 decodeAndProcess interactiveType envelopeIdentifier processFunc raw = do
   let eithEvt = parseEither parseJSON raw
   case eithEvt of
