@@ -54,8 +54,7 @@ test_messageBlocksSpec = TestGroup "Message blocks" $
         , "3.1quote block "
         , " 3.2quote block"
         , "4.1plain "
-        , " 4.1strike "
-        , " 4.1bold "
+        , " 4.1strike  4.1bold "
         , "4.2plain "
         , " 4.2strike github  4.2bold "
         , "between the lists\n"
@@ -69,7 +68,7 @@ test_messageBlocksSpec = TestGroup "Message blocks" $
         , "end!"
         ]
       getLevel2Errors (snd res) @?=
-        [ "emoji", "user", "broadcast"
+        [ "user", "broadcast"
         ]
   ]
 

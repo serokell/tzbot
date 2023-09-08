@@ -202,15 +202,24 @@ extractPieces mBlocks = runWriter $ concat <$> mapM goMessageBlock mBlocks
     go :: Maybe Builder -> [Text] -> [WithUnknown BlockElementLevel2] -> Writer [ExtractError] [Text]
     go mbCurPiece prevPieces (e:es) = case unUnknown e of
       Left val -> do
-        let _type = fromMaybe "unknown" (val ^? key "type" . _String)
-        tell [EEUnknownBlockElementLevel2 $ UnknownBlockElementLevel2Error _type val]
-        go Nothing (prependMbCurrentToPrevious mbCurPiece prevPieces) es
+        let blockType = fromMaybe "unknown" (val ^? key "type" . _String)
+        case blockType of
+          "emoji" ->
+            -- skip over emoji blocks
+            go mbCurPiece prevPieces es
+          _ -> do
+            tell [EEUnknownBlockElementLevel2 $ UnknownBlockElementLevel2Error blockType val]
+            -- break the message in two separate `Text` pieces.
+            go Nothing (prependMbCurrentToPrevious mbCurPiece prevPieces) es
       Right (BEL2ElementText elementText) -> do
         let etTextB = fromText elementText.etText
         if (elementText.etStyle >>= styCode) == Just True
-          -- ignore inline code block
-          then go Nothing (prependMbCurrentToPrevious mbCurPiece prevPieces) es
-          else go (Just $ maybe etTextB (<> etTextB) mbCurPiece) prevPieces es
+          then
+            -- ignore inline code block
+            go Nothing (prependMbCurrentToPrevious mbCurPiece prevPieces) es
+          else
+            -- collate this block's text with any adjacent text-like block
+            go (Just $ maybe etTextB (<> etTextB) mbCurPiece) prevPieces es
       Right (BEL2ElementLink elementLink) -> do
         let linkText = fromText elementLink.elText
         go (Just $ maybe linkText (<> linkText) mbCurPiece) prevPieces es
