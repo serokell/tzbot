@@ -118,6 +118,7 @@ type API =
     :> ReqBody '[JSON] UpdateViewReq
     :> Post '[JSON] (SlackResponse $ SlackContents "view" Value)
   :<|>
+  -- See https://api.slack.com/methods/chat.getPermalink
   Auth '[JWT] Text
     :> "chat.getPermalink"
     :> RequiredParam "channel" ChannelId
