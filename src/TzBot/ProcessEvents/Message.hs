@@ -58,6 +58,9 @@ filterMessageTypeWithLog evt = case meMessageDetails evt of
   MDUserLeftChannel -> do
     logInfo [int||Incoming message subtype=channel_leave, ignoring|]
     pure Nothing
+  MDMessageUrlUnfurl -> do
+    logInfo [int||Incoming message with URL preview, ignoring|]
+    pure Nothing
 
 withSenderNotBot :: MessageEvent -> BotM (Maybe User)
 withSenderNotBot evt = do

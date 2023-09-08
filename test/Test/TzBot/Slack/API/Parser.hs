@@ -7,6 +7,7 @@ module Test.TzBot.Slack.API.Parser
   , unit_Parse_message_channel_join_events
   , unit_Parse_message_edited
   , unit_Parse_message_with_broadcast
+  , unit_Parse_message_with_unfurled_url
   ) where
 
 import TzPrelude
@@ -480,5 +481,159 @@ unit_Parse_message_with_broadcast =
             }
         , meTs = read "2023-09-08 16:33:24.0026 UTC"
         , meMessageDetails = MDMessageBroadcast
+        }
+    )
+
+-- | These events happen when a user posts a link with a URL
+-- and Slack displays a URL preview.
+--
+-- https://github.com/serokell/tzbot/issues/108
+unit_Parse_message_with_unfurled_url :: Assertion
+unit_Parse_message_with_unfurled_url = do
+  parseEither @_ @MessageEvent parseJSON [aesonQQ|
+  {
+    "channel": "C02N85E82LV",
+    "channel_type": "channel",
+    "event_ts": "1694188283.002300",
+    "hidden": true,
+    "message": {
+        "attachments": [
+            {
+                "fallback": "GitHub: GitHub: Let’s build from here",
+                "from_url": "http://www.github.com/",
+                "id": 1,
+                "image_bytes": 309453,
+                "image_height": 630,
+                "image_url": "https://github.githubassets.com/images/modules/site/social-cards/campaign-social.png",
+                "image_width": 1200,
+                "original_url": "http://www.github.com",
+                "service_icon": "https://github.com/favicon.ico",
+                "service_name": "GitHub",
+                "text": "GitHub is where over 100 million developers shape the future of software, together. Contribute to the open source community, manage your Git repositories, review code like a pro, track bugs and fea...",
+                "title": "GitHub: Let’s build from here",
+                "title_link": "http://www.github.com/"
+            }
+        ],
+        "blocks": [
+            {
+                "block_id": "yLL",
+                "elements": [
+                    {
+                        "elements": [
+                            {
+                                "text": "Hello with link to ",
+                                "type": "text"
+                            },
+                            {
+                                "text": "github.com",
+                                "type": "link",
+                                "unsafe": true,
+                                "url": "http://www.github.com"
+                            }
+                        ],
+                        "type": "rich_text_section"
+                    }
+                ],
+                "type": "rich_text"
+            }
+        ],
+        "client_msg_id": "679a7537-094f-42c3-b629-6d568feafc9e",
+        "team": "T02NDBHSWSG",
+        "text": "Hello with link to <http://www.github.com|github.com>",
+        "ts": "1694188279.128769",
+        "type": "message",
+        "user": "U02N85E78QM"
+    },
+    "previous_message": {
+        "blocks": [
+            {
+                "block_id": "yLL",
+                "elements": [
+                    {
+                        "elements": [
+                            {
+                                "text": "Hello with link to ",
+                                "type": "text"
+                            },
+                            {
+                                "text": "github.com",
+                                "type": "link",
+                                "unsafe": true,
+                                "url": "http://www.github.com"
+                            }
+                        ],
+                        "type": "rich_text_section"
+                    }
+                ],
+                "type": "rich_text"
+            }
+        ],
+        "client_msg_id": "679a7537-094f-42c3-b629-6d568feafc9e",
+        "team": "T02NDBHSWSG",
+        "text": "Hello with link to <http://www.github.com|github.com>",
+        "ts": "1694188279.128769",
+        "type": "message",
+        "user": "U02N85E78QM"
+    },
+    "subtype": "message_changed",
+    "ts": "1694188283.002300",
+    "type": "message"
+  }
+  |] @?=
+    Right
+    ( MessageEvent
+        { meChannel = ChannelId
+            { unChannelId = "C02N85E82LV" }
+        , meChannelType = Just CTChannel
+        , meMessage = Message
+            { mUser = UserId
+                { unUserId = "U02N85E78QM" }
+            , mText = "Hello with link to <http://www.github.com|github.com>"
+            , mMessageId = MessageId
+                { unMessageId = "1694188279.128769" }
+            , mTs = read "2023-09-08 15:51:19.128769 UTC"
+            , mThreadId = Nothing
+            , mEdited = False
+            , mSubType = Nothing
+            , msgBlocks = Just
+                ( WithUnknown
+                    { unUnknown = Right
+                        [ MessageBlock
+                            { mbElements =
+                                [ BEL1Plain
+                                    ( PlainBlockElementLevel1
+                                        { beType = WithUnknown { unUnknown = Right BETRichTextSection }
+                                        , beElements = Just
+                                            [ WithUnknown
+                                                { unUnknown = Right
+                                                    ( BEL2ElementText
+                                                        ( ElementText
+                                                            { etText = "Hello with link to "
+                                                            , etStyle = Nothing
+                                                            }
+                                                        )
+                                                    )
+                                                }
+                                            , WithUnknown
+                                                { unUnknown = Right
+                                                    ( BEL2ElementLink
+                                                        ( ElementLink
+                                                            { elText = "github.com"
+                                                            , etUrl = "http://www.github.com"
+                                                            }
+                                                        )
+                                                    )
+                                                }
+                                            ]
+                                        }
+                                    )
+                                ]
+                            }
+                        ]
+                    }
+                )
+            }
+        , meTs = read "2023-09-08 15:51:23.0023 UTC"
+        , meMessageDetails = MDMessageUrlUnfurl
         }
     )

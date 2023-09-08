@@ -29,6 +29,7 @@ module TzBot.Slack.API.MessageBlock
   , PlainBlockElementLevel1(..)
   , BlockElementLevel2(..)
   , ElementText(..)
+  , ElementLink(..)
   ) where
 
 import TzPrelude
