@@ -9,13 +9,13 @@ module Test.TzBot.MessageBlocksSpec
 
 import TzPrelude
 
-import Data.Aeson (decode)
+import Data.Aeson (Value, parseJSON)
+import Data.Aeson.QQ.Simple (aesonQQ)
+import Data.Aeson.Types (parseMaybe)
 import Data.Maybe (fromJust)
-import Data.String.Conversions
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCase, (@?=))
 import Test.Tasty.Runners (TestTree(..))
-import Text.Interpolation.Nyan
 
 import TzBot.ProcessEvents.Common (ignoreCodeBlocksManually)
 import TzBot.Slack.API.MessageBlock
@@ -45,7 +45,7 @@ test_ignoreManuallySpec = TestGroup "Test `ignoreCodeBlocksManually`" $
 test_messageBlocksSpec :: TestTree
 test_messageBlocksSpec = TestGroup "Message blocks" $
   [ testCase "Correct extraction of all text pieces ignoring code blocks" $ do
-      let justEverything = fromJust $ decode $ cs justEverythingRaw
+      let justEverything = fromJust $ parseMaybe @_ @[MessageBlock] parseJSON justEverythingRaw
           res = extractPieces justEverything
       fst res @?=
         [ "1plain "
@@ -54,13 +54,13 @@ test_messageBlocksSpec = TestGroup "Message blocks" $
         , "3.1quote block "
         , " 3.2quote block"
         , "4.1plain "
-        , " 4.1strike  4.1bold "
+        , " 4.1strike  4.1bold"
         , "4.2plain "
-        , " 4.2strike github  4.2bold "
+        , " 4.2strike github  4.2bold"
         , "between the lists\n"
         , "5.1plain "
-        , " 5.1strike "
-        , " 5.1bold"
+        , " 5 .1strike "
+        , " 5 .1bold"
         , "5.2something "
         , " 10am "
         , " 10"
@@ -72,23 +72,44 @@ test_messageBlocksSpec = TestGroup "Message blocks" $
         ]
   ]
 
-{- | The original Slack message:
-1plain `code` ~1strike~ `code` *bold* ~_1strikeditalic_~
+{- | The original Slack message (in markdown format):
+
+@
+1plain `code` ~1strike~ `code` *bold* _~1strikeditalic~_
 ```2big code block```
-&gt; 3.1quote block `code` 3.2quote block
-1. 4.1plain `code` ~4.1strike~ :slightly_smiling_face: *4.1bold*
-2. 4.2plain `code` ~4.2strike~ <http://github.com|github>  *4.2bold*
+> 3.1quote block `code` 3.2quote block
+1. 4.1plain `code` ~4.1strike~ *:slightly_smiling_face:* *4.1bold*
+2. 4.2plain `code` ~4.2strike~ [github](http://github.com)  *4.2bold*
 between the lists
-\8226 5.1plain `code` 5~.1strike~ `code` 5*.1bold*
-\8226 5.2something <@U04FQH806E9> 10am <!here> 10
-\8226 am I a human?
+* 5.1plain `code` 5 ~.1strike~ `code` 5 *.1bold*
+* 5.2something @dc 10am @here 10
+* am I a human?
 end!
- -}
-justEverythingRaw :: ByteString
-justEverythingRaw = [int||
+@
+
+To obtain the corresponding block elements:
+
+1. Paste this message into a slack channel
+2. Right-click the message, "Copy link".
+   The link should contain the channel ID and message timestamp,
+   e.g.: https://diogotest.slack.com/archives/C02N85E82LV/p1694174625423609
+3. Retrieve the block elements via the Web API.
+   Use the command below, replacing the Bot Token, channel ID, and message timestamp.
+
+@
+curl 'https://slack.com/api/conversations.history' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <Bot Token>' \
+  -d '{"channel": "C02N85E82LV", "latest": "1694174625.423609", "limit": 1, "inclusive": true}' \
+  | jq '.messages[0].blocks'
+@
+
+-}
+justEverythingRaw :: Value
+justEverythingRaw = [aesonQQ|
 [
     {
-        "block_id": "tH8as",
+        "block_id": "h35BL",
         "elements": [
             {
                 "elements": [
@@ -149,7 +170,7 @@ justEverythingRaw = [int||
                         "type": "text"
                     },
                     {
-                        "text": "\\n",
+                        "text": "\n",
                         "type": "text"
                     }
                 ],
@@ -232,7 +253,7 @@ justEverythingRaw = [int||
                                 "style": {
                                     "bold": true
                                 },
-                                "text": "4.1bold ",
+                                "text": "4.1bold",
                                 "type": "text"
                             }
                         ],
@@ -272,14 +293,14 @@ justEverythingRaw = [int||
                                 "url": "http://github.com"
                             },
                             {
-                                "text": "  ",
+                                "text": " ",
                                 "type": "text"
                             },
                             {
                                 "style": {
                                     "bold": true
                                 },
-                                "text": "4.2bold ",
+                                "text": "4.2bold",
                                 "type": "text"
                             }
                         ],
@@ -293,7 +314,7 @@ justEverythingRaw = [int||
             {
                 "elements": [
                     {
-                        "text": "between the lists\\n",
+                        "text": "between the lists\n",
                         "type": "text"
                     }
                 ],
@@ -316,11 +337,11 @@ justEverythingRaw = [int||
                                 "type": "text"
                             },
                             {
-                                "text": " 5",
+                                "text": " 5 ",
                                 "type": "text"
                             },
                             {
-                               "style": {
+                                "style": {
                                     "strike": true
                                 },
                                 "text": ".1strike",
@@ -338,7 +359,7 @@ justEverythingRaw = [int||
                                 "type": "text"
                             },
                             {
-                                "text": " 5",
+                                "text": " 5 ",
                                 "type": "text"
                             },
                             {
@@ -359,7 +380,7 @@ justEverythingRaw = [int||
                             },
                             {
                                 "type": "user",
-                                "user_id": "U04FQH806E9"
+                                "user_id": "U02N85E78QM"
                             },
                             {
                                 "text": " 10am ",
@@ -403,5 +424,4 @@ justEverythingRaw = [int||
         "type": "rich_text"
     }
 ]
-
 |]

@@ -103,7 +103,6 @@ tests:
     - katip
     - nyan-interpolation
     - servant-client-core
-    - string-conversions
     - tasty
     - tasty-hspec
     - tasty-hunit
