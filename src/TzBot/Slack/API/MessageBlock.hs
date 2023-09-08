@@ -12,7 +12,7 @@
  -}
 module TzBot.Slack.API.MessageBlock
   ( -- * Block datatype
-    MessageBlock
+    MessageBlock(..)
 
     -- * Extract errors (or, more precisely, warnings)
   , ExtractError (..)
@@ -22,6 +22,14 @@ module TzBot.Slack.API.MessageBlock
     -- * Functions
   , extractPieces
   , splitExtractErrors
+
+    -- * Internals
+  , BlockElementLevel1(..)
+  , BlockElementType(..)
+  , PlainBlockElementLevel1(..)
+  , BlockElementLevel2(..)
+  , ElementText(..)
+  , ElementLink(..)
   ) where
 
 import TzPrelude

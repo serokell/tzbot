@@ -34,6 +34,9 @@ data MessageDetails
   = MDMessage
   | MDMessageEdited Message
   | MDMessageBroadcast -- message copied to channel from thread
+  | MDMessageUrlUnfurl
+    -- ^ This event is occurs when a user posts a message with a URL
+    -- and Slack displays a URL preview.
   | MDUserJoinedChannel
   | MDUserLeftChannel
   deriving stock (Eq, Show, Generic)
@@ -52,18 +55,24 @@ instance FromJSON MessageEvent where
       Just "channel_join"     -> (,MDUserJoinedChannel) <$> parseMessage o
       Just "channel_leave"    -> (,MDUserLeftChannel) <$> parseMessage o
       Just "message_changed"  -> do
-        -- Explanation: when someone posts a message to a thread with channel broadcast,
-        -- two events come: message and then message_changed, the latter seemingly
-        -- corresponds to sending this message directly to the channel.
-        -- These messages lack "edited" field, and they are not really edited.
         newMsg <- o .: "message" >>= parseMessage
-        case (mEdited newMsg, mSubType newMsg) of
-          (True, _) -> do
-            prevMsg <- o .: "previous_message" >>= parseMessage
-            pure (newMsg, MDMessageEdited prevMsg)
-          (False, Just "thread_broadcast") ->
-            pure (newMsg, MDMessageBroadcast)
-          _ -> fail "expected edited message"
+
+        messageDetails <-
+          if
+            | newMsg.mEdited -> do
+                prevMsg <- o .: "previous_message" >>= parseMessage
+                pure $ MDMessageEdited prevMsg
+            | not newMsg.mEdited && newMsg.mSubType == Just "thread_broadcast" ->
+                -- Explanation: when someone posts a message to a thread with channel broadcast,
+                -- two events come: message and then message_changed, the latter seemingly
+                -- corresponds to sending this message directly to the channel.
+                -- These messages lack "edited" field, and they are not really edited.
+                pure MDMessageBroadcast
+            | not newMsg.mEdited && subtype == Just "message_changed" ->
+                pure MDMessageUrlUnfurl
+            | otherwise -> fail "expected edited message"
+
+        pure (newMsg, messageDetails)
       Just _unknownSubtype -> parseMessageFromTopObject
     pure MessageEvent {..}
 
