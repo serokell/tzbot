@@ -16,7 +16,7 @@ import Data.Aeson (KeyValue((.=)), ToJSON(..), object)
 import Katip
 import Text.Interpolation.Nyan (int, rmode's)
 
-import TzBot.Slack.API (ChannelId(..), MessageId(..))
+import TzBot.Slack.API (ChannelId(..), MessageId(..), ThreadId(..))
 
 logSugar_ :: (KatipContext m, HasCallStack) => Severity -> Text -> m ()
 logSugar_ sev = logLocM sev . logStr
@@ -72,13 +72,16 @@ instance LogItem EventContext where
 
 -- | A message is uniquely identified by the Channel ID
 -- and the message timestamp (i.e. `MessageId`).
-data MessageContext = MessageContext ChannelId MessageId
+--
+-- When a message is in a thread, we also need to know the thread ID.
+data MessageContext = MessageContext ChannelId MessageId (Maybe ThreadId)
 
 instance ToJSON MessageContext where
-  toJSON (MessageContext channelId msgId) =
+  toJSON (MessageContext channelId msgId threadId) =
     object
       [ "channel_id" .= channelId
       , "message_id" .= msgId
+      , "thread_id" .= threadId
       ]
 
 instance ToObject MessageContext

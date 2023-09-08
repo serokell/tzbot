@@ -29,10 +29,8 @@ import TzPrelude
 import Control.Lens
 import Control.Monad.Trans.Writer.CPS (Writer, runWriter, tell)
 import Data.Aeson
-  (FromJSON(..), Options(..), SumEncoding(..), ToJSON(toJSON), Value, camelTo2, defaultOptions,
-  genericParseJSON, genericToJSON)
+  (FromJSON(..), Options(..), ToJSON(toJSON), Value, camelTo2, genericParseJSON, genericToJSON)
 import Data.Aeson.Lens (_String, key)
-import Data.Char (isLower)
 import Data.String.Conversions (cs)
 import Data.Text.Internal.Builder (Builder, fromText, toLazyText)
 import Deriving.Aeson (CamelToSnake, ConstructorTagModifier, CustomJSON(..), StripPrefix)
@@ -64,12 +62,75 @@ data BlockElementType
 
 data PlainBlockElementLevel1 = PlainBlockElementLevel1
   { beType     :: WithUnknown BlockElementType
-  , beElements :: Maybe [WithUnknown ElementText]
+  , beElements :: Maybe [WithUnknown BlockElementLevel2]
     -- ^ Level 2 elements
   } deriving stock (Eq, Show, Generic)
     deriving (FromJSON) via RecordWrapper PlainBlockElementLevel1
 
-----
+----------------------------------------------------------------------------
+-- Level 2 elements
+----------------------------------------------------------------------------
+
+data BlockElementLevel2
+  = BEL2ElementLink ElementLink
+  | BEL2ElementText ElementText
+  deriving stock (Show, Eq, Generic)
+  deriving (FromJSON, ToJSON) via SumWrapper BlockElementLevel2
+
+-- | A json object will be parsed to a record type @ElementX@
+-- only if it has a field @"type": "x"@.
+blockElementOptions :: Options
+blockElementOptions = defaultTypedOptions
+  { constructorTagModifier = camelTo2 '_' . stripPrefixIfPresent "Element"
+  }
+
+{- | Example:
+@
+{
+    "type": "link",
+    "url": "https://issues.serokell.io/issue/LIGO-205",
+    "text": "Issue"
+}
+@
+-}
+data ElementLink = ElementLink
+  { elText :: Text
+  , etUrl :: Text
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON ElementLink where parseJSON = genericParseJSON blockElementOptions
+instance ToJSON ElementLink where toJSON = genericToJSON blockElementOptions
+
+{- | Examples:
+@
+{
+  "type": "text",
+  "text": "some text",
+  "style": {
+    "bold": true
+  }
+}
+@
+@
+{
+  "type": "text",
+  "text": "x :: Int",
+  "style": {
+    "code": true
+  }
+}
+@
+-}
+data ElementText = ElementText
+  { etText  :: Text
+  , etStyle :: Maybe Style
+  }
+  deriving stock (Eq, Show, Generic)
+
+instance FromJSON ElementText where parseJSON = genericParseJSON blockElementOptions
+instance ToJSON ElementText where toJSON = genericToJSON blockElementOptions
+
 data Style = Style
   { styCode   :: Maybe Bool
   , styStrike :: Maybe Bool
@@ -78,30 +139,10 @@ data Style = Style
   } deriving stock (Eq, Show, Generic)
     deriving (FromJSON, ToJSON) via RecordWrapper Style
 
---
--- | Here it's the only level 2 element because we are not interested
--- in others at the current moment.
-data ElementText = ElementText
-  { etText  :: Text
-  , etStyle :: Maybe Style
-  } deriving stock (Eq, Show, Generic)
+----------------------------------------------------------------------------
+-- Errors
+----------------------------------------------------------------------------
 
-blockElementOptions :: Options
-blockElementOptions = defaultOptions
-  { fieldLabelModifier = camelTo2 '_' . dropWhile isLower
-  , constructorTagModifier = camelTo2 '_' . stripPrefixIfPresent "Element"
-  , tagSingleConstructors = True
-  , sumEncoding = TaggedObject "type" "contents"
-  , omitNothingFields = True
-  }
-
-instance FromJSON ElementText where
-  parseJSON = genericParseJSON blockElementOptions
-
-instance ToJSON ElementText where
-  toJSON = genericToJSON blockElementOptions
-
-----
 data ExtractError
   = EEUnknownBlockElementLevel1Type UnknownBlockElementLevel1Type
   | EEUnknownBlockElementLevel2 UnknownBlockElementLevel2Error
@@ -130,6 +171,14 @@ data UnknownBlockElementLevel2Error = UnknownBlockElementLevel2Error
 --
 -- Also since the message blocks are not documented, it collects unrecognized
 -- values of level1/level2 block elements.
+--
+-- Notes:
+--   * If it finds two adjacent "text"/"link" blocks, it will join their contents into a single string.
+--   * If it finds an inline code block in the middle of a sentence,
+--     it'll ignore the code and break the string in two,
+--     e.g. The message @Some `inline code` here@ will be converted to @["Some", "here"]@
+--   * If it finds an unrecognized level 2 block in the middle of a sentence,
+--     it'll ignore the block and break the string in two.
 extractPieces :: [MessageBlock] -> ([Text], [ExtractError])
 extractPieces mBlocks = runWriter $ concat <$> mapM goMessageBlock mBlocks
   where
@@ -147,21 +196,24 @@ extractPieces mBlocks = runWriter $ concat <$> mapM goMessageBlock mBlocks
         WithUnknown (Right BETRichTextPreformatted) -> pure []
         _ -> maybe (pure []) goBlockElementLevel2 beElements
 
-  goBlockElementLevel2 :: [WithUnknown ElementText] -> Writer [ExtractError] [Text]
+  goBlockElementLevel2 :: [WithUnknown BlockElementLevel2] -> Writer [ExtractError] [Text]
   goBlockElementLevel2 els = reverse <$> go Nothing [] els
     where
-    go :: Maybe Builder -> [Text] -> [WithUnknown ElementText] -> Writer [ExtractError] [Text]
+    go :: Maybe Builder -> [Text] -> [WithUnknown BlockElementLevel2] -> Writer [ExtractError] [Text]
     go mbCurPiece prevPieces (e:es) = case unUnknown e of
       Left val -> do
         let _type = fromMaybe "unknown" (val ^? key "type" . _String)
         tell [EEUnknownBlockElementLevel2 $ UnknownBlockElementLevel2Error _type val]
         go Nothing (prependMbCurrentToPrevious mbCurPiece prevPieces) es
-      Right elementText -> do
+      Right (BEL2ElementText elementText) -> do
         let etTextB = fromText elementText.etText
         if (elementText.etStyle >>= styCode) == Just True
-          -- ignore simple code block
+          -- ignore inline code block
           then go Nothing (prependMbCurrentToPrevious mbCurPiece prevPieces) es
           else go (Just $ maybe etTextB (<> etTextB) mbCurPiece) prevPieces es
+      Right (BEL2ElementLink elementLink) -> do
+        let linkText = fromText elementLink.elText
+        go (Just $ maybe linkText (<> linkText) mbCurPiece) prevPieces es
     go mbCurPiece prevPieces [] =
       pure $ prependMbCurrentToPrevious mbCurPiece prevPieces
 
