@@ -45,7 +45,7 @@ test_ignoreManuallySpec = TestGroup "Test `ignoreCodeBlocksManually`" $
 test_messageBlocksSpec :: TestTree
 test_messageBlocksSpec = TestGroup "Message blocks" $
   [ testCase "Correct extraction of all text pieces ignoring code blocks" $ do
-      let justEverything = fromJust $ parseMaybe @_ @[MessageBlock] parseJSON justEverythingRaw
+      let justEverything = fromJust $ parseMaybe @_ @[MessageBlock] parseJSON messageBlocksJSON
           res = extractPieces justEverything
       fst res @?=
         [ "1plain "
@@ -105,323 +105,323 @@ curl 'https://slack.com/api/conversations.history' \
 @
 
 -}
-justEverythingRaw :: Value
-justEverythingRaw = [aesonQQ|
+messageBlocksJSON :: Value
+messageBlocksJSON = [aesonQQ|
 [
-    {
-        "block_id": "h35BL",
+  {
+    "type": "rich_text",
+    "block_id": "h35BL",
+    "elements": [
+      {
+        "type": "rich_text_section",
         "elements": [
-            {
-                "elements": [
-                    {
-                        "text": "1plain ",
-                        "type": "text"
-                    },
-                    {
-                        "style": {
-                            "code": true
-                        },
-                        "text": "code",
-                        "type": "text"
-                    },
-                    {
-                        "text": " ",
-                        "type": "text"
-                    },
-                    {
-                        "style": {
-                            "strike": true
-                        },
-                        "text": "1strike",
-                        "type": "text"
-                    },
-                    {
-                        "text": " ",
-                        "type": "text"
-                    },
-                    {
-                        "style": {
-                            "code": true
-                        },
-                        "text": "code",
-                        "type": "text"
-                    },
-                    {
-                        "text": " ",
-                        "type": "text"
-                    },
-                    {
-                        "style": {
-                            "bold": true
-                        },
-                        "text": "bold",
-                        "type": "text"
-                    },
-                    {
-                        "text": " ",
-                        "type": "text"
-                    },
-                    {
-                        "style": {
-                            "italic": true,
-                            "strike": true
-                        },
-                        "text": "1strikeditalic",
-                        "type": "text"
-                    },
-                    {
-                        "text": "\n",
-                        "type": "text"
-                    }
-                ],
-                "type": "rich_text_section"
-            },
-            {
-                "border": 0,
-                "elements": [
-                    {
-                        "text": "2big code block",
-                        "type": "text"
-                    }
-                ],
-                "type": "rich_text_preformatted"
-            },
-            {
-                "elements": [
-                    {
-                        "text": "3.1quote block ",
-                        "type": "text"
-                    },
-                    {
-                        "style": {
-                            "code": true
-                        },
-                        "text": "code",
-                        "type": "text"
-                    },
-                    {
-                        "text": " 3.2quote block",
-                        "type": "text"
-                    }
-                ],
-                "type": "rich_text_quote"
-            },
-            {
-                "border": 0,
-                "elements": [
-                    {
-                        "elements": [
-                            {
-                                "text": "4.1plain ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "code": true
-                                },
-                                "text": "code",
-                                "type": "text"
-                            },
-                            {
-                                "text": " ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "strike": true
-                                },
-                                "text": "4.1strike",
-                                "type": "text"
-                            },
-                            {
-                                "text": " ",
-                                "type": "text"
-                            },
-                            {
-                                "name": "slightly_smiling_face",
-                                "style": {
-                                    "bold": true
-                                },
-                                "type": "emoji",
-                                "unicode": "1f642"
-                            },
-                            {
-                                "text": " ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "bold": true
-                                },
-                                "text": "4.1bold",
-                                "type": "text"
-                            }
-                        ],
-                        "type": "rich_text_section"
-                    },
-                    {
-                        "elements": [
-                            {
-                                "text": "4.2plain ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "code": true
-                                },
-                                "text": "code",
-                                "type": "text"
-                            },
-                            {
-                                "text": " ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "strike": true
-                                },
-                                "text": "4.2strike",
-                                "type": "text"
-                            },
-                            {
-                                "text": " ",
-                                "type": "text"
-                            },
-                            {
-                                "text": "github",
-                                "type": "link",
-                                "url": "http://github.com"
-                            },
-                            {
-                                "text": " ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "bold": true
-                                },
-                                "text": "4.2bold",
-                                "type": "text"
-                            }
-                        ],
-                        "type": "rich_text_section"
-                    }
-                ],
-                "indent": 0,
-                "style": "ordered",
-                "type": "rich_text_list"
-            },
-            {
-                "elements": [
-                    {
-                        "text": "between the lists\n",
-                        "type": "text"
-                    }
-                ],
-                "type": "rich_text_section"
-            },
-            {
-                "border": 0,
-                "elements": [
-                    {
-                        "elements": [
-                            {
-                                "text": "5.1plain ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "code": true
-                                },
-                                "text": "code",
-                                "type": "text"
-                            },
-                            {
-                                "text": " 5 ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "strike": true
-                                },
-                                "text": ".1strike",
-                                "type": "text"
-                            },
-                            {
-                                "text": " ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "code": true
-                                },
-                                "text": "code",
-                                "type": "text"
-                            },
-                            {
-                                "text": " 5 ",
-                                "type": "text"
-                            },
-                            {
-                                "style": {
-                                    "bold": true
-                                },
-                                "text": ".1bold",
-                                "type": "text"
-                            }
-                        ],
-                        "type": "rich_text_section"
-                    },
-                    {
-                        "elements": [
-                            {
-                                "text": "5.2something ",
-                                "type": "text"
-                            },
-                            {
-                                "type": "user",
-                                "user_id": "U02N85E78QM"
-                            },
-                            {
-                                "text": " 10am ",
-                                "type": "text"
-                            },
-                            {
-                                "range": "here",
-                                "type": "broadcast"
-                            },
-                            {
-                                "text": " 10",
-                                "type": "text"
-                            }
-                        ],
-                        "type": "rich_text_section"
-                    },
-                    {
-                        "elements": [
-                            {
-                                "text": "am I a human?",
-                                "type": "text"
-                            }
-                        ],
-                        "type": "rich_text_section"
-                    }
-                ],
-                "indent": 0,
-                "style": "bullet",
-                "type": "rich_text_list"
-            },
-            {
-                "elements": [
-                    {
-                        "text": "end!",
-                        "type": "text"
-                    }
-                ],
-                "type": "rich_text_section"
+          {
+            "type": "text",
+            "text": "1plain "
+          },
+          {
+            "type": "text",
+            "text": "code",
+            "style": {
+              "code": true
             }
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "text": "1strike",
+            "style": {
+              "strike": true
+            }
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "text": "code",
+            "style": {
+              "code": true
+            }
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "text": "bold",
+            "style": {
+              "bold": true
+            }
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "text": "1strikeditalic",
+            "style": {
+              "italic": true,
+              "strike": true
+            }
+          },
+          {
+            "type": "text",
+            "text": "\n"
+          }
+        ]
+      },
+      {
+        "type": "rich_text_preformatted",
+        "elements": [
+          {
+            "type": "text",
+            "text": "2big code block"
+          }
         ],
-        "type": "rich_text"
-    }
+        "border": 0
+      },
+      {
+        "type": "rich_text_quote",
+        "elements": [
+          {
+            "type": "text",
+            "text": "3.1quote block "
+          },
+          {
+            "type": "text",
+            "text": "code",
+            "style": {
+              "code": true
+            }
+          },
+          {
+            "type": "text",
+            "text": " 3.2quote block"
+          }
+        ]
+      },
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "4.1plain "
+              },
+              {
+                "type": "text",
+                "text": "code",
+                "style": {
+                  "code": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "text",
+                "text": "4.1strike",
+                "style": {
+                  "strike": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "emoji",
+                "name": "slightly_smiling_face",
+                "unicode": "1f642",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "text",
+                "text": "4.1bold",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "4.2plain "
+              },
+              {
+                "type": "text",
+                "text": "code",
+                "style": {
+                  "code": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "text",
+                "text": "4.2strike",
+                "style": {
+                  "strike": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "link",
+                "url": "http://github.com",
+                "text": "github"
+              },
+              {
+                "type": "text",
+                "text": "  "
+              },
+              {
+                "type": "text",
+                "text": "4.2bold",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          }
+        ],
+        "style": "ordered",
+        "indent": 0,
+        "border": 0
+      },
+      {
+        "type": "rich_text_section",
+        "elements": [
+          {
+            "type": "text",
+            "text": "between the lists\n"
+          }
+        ]
+      },
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "5.1plain "
+              },
+              {
+                "type": "text",
+                "text": "code",
+                "style": {
+                  "code": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 5 "
+              },
+              {
+                "type": "text",
+                "text": ".1strike",
+                "style": {
+                  "strike": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "text",
+                "text": "code",
+                "style": {
+                  "code": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 5 "
+              },
+              {
+                "type": "text",
+                "text": ".1bold",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "5.2something "
+              },
+              {
+                "type": "user",
+                "user_id": "U02N85E78QM"
+              },
+              {
+                "type": "text",
+                "text": " 10am "
+              },
+              {
+                "type": "broadcast",
+                "range": "here"
+              },
+              {
+                "type": "text",
+                "text": " 10"
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "am I a human?"
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0
+      },
+      {
+        "type": "rich_text_section",
+        "elements": [
+          {
+            "type": "text",
+            "text": "end!"
+          }
+        ]
+      }
+    ]
+  }
 ]
 |]
