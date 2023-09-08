@@ -208,7 +208,9 @@ extractPieces mBlocks = runWriter $ concat <$> mapM goMessageBlock mBlocks
             -- skip over emoji blocks
             go mbCurPiece prevPieces es
           _ -> do
-            tell [EEUnknownBlockElementLevel2 $ UnknownBlockElementLevel2Error blockType val]
+            -- return an error if we find a block type we don't recognize.
+            when (blockType `notElem` knownBlockTypes) do
+              tell [EEUnknownBlockElementLevel2 $ UnknownBlockElementLevel2Error blockType val]
             -- break the message in two separate `Text` pieces.
             go Nothing (prependMbCurrentToPrevious mbCurPiece prevPieces) es
       Right (BEL2ElementText elementText) -> do
@@ -229,3 +231,10 @@ extractPieces mBlocks = runWriter $ concat <$> mapM goMessageBlock mBlocks
     prependMbCurrentToPrevious :: Maybe Builder -> [Text] -> [Text]
     prependMbCurrentToPrevious mbCurPiece prevPieces =
       maybe prevPieces ((: prevPieces) . cs . toLazyText) mbCurPiece
+
+    knownBlockTypes :: [Text]
+    knownBlockTypes =
+      [ "user" -- A user tag, e.g. `@gromak`
+      , "usergroup" -- A tag for a user group, e.g. `@ligo-lsp-project
+      , "broadcast" -- A tag like `@here` or `@channel`
+      ]

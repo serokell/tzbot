@@ -67,9 +67,7 @@ test_messageBlocksSpec = TestGroup "Message blocks" $
         , "am I a human?"
         , "end!"
         ]
-      getLevel2Errors (snd res) @?=
-        [ "user", "broadcast"
-        ]
+      getLevel2Errors (snd res) @?= []
   ]
 
 {- | The original Slack message (in markdown format):
