@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 { self, ... }@inputs: { config, pkgs, lib, ... }:
 let
-  inherit (lib) mkEnableOption mkOption types mkIf;
+  inherit (lib) mkEnableOption mkOption types mkIf mkDefault;
 in
 {
   options.services.tzbot = {
@@ -50,10 +50,14 @@ in
         export SLACK_TZ_BOT_TOKEN="${cfg.slackBotToken}"
         ${cfg.package}/bin/tzbot-exe --config ${pkgs.writeText "config.yml" (builtins.toJSON cfg.botConfig)}
       '';
+      startLimitBurst = mkDefault 5;
+      startLimitIntervalSec = mkDefault 300;
       serviceConfig = {
         User = "tzbot";
         Group = "tzbot";
         StateDirectory = "tzbot";
+        Restart = mkDefault "on-failure";
+        RestartSec = mkDefault 10;
       };
     };
     users.users.tzbot = {
