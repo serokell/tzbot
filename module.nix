@@ -50,14 +50,32 @@ in
         export SLACK_TZ_BOT_TOKEN="${cfg.slackBotToken}"
         ${cfg.package}/bin/tzbot-exe --config ${pkgs.writeText "config.yml" (builtins.toJSON cfg.botConfig)}
       '';
+
       startLimitBurst = mkDefault 5;
       startLimitIntervalSec = mkDefault 300;
-      serviceConfig = {
+      serviceConfig = withHardeningProfile hardeningProfiles.backend {
         User = "tzbot";
         Group = "tzbot";
         StateDirectory = "tzbot";
         Restart = mkDefault "on-failure";
         RestartSec = mkDefault 10;
+
+        SystemCallFilter = [
+          "~@clock"
+          "~@debug"
+          "~@module"
+          "~@mount"
+          "~@raw-io"
+          "~@reboot"
+          "~@swap"
+          "~@privileged"
+          "~@resources"
+          "~@cpu-emulation"
+          "~@obsolete"
+
+          # override hardening profile
+          "set_mempolicy"
+        ];
       };
     };
     users.users.tzbot = {
