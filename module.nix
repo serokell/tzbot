@@ -1,9 +1,10 @@
 # SPDX-FileCopyrightText: 2023 Serokell <https://serokell.io>
 #
 # SPDX-License-Identifier: MPL-2.0
-{ self, ... }@inputs: { config, pkgs, lib, ... }:
+{ self, serokell-nix, ... }@inputs: { config, pkgs, lib, ... }:
 let
   inherit (lib) mkEnableOption mkOption types mkIf mkDefault;
+  inherit (serokell-nix.lib.systemd) hardeningProfiles withHardeningProfile;
 in
 {
   options.services.tzbot = {
