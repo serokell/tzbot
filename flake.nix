@@ -39,7 +39,7 @@
         };
       };
     };
-  } // (flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
+  } // (flake-utils.lib.eachSystem [ "x86_64-linux" "x86_64-darwin" ] (system:
     let
       haskellPkgs = haskell-nix.legacyPackages."${system}";
       pkgs = import nixpkgs {
@@ -92,8 +92,17 @@
       # all components for the current haskell package
       all-components = get-package-components hs-pkg.components;
 
-      stack2cabal = haskellPkgs.haskell.lib.overrideCabal haskellPkgs.haskellPackages.stack2cabal
-        (drv: { jailbreak = true; broken = false; });
+      stack2cabal = (haskellPkgs.haskell.lib.overrideCabal haskellPkgs.haskellPackages.stack2cabal
+        (drv: { jailbreak = true; broken = false; })).overrideAttrs (oldAttrs: {
+          version = "724dc9f";
+          # Pin the revision that works with newer GHCs
+          src = pkgs.fetchFromGitHub {
+            owner = "hasufell";
+            repo = "stack2cabal";
+            rev = "724dc9f478dac1208a607b9e4d2bc37b7a38e126";
+            sha256 = "sha256-HvtsyfuqwI21Dj1qOqxaLo0LA4MeEaNtxzeprKg+VGc=";
+          };
+        });
 
     in {
       # nixpkgs revision pinned by this flake
