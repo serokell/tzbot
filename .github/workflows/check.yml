@@ -34,10 +34,9 @@ jobs:
         run: nix build -L .#checks.x86_64-linux.hlint
         if: success() || failure()
 
-      # not working for unknown reason (OPS-1487)
-      # - name: xrefcheck
-      #   run: nix run github:serokell/xrefcheck
-      #   if: success() || failure()
+      - name: xrefcheck
+        run: nix run github:serokell/xrefcheck
+        if: success() || failure()
 
       - name: REUSE lint
         run: nix build -L .#checks.x86_64-linux.reuse-lint
